@@ -43,12 +43,14 @@ Relay_channel = [17]
 sleep_for = 300
 sleep_on_recycle = 600 - sleep_for
 log_stride = 12
+log_file = ""
 
 # ----------------------------------------------------------------------------------------
 # See https://www.sunfounder.com/modules/input-module/relay/2-channel-dc-5v-relay-module-with-optocoupler-low-level-trigger-expansion-board-for-arduino-uno-r3-mega-2560-1280-dsp-arm-pic-avr-stm32-raspberry-pi.html
 # a and http://wiki.sunfounder.cc/index.php?title=2_Channel_5V_Relay_Module
 # ----------------------------------------------------------------------------------------
 def setup():
+	global log_file
 	GPIO.setwarnings(False)
 	#  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 	#  systemd logs this on restart...
@@ -74,6 +76,9 @@ def setup():
 	print "|=====================================================|"
 	'''
 
+	log_file = sys.argv[0]
+	log_file = re.sub('\.py', '.log', log_file)
+
 # ----------------------------------------------------------------------------------------
 def power_cycle():
 	##DEBUG## ___print '...Relay channel %d on' % 1
@@ -95,8 +100,9 @@ def destroy():
 
 # ----------------------------------------------------------------------------------------
 def logger(message):
+	global log_file
 	timestamp = datetime.datetime.utcnow().strftime("%Y%m%d %H:%M:%S")
-	FH = open("./webcamwatch.txt", "a")
+	FH = open(log_file, "a")
 	FH.write(timestamp + " " + message + "\n")
 	FH.close
 
