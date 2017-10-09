@@ -29,6 +29,9 @@
 #              clear combining these makes sense because they will drive different
 #              actions.  Although both look at the web server, the actions here
 #              have nothing to do with Cumulus MX.
+# 20171003 RAD Mounted WX components to backing board and changed up the GPIO
+#              usage.  17 and 18 were move to 20 and 21 respectively.  (These
+#              are not dual-purpose pins, and who knows what we'll need later.
 # ========================================================================================
 
 import urllib
@@ -39,7 +42,7 @@ from time import sleep
 import sys
 from os import getpid
 
-Relay_channel = [17]
+webcam_channel = 21
 sleep_for = 300
 sleep_on_recycle = 600 - sleep_for
 log_stride = 12
@@ -60,8 +63,8 @@ def setup():
 	#  Aug 30 13:11:50 raspberrypi_02 webcamwatch.py[14590]: GPIO.setup(18, GPIO.OUT, initial=GPIO.HIGH)
 	#  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 	GPIO.setmode(GPIO.BCM)
-	GPIO.setup(17, GPIO.OUT, initial=GPIO.HIGH)
-	GPIO.setup(18, GPIO.OUT, initial=GPIO.HIGH)
+	GPIO.setup(20, GPIO.OUT, initial=GPIO.HIGH)
+	GPIO.setup(21, GPIO.OUT, initial=GPIO.HIGH)
 	'''
 	print "|=====================================================|"
 	print "|         2-Channel High trigger Relay Sample         |"
@@ -69,7 +72,7 @@ def setup():
 	print "|                                                     |"
 	print "|          Turn 2 channels on off in orders           |"
 	print "|                                                     |"
-	print "|                    17 ===> IN2                      |"
+	print "|                    21 ===> IN2                      |"
 	print "|                    18 ===> IN1                      |"
 	print "|                                                     |"
 	print "|                                           SunFounder|"
@@ -84,18 +87,18 @@ def power_cycle():
 	##DEBUG## ___print '...Relay channel %d on' % 1
 	##DEBUG## ___print '...open leftmost pair of connectors.'
 	logger( '...open leftmost pair of connectors.')
-	GPIO.output(17, GPIO.LOW)
+	GPIO.output(webcam_channel, GPIO.LOW)
 	sleep(5)
 	##DEBUG## ___print '...Relay channel %d off' % 1
 	##DEBUG## ___print '...close leftmost pair of connectors.'
 	logger('...close leftmost pair of connectors.')
-	GPIO.output(17, GPIO.HIGH)
+	GPIO.output(webcam_channel, GPIO.HIGH)
 
 # ----------------------------------------------------------------------------------------
 def destroy():
 	##DEBUG## ___print "\nShutting down..."
 	logger("Shutting down...\n")
-	GPIO.output(17, GPIO.HIGH)
+	GPIO.output(webcam_channel, GPIO.HIGH)
 	GPIO.cleanup()
 
 # ----------------------------------------------------------------------------------------

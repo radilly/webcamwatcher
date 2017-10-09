@@ -47,6 +47,7 @@ import urllib
 import re
 import datetime
 import RPi.GPIO as GPIO
+import time
 from time import sleep
 import sys
 import subprocess
@@ -57,10 +58,10 @@ Relay_channel = [17]
 sleep_for = 300
 sleep_for = 24
 sleep_on_recycle = 600
-log_stride = 12
+log_stride = 18
 
-last_secs = 999999                  # This is a sentinel value for startup.
-proc_load_lim = 4.0
+last_secs = 999999          # This is a sentinel value for startup.
+proc_load_lim = 4.0         # See https://www.booleanworld.com/guide-linux-top-command/
 mem_usage_lim = 85
 
 ### /home/pi/Cumulus_MX/DataStopped.sh
@@ -69,7 +70,41 @@ logger_file = sys.argv[0]
 logger_file = re.sub('\.py', '.log', logger_file)
 
 strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
-exception_tstamp = ""
+saved_exception_tstamp = "9999-99-9999:00:00.999:....."
+
+pcyc_holdoff_time = 0
+
+
+# https://www.python-course.eu/dictionaries.php
+# https://docs.python.org/2/tutorial/datastructures.html#dictionaries
+#
+data = { 'pid' : getpid() }
+
+data_keys = [ "pid", "server_stalled", "ws_data_stopped", "rf_dropped", "realtime_stalled",
+	"proc_load", "camera_down", "effective_used", "mem_pct", "swap_used",
+	"swap_pct", "cpu_temp" ]
+#
+#
+#                          pid
+#                          >>>                    date-time
+#                          server_stalled
+#                          ws_data_stopped
+#                          rf_dropped
+#                          realtime_stalled
+#                          proc_load
+#                          camera_down
+#                          effective_used
+#                          mem_pct
+#                          swap_used
+#                          swap_pct
+#                          >>>                    cpu_t
+#                          cpu_temp
+#                          cpu_temp_f
+#
+#
+#
+
+# exit
 
 # ----------------------------------------------------------------------------------------
 #
@@ -108,7 +143,41 @@ def main():
 		###  ___print "ws_data_stopped = " + str( ws_data_stopped() )
 		############################################################
 
-		### realtime_stalled()
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		#  https://pythonspot.com/en/ftp-client-in-python/
+		#  https://docs.python.org/2/library/ftplib.html
+		#  http://api.highcharts.com/highstock/Highcharts.stockChart
+		#  https://www.highcharts.com/products/highcharts/
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# for key in data :
+		# 	print key, data[key]
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		#		swap_pct 0
+		#		swap_used 500
+		#		cpu_temp 38.089
+		#		mem_pct 34
+		#		rf_dropped 0
+		#		effective_used 323012
+		#		pid 16978
+		#		cpu_temp_f 100.5602
+		#		realtime_stalled -2
+		#		proc_load 0.24
+		#		server_stalled 0
+		#		ws_data_stopped 0
+		#		camera_down 0
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+
+
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# Periodically put a record into the log for reference.
+		#___# if 0 == iii % log_stride:
+			#___# logger(words[0] + " " + words[2])
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
 		iii += 1
 		sleep(sleep_for)
@@ -175,11 +244,13 @@ def destroy():
 # ----------------------------------------------------------------------------------------
 def logger(message):
 	timestamp = datetime.datetime.utcnow().strftime(strftime_GMT)
-	### logger_file = sys.argv[0]
-	### logger_file = re.sub('\.py', '.log', logger_file)
-	FH = open(logger_file, "a")
-	FH.write(timestamp + message + "\n")
-	FH.close
+
+	print timestamp + " " + message
+
+	if 0 > 1 :
+		FH = open(logger_file, "a")
+		FH.write(timestamp + message + "\n")
+		FH.close
 
 # ----------------------------------------------------------------------------------------
 def messager(message):
@@ -213,6 +284,7 @@ def ws_data_stopped():
 	FH.close
 	if data_status > 0 :
 		print "WARNING:  CumulusMX reports data_stopped (<#DataStopped> == 1)."
+	data['ws_data_stopped'] = data_status
 	return data_status
 
 # ----------------------------------------------------------------------------------------
@@ -222,6 +294,7 @@ def ws_data_stopped():
 #
 # ----------------------------------------------------------------------------------------
 def server_stalled():
+	global data
 	response = urllib.urlopen('http://dillys.org/wx/WS_Updates.txt')
 	content = response.read()
 	# .................................................................
@@ -249,10 +322,12 @@ def server_stalled():
 		unique_count = 99
 	##_DEBUG_## ___print "wx/WS_Updates.txt = " + str( unique_count )
 	if unique_count < 3 :
+		data['server_stalled'] = 1
 		return 1
 		print "WARNING:  unique_count =" + str(unique_count) + "; expected 12." + \
 			"  realtime.txt data was not updated recently (last 45 mins)."
 	else:
+		data['server_stalled'] = 0
 		return 0
 
 
@@ -293,6 +368,7 @@ def realtime_stalled():
 		words = re.split(':', timestamp)
 		seconds = int(words[2]) + 60 * ( int(words[1]) + ( 60 * int(words[0]) ) )
 		diff_secs = seconds - last_secs
+
 	#  ---------------------------------------------------------------------
 	#  date-time, server_stalled, ws_data_stopped, rf_dropped, realtime_stalled, proc_load, 
 	#  2017/09/17 22:11:35 GMT,  0,  0,  0,  24,  0.0,  101092,  10%,  0,  0%,
@@ -315,17 +391,23 @@ def realtime_stalled():
 		stat_text = "ok"
 		status = 0
 		diff_secs = -2
-
 	elif diff_secs > 200 :
 		stat_text = "NOT UPDATED"
 		status = 1
 		print "WARNING: " + str(diff_secs) + " elapsed since realtime.txt was updated."
+	elif diff_secs < -2000 :
+		stat_text = "NOT UPDATED"
+		status = -1
+		print "DEBUG: Got large negative value from record:\n\t" + content
+#		for item in content :
+#			print "    " + item
 	else:
 		stat_text = "ok"
 		status = 0
 
 	#########################  ___print "  {}    {}    {}   {}".format(timestamp,seconds,diff_secs,status)
 	last_secs = seconds
+	data['realtime_stalled'] = diff_secs
 	return diff_secs       # For now we track this number. Later should return status.
 
 
@@ -352,6 +434,7 @@ def proc_load():
 	if cur_proc_load > proc_load_lim :
 		print "WARNING: 1 minute load average = " + str(cur_proc_load) + \
 			";  proc_load_lim = " + str(proc_load_lim)
+	data['proc_load'] = cur_proc_load
 	return cur_proc_load
 
 
@@ -400,6 +483,11 @@ def mem_usage():
 	free = re.sub(' $', '', free)                     # Trim any trailing blank
 	words = re.split(' +', free)
 
+	# free|945512|908692|36820|3732|244416|226828|437448|508064|102396|3064|99332
+
+	if (len(words)) < 11 :
+		print "WARNING:  Expecting 11 tokens from \"free\", but got " + str(mem_pct) 
+
 	### for iii in range(0, len(words)):
 	### 	___print str(iii) + "  " + words[iii]
 
@@ -416,11 +504,15 @@ def mem_usage():
 
 	swap_total = int(words[8])
 	swap_used = int(words[9])
+	data['swap_used'] = swap_used
 	swap_free = int(words[10])
 
 	swap_pct = 100 * swap_used / swap_total
+	data['swap_pct'] = swap_pct
 	effective_used = mem_total - bu_ca_free
+	data['effective_used'] = effective_used 
 	mem_pct = 100 * effective_used / mem_total
+	data['mem_pct'] = mem_pct
 	# This was misleading...
 	# mem_pct = 100 * mem_used / mem_total
 	if mem_pct > mem_usage_lim :
@@ -429,7 +521,9 @@ def mem_usage():
 	free = re.sub(' ', '|', free)                     # Replace each blank with a |
 
 	cpu_temp = read_cpu_temp()
+	data['cpu_temp'] = cpu_temp
 	cpu_temp_f = ( cpu_temp * 1.8 ) + 32
+	data['cpu_temp_f'] = cpu_temp_f
 
 	return "  {},  {}%,  {},  {}%,  {:4.1f},  {:6.3f},   {:5.1f},".format(effective_used, mem_pct, swap_used, swap_pct, \
 		cpu_temp, cpu_temp, cpu_temp_f ) + \
@@ -453,6 +547,7 @@ def mem_usage():
 #
 # ----------------------------------------------------------------------------------------
 def rf_dropped() :
+	global saved_exception_tstamp
 	return_value = 0
 	file_list = listdir("/mnt/root/home/pi/Cumulus_MX/MXdiags/")
 	file_list.sort()
@@ -501,13 +596,18 @@ def rf_dropped() :
 		# 2017/09/23 02:24:27 GMT,  0,  0,  0,  24,   0.06,  0,  150808,  15%,  0,  0%,  49.4,  49.388,
 		# free|945512|764580|180932|6828|445328|168444|150808|794704|102396|0|102396
 		# ------------------------------------------------------------------------
+		#      WARNING:  exception_tstamp = 2017-10-0210:57:00.626:.....
 
 		if "Exception" in lineList[iii] :
 			exception_tstamp = re.sub('[^-\.:0-9]*', '', lineList[iii] )
-			print "WARNING:  exception_tstamp = " + exception_tstamp 
-			print "WARNING:  Cumulus MX Exception thrown\n"
-			for jjj in range(iii-1, -1, 1) :
-				print str(jjj-iii+1) + "\t" + lineList[jjj]
+			if saved_exception_tstamp == exception_tstamp :
+				print "WARNING:  Cumulus MX Exception thrown (see above)"
+			else:
+				print "WARNING:  exception_tstamp = " + exception_tstamp 
+				print "WARNING:  Cumulus MX Exception thrown\n"
+				for jjj in range(iii-1, -1, 1) :
+					print str(jjj-iii+1) + "\t" + lineList[jjj]
+				saved_exception_tstamp = exception_tstamp 
 		if "Sensor contact lost; ignoring outdoor data" in lineList[iii] :
 			print "WARNING:  Sensor contact lost; ignoring outdoor data.  " + \
 				"Press \"V\" button on WS console"
@@ -531,17 +631,27 @@ def rf_dropped() :
 	#  2017/09/20 12:51:11 GMT,  0,  0,  0,  24,  0.07,  0,  122696,  12%,  0,  0%,
 	#  free|945512|664296|281216|6764|392868|148732|122696|822816|102396|0|102396
 	# --------------------------------------------------------------------------------
+	data['rf_dropped'] = return_value
 	return return_value
+
 
 
 # ----------------------------------------------------------------------------------------
 #  Check web cam status.
+#
+#  After power-cycling the web cam, it could take up to 5 minutes for the next
+#  image update.  But more importantly, the dillys.org webserver cron job only
+#  runs every 5 minutes... but empirically, up to 10 minutes - accounting for
+#  each 5 minutes....?
+#
+#
+#
 # ----------------------------------------------------------------------------------------
 def camera_down():
+	global pcyc_holdoff_time
 
 	#___# # <<<<<<<<<<<<<<<<<<<< COMMENTED OUT THE RELAY STUFF
 
-	iii = 0
 	try:
 		response = urllib.urlopen('http://dillys.org/wx/N_Since_Updated.txt')
 		content = response.read()
@@ -559,24 +669,57 @@ def camera_down():
 	words = re.split(' +', content)
 	##DEBUG## ___print words[0], words[2]
 
-	# Periodically put a record into the log for reference.
-	#___# if 0 == iii % log_stride:
-		#___# logger(words[0] + " " + words[2])
-	iii += 1
+	# --------------------------------------------------------------------------------
+	#										##
+	#										##
+	#     Traceback (most recent call last):					##
+	#       File "/mnt/root/home/pi/watchdog.py", line 672, in <module>		##
+	#         write_pid_file()							##
+	#       File "/mnt/root/home/pi/watchdog.py", line 125, in main			##
+	#         rf_dropped(), realtime_stalled(), proc_load(), camera_down() ) + \	##
+	#       File "/mnt/root/home/pi/watchdog.py", line 643, in camera_down		##
+	#     										##
+	#     ValueError: invalid literal for int() with base 10: ''			##
+	#										##
+	#										##
+	# --------------------------------------------------------------------------------
 
 	##### interval = int(result.group(1))
 	interval = int(words[0])
 	if interval > 3000:
 		#___# power_cycle()
-		logger(words[0] + " " + words[2] + " power cycled")
+
+		# ------------------------------------------------------------------------
+		#
+		#   2017/10/04 13:05:12 GMT 3166 13:05:02_UTC power cycled
+		#   2017/10/04 13:05:12 GMT,  0,  0,  0,  24,   0.00,  1,  93332,  9%,  0,  0%,  43.5,  43.470,   110.2,
+		#   free|945512|296608|648904|6768|77532|125744|93332|852180|102396|0|102396
+		#
+		#   2017/10/04 13:15:25 GMT 3465 13:10:01_UTC power cycled
+		#   2017/10/04 13:15:25 GMT,  0,  0,  0,  24,   0.17,  1,  92956,  9%,  0,  0%,  42.9,  42.932,   109.3,
+		#   free|945512|296760|648752|6768|78044|125760|92956|852556|102396|0|102396
+		# ------------------------------------------------------------------------
+
+		if pcyc_holdoff_time > 0 :
+			if int(time.strftime("%s")) > pcyc_holdoff_time :
+				# holdoff has expired
+				logger(words[0] + " " + words[2] + " waiting on webcam image update.")
+		else:
+			pcyc_holdoff_time = int(time.strftime("%s")) + 600
+			logger(words[0] + " " + words[2] + " power cycled")
+
+
 		# Give the cam time to reset, and the webserver crontab to fire.
 		# The camera comes up pretty quickly, but it seems to resynch to
 		# the 5-minute interval, and the server crontab only fires every
 		# 5 minutes (unsyncronized as a practical matter).  So 10 min max.
 
 		#___# sleep(sleep_on_recycle)
+		data['camera_down'] = 1
 		return 1
 	else:
+		pcyc_holdoff_time = 0
+		data['camera_down'] = 0
 		return 0
 
 
