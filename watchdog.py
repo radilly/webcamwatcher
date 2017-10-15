@@ -61,6 +61,7 @@ sleep_on_recycle = 600
 log_stride = 18
 
 last_secs = 999999          # This is a sentinel value for startup.
+last_date = ""
 proc_load_lim = 4.0         # See https://www.booleanworld.com/guide-linux-top-command/
 mem_usage_lim = 85
 
@@ -82,7 +83,7 @@ data = { 'pid' : getpid() }
 
 data_keys = [ "pid", "server_stalled", "ws_data_stopped", "rf_dropped", "realtime_stalled",
 	"proc_load", "camera_down", "effective_used", "mem_pct", "swap_used",
-	"swap_pct", "cpu_temp" ]
+	"swap_pct", "cpu_temp", "cpu_temp_f"]
 #
 #
 #                          pid
@@ -148,11 +149,20 @@ def main():
 		#  https://docs.python.org/2/library/ftplib.html
 		#  http://api.highcharts.com/highstock/Highcharts.stockChart
 		#  https://www.highcharts.com/products/highcharts/
+		#  https://www.highcharts.com/products/highcharts/
+		#  https://www.highcharts.com/docs/working-with-data/data-module
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		# for key in data :
-		# 	print key, data[key]
+		if 999 == iii % 3 :
+			print "<TABLE>"
+			for iii in range(0, len(data)):
+				print "<TR><TD> {} </TD><TD> {} </TD></TR>".format( data_keys[iii], data[ data_keys[iii] ] )
+			print "</TABLE>"
+	#		for key in data :
+	#			print key, data[key]
+
+
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -295,8 +305,39 @@ def ws_data_stopped():
 # ----------------------------------------------------------------------------------------
 def server_stalled():
 	global data
-	response = urllib.urlopen('http://dillys.org/wx/WS_Updates.txt')
-	content = response.read()
+	# --------------------------------------------------------------------------------
+	#   2017/10/11 13:01:56 GMT,  0,  0,  0,  24,   0.01,  0,  89248,  9%,  0,  0%,  46.2,  46.160,   115.1,
+	#   free|945512|271656|673856|6796|55352|127056|89248|856264|102396|0|102396
+	#   Traceback (most recent call last):
+	#     File "/mnt/root/home/pi/watchdog.py", line 759, in <module>
+	#       main()
+	#     File "/mnt/root/home/pi/watchdog.py", line 130, in main
+	#       rf_dropped(), realtime_stalled(), proc_load(), camera_down() ) + \
+	#     File "/mnt/root/home/pi/watchdog.py", line 306, in server_stalled
+	#       response = urllib.urlopen('http://dillys.org/wx/WS_Updates.txt')
+	#     File "/usr/lib/python2.7/urllib.py", line 87, in urlopen
+	#       return opener.open(url)
+	#     File "/usr/lib/python2.7/urllib.py", line 213, in open
+	#       return getattr(self, name)(url)
+	#     File "/usr/lib/python2.7/urllib.py", line 350, in open_http
+	#       h.endheaders(data)
+	#     File "/usr/lib/python2.7/httplib.py", line 1035, in endheaders
+	#       self._send_output(message_body)
+	#     File "/usr/lib/python2.7/httplib.py", line 879, in _send_output
+	#       self.send(msg)
+	#     File "/usr/lib/python2.7/httplib.py", line 841, in send
+	#       self.connect()
+	#     File "/usr/lib/python2.7/httplib.py", line 822, in connect
+	#       self.timeout, self.source_address)
+	#     File "/usr/lib/python2.7/socket.py", line 553, in create_connection
+	#       for res in getaddrinfo(host, port, 0, SOCK_STREAM):
+	#   IOError: [Errno socket error] [Errno -2] Name or service not known
+	# --------------------------------------------------------------------------------
+	try:
+		response = urllib.urlopen('http://dillys.org/wx/WS_Updates.txt')
+		content = response.read()
+	except:
+		content = "12"      # Assume a good answer...
 	# .................................................................
 	# Strip off the trailing newline which is helpf when catting on the other
 	# side. This should have a value be 1 and 10 - when 10 is realy expected.
@@ -340,6 +381,11 @@ def server_stalled():
 # ----------------------------------------------------------------------------------------
 def realtime_stalled():
 	global last_secs
+	global last_date
+	#  ---------------------------------------------------------------------
+	#  09/10/17 12:02:47 73.0 92 70.6 3.1 4.5 270 ...
+	#  09/10/17 12:03:11 73.0 92 70.6 3.1 4.5 270 ...
+	#  ---------------------------------------------------------------------
 	response = urllib.urlopen('http://dillys.org/wx/realtime.txt')
 	content = response.read()
 	words = re.split(' +', content)
@@ -359,10 +405,12 @@ def realtime_stalled():
 	#       *** File may not have been completely written
 	#  ---------------------------------------------------------------------
 	if (len(words)) < 2 :
+		date_str = "0000/00/00"
 		timestamp = "00:00:00"
 		seconds = last_secs
 		diff_secs = -1
 	else:
+		date_str = words[0]
 		timestamp = words[1]
 		########## ___print timestamp
 		words = re.split(':', timestamp)
@@ -401,12 +449,18 @@ def realtime_stalled():
 		print "DEBUG: Got large negative value from record:\n\t" + content
 #		for item in content :
 #			print "    " + item
+		if last_date != date_str :
+			print "DEBUG: Likely the day rolled over as save date does not match..."
+			if seconds < 300 :
+				print "DEBUG:    ... and seconds = ${seconds}"
 	else:
 		stat_text = "ok"
 		status = 0
 
+
 	#########################  ___print "  {}    {}    {}   {}".format(timestamp,seconds,diff_secs,status)
 	last_secs = seconds
+	last_date = date_str
 	data['realtime_stalled'] = diff_secs
 	return diff_secs       # For now we track this number. Later should return status.
 
@@ -432,8 +486,9 @@ def proc_load():
 	# ___print cur_proc_load
 	# ___print cur_proc_load
 	if cur_proc_load > proc_load_lim :
-		print "WARNING: 1 minute load average = " + str(cur_proc_load) + \
-			";  proc_load_lim = " + str(proc_load_lim)
+		print "WARNING: \t" + \
+			"proc_load_lim = " + str(proc_load_lim) + \
+			"\t\t 1 minute load average = " + str(cur_proc_load)
 	data['proc_load'] = cur_proc_load
 	return cur_proc_load
 
@@ -607,7 +662,7 @@ def rf_dropped() :
 				print "WARNING:  Cumulus MX Exception thrown\n"
 				for jjj in range(iii-1, -1, 1) :
 					print str(jjj-iii+1) + "\t" + lineList[jjj]
-				saved_exception_tstamp = exception_tstamp 
+			saved_exception_tstamp = exception_tstamp 
 		if "Sensor contact lost; ignoring outdoor data" in lineList[iii] :
 			print "WARNING:  Sensor contact lost; ignoring outdoor data.  " + \
 				"Press \"V\" button on WS console"
