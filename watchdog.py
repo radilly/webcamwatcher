@@ -1,6 +1,14 @@
 #!/usr/bin/python
 #
-# Stop with ...  sudo kill -9 `cat watchdog.PID`
+# Restart using...
+#   kill -9 `cat watchdog.PID` ; nohup /usr/bin/python -u /mnt/root/home/pi/watchdog.py >> /mnt/root/home/pi/watchdog.log 2>&1 &
+#
+# Stop with ... 
+#   kill -9 `cat watchdog.PID`
+#
+# Start with ...
+#   nohup /usr/bin/python -u /mnt/root/home/pi/watchdog.py >> /mnt/root/home/pi/watchdog.log 2>&1 &
+#
 #
 # This is a first hack to see if I can prove the concept of, basically a
 # watchdog running on a Pi that will detect when images stopped uploading
@@ -21,6 +29,9 @@
 # reducing the output.
 #
 # ========================================================================================
+# 20171012 RAD Started writing status.html, which CMX copies up to the web-server.
+#              It's pretty simple yet, but now I can at least check the current
+#              status remoted via web-browser.
 # 20170920 RAD Noticed rf_dropped() was returning "None" in some cases.
 #              Cumulus MX is catching an exception tied to Weather Underground.
 #              See http://sandaysoft.com/forum/viewtopic.php?f=27&t=16510
@@ -66,7 +77,10 @@ proc_load_lim = 4.0         # See https://www.booleanworld.com/guide-linux-top-c
 mem_usage_lim = 85
 
 ### /home/pi/Cumulus_MX/DataStopped.sh
-data_stop_file = "/home/pi/Cumulus_MX/web/DataStoppedT.txttmp"
+# data_stop_file = "/home/pi/Cumulus_MX/web/DataStoppedT.txttmp"
+data_stop_file = "/mnt/root/home/pi/Cumulus_MX/web/DataStoppedT.txttmp"
+status_page = "/mnt/root/home/pi/Cumulus_MX/web/status.html"
+
 logger_file = sys.argv[0]
 logger_file = re.sub('\.py', '.log', logger_file)
 
@@ -82,8 +96,13 @@ pcyc_holdoff_time = 0
 data = { 'pid' : getpid() }
 
 data_keys = [ "pid", "server_stalled", "ws_data_stopped", "rf_dropped", "realtime_stalled",
-	"proc_load", "camera_down", "effective_used", "mem_pct", "swap_used",
-	"swap_pct", "cpu_temp", "cpu_temp_f"]
+	"proc_load", "proc_load_5m", "camera_down", "effective_used", "mem_pct", "swap_used",
+	"swap_pct", "cpu_temp_c", "cpu_temp_f"]
+
+data_format = [ "{}", "{}", "{}", "{}", "{}",
+	"{:7.2f}", "{:7.2f}", "{}", "{}", "{}&percnt;", "{}",
+	"{}&percnt;", "{:6.1f}&deg; C", "{:6.1f}&deg; F" ]
+
 #
 #
 #                          pid
@@ -123,10 +142,10 @@ def main():
 			print "date-time, server_stalled, ws_data_stopped, rf_dropped, " + \
 				"realtime_stalled, proc_load, camera_down, " + \
 				"effective_used, mem_pct, swap_used, swap_pct, " + \
-				"cpu_t, cpu_temp, cpu_temp_f "
+				"cpu_temp_c, cpu_temp_f "
 
 		print datetime.datetime.utcnow().strftime(strftime_GMT) + \
-			",  {},  {},  {},  {},  {:5.2f},  {},".format( server_stalled(), ws_data_stopped(), \
+			", {}, {}, {}, {:3d}, {:7.2f}, {},".format( server_stalled(), ws_data_stopped(), \
 			rf_dropped(), realtime_stalled(), proc_load(), camera_down() ) + \
 			 mem_usage()
 		############################################################
@@ -154,11 +173,14 @@ def main():
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		if 999 == iii % 3 :
-			print "<TABLE>"
-			for iii in range(0, len(data)):
-				print "<TR><TD> {} </TD><TD> {} </TD></TR>".format( data_keys[iii], data[ data_keys[iii] ] )
-			print "</TABLE>"
+		# if 999 == iii % 5 :
+		if 0 == iii % 3 :
+			summarize()
+#			print "<TABLE>"
+#			for iii in range(0, len(data)):
+#				print "<TR><TD> {} </TD><TD> {} </TD></TR>".format( data_keys[iii], data[ data_keys[iii] ] )
+#			print "</TABLE>"
+
 	#		for key in data :
 	#			print key, data[key]
 
@@ -191,6 +213,69 @@ def main():
 
 		iii += 1
 		sleep(sleep_for)
+
+
+# ----------------------------------------------------------------------------------------
+def mono_threads():
+	load = subprocess.check_output(["/usr/bin/top", "-H", "-w", "125", "-n", "1", "-b", "-o", "+RES"])
+	lines = re.split('\n', load)
+	jjj = 0
+	for iii in range(0, len(lines)):
+		if re.search('mono$', lines[iii]) :
+			jjj += 1
+	return jjj
+
+
+
+# ----------------------------------------------------------------------------------------
+def summarize():
+	timestamp = datetime.datetime.utcnow().strftime(strftime_GMT)
+
+	FH = open(status_page , "w")
+
+	FH.write( "<HEAD><TITLE>\n" )
+	FH.write( "Raspberry Pi / Cumulus MX Health\n" )
+	FH.write( "</TITLE></HEAD><BODY BGCOLOR=\"#555555\" TEXT=\"#FFFFFF\" LINK=\"#FFFF00\" VLINK=\"#FFBB00\" ALINK=\"#FFAAFF\"><H1>\n" )
+	FH.write( "Raspberry Pi / Cumulus MX Health\n" )
+	FH.write( "</H1>\n\n" )
+	FH.write( "<P> &nbsp;\n\n" )
+	
+	FH.write( "<TABLE>\n" )
+	for iii in range(0, len(data)):
+		format_str = "<TR><TD> {} </TD><TD ALIGN=right> " + data_format[iii]  + " </TD></TR>\n"
+		FH.write( format_str.format( data_keys[iii], data[ data_keys[iii] ] ) )
+	FH.write( "</TABLE>\n" )
+
+	FH.write( "<P> &nbsp;\n" )
+	FH.write( "<center><table style=\"width:100%;border-collapse: collapse; border-spacing: 0;\" >\n" )
+  	FH.write( "  <tr>\n" )
+    	FH.write( "    <td align=center colspan=\"4\" class=\"td_navigation_bar\">:<a href=\"index.htm\">now</a>::<a href=\"gauges.htm\">gauges</a>::<a href=\"today.htm\">today</a>::<a href=\"yesterday.htm\">yesterday</a>::<a href=\"thismonth.htm\">this&nbsp;month</a>::<a href=\"thisyear.htm\">this&nbsp;year</a>:\n" )
+	FH.write( "      <br>:<a href=\"record.htm\">records</a>::<a href=\"monthlyrecord.htm\">monthly&nbsp;records</a>::<a href=\"trends.htm\">trends</a>::<a href=\"http://sandaysoft.com/forum/\">forum</a>::<a href=\"http://dillys.org/WX/NW_View.html\">webcam</a>:::<a href=\"status.html\">pi status</a></td>\n" )
+  	FH.write( "  </tr>\n" )
+	FH.write( " </table></center>\n" )
+
+	FH.write( "<P> &nbsp;\n" )
+	FH.write( "<P ALIGN=CENTER> Updated: " + timestamp + "\n" )
+
+	FH.close
+
+#	print "<HEAD><TITLE>"
+#	print "Raspberry Pi / Cumulus MX Health"
+#	print "</TITLE></HEAD><BODY BGCOLOR="#555555" TEXT="#FFFFFF" LINK="#FFFF00" VLINK="#FFBB00" ALINK="#FFAAFF"><H1>"
+#	print "Raspberry Pi / Cumulus MX Health"
+#	print "</H1>"
+#	print "<P> &nbsp;"
+	
+#	print "<TABLE>"
+#	for iii in range(0, len(data)):
+#		print "<TR><TD> {} </TD><TD> {} </TD></TR>".format( data_keys[iii], data[ data_keys[iii] ] )
+#	print "</TABLE>"
+
+#	print "<P> &nbsp;"
+#	print "<P> &nbsp;"
+#	print "<P ALIGN=CENTER> Updated timestamp"
+
+
 
 # ----------------------------------------------------------------------------------------
 #
@@ -293,7 +378,7 @@ def ws_data_stopped():
 	data_status = int( FH.readline() )
 	FH.close
 	if data_status > 0 :
-		print "WARNING:  CumulusMX reports data_stopped (<#DataStopped> == 1)."
+		messager( "WARNING:  CumulusMX reports data_stopped (<#DataStopped> == 1)." )
 	data['ws_data_stopped'] = data_status
 	return data_status
 
@@ -344,7 +429,7 @@ def server_stalled():
 	# .................................................................
 	content = content.rstrip()
 	if len(content) < 1:
-		print "DEBUG: WS_Updates.txt looks short = \"" + content.rstrip() + "\""
+		messager( "DEBUG: WS_Updates.txt looks short = \"" + content.rstrip() + "\"" )
 
 	# ...... REMOVE ...................................................
 	####### result = re.search('(\d*)', content)
@@ -365,8 +450,8 @@ def server_stalled():
 	if unique_count < 3 :
 		data['server_stalled'] = 1
 		return 1
-		print "WARNING:  unique_count =" + str(unique_count) + "; expected 12." + \
-			"  realtime.txt data was not updated recently (last 45 mins)."
+		messager( "WARNING:  unique_count =" + str(unique_count) + "; expected 12." + \
+			"  realtime.txt data was not updated recently (last 45 mins)." )
 	else:
 		data['server_stalled'] = 0
 		return 0
@@ -442,17 +527,17 @@ def realtime_stalled():
 	elif diff_secs > 200 :
 		stat_text = "NOT UPDATED"
 		status = 1
-		print "WARNING: " + str(diff_secs) + " elapsed since realtime.txt was updated."
+		messager( "WARNING: " + str(diff_secs) + " elapsed since realtime.txt was updated." )
 	elif diff_secs < -2000 :
 		stat_text = "NOT UPDATED"
 		status = -1
-		print "DEBUG: Got large negative value from record:\n\t" + content
+		messager( "DEBUG: Got large negative value from record:\n\t" + content )
 #		for item in content :
-#			print "    " + item
+#			___print "    " + item
 		if last_date != date_str :
-			print "DEBUG: Likely the day rolled over as save date does not match..."
+			messager( "DEBUG: Likely the day rolled over as save date does not match..." )
 			if seconds < 300 :
-				print "DEBUG:    ... and seconds = ${seconds}"
+				messager( "DEBUG:    ... and seconds = ${seconds}" )
 	else:
 		stat_text = "ok"
 		status = 0
@@ -477,25 +562,28 @@ def realtime_stalled():
 def proc_load():
 	load = subprocess.check_output('/usr/bin/uptime')
 	load = re.sub('.*average: *', '', load)
+	load = load.rstrip()
+	# messager( "DEBUG: uptime data: \"" + load + "\"" )
 	# load = re.sub(',', '', load)
-	# words = re.split(' ', load)
-	# cur_proc_load = float(words[0])
-	cur_proc_load = float(re.sub(', .*', '', load))
-	# ___print cur_proc_load
-	# ___print cur_proc_load
-	# ___print cur_proc_load
-	# ___print cur_proc_load
+	words = re.split(', ', load)
+###	for iii in range(0, len(words)):
+###		print "DEBUG: words[" + str(iii) + "] = \"" +  words[iii] + "\""
+
+	cur_proc_load = float(words[0])
+	proc_load_5m = float(words[1])
+
 	if cur_proc_load > proc_load_lim :
-		print "WARNING: \t" + \
+		messager( "WARNING: \t" + \
 			"proc_load_lim = " + str(proc_load_lim) + \
-			"\t\t 1 minute load average = " + str(cur_proc_load)
+			"\t\t 1 minute load average = " + str(cur_proc_load) )
 	data['proc_load'] = cur_proc_load
+	data['proc_load_5m'] = proc_load_5m
 	return cur_proc_load
 
 
 	if cur_proc_load > proc_load_lim :
-		print "WARNING: 1 minute load average = " + str(cur_proc_load) + \
-			";  proc_load_lim = " + str(proc_load_lim)
+		messager( "WARNING: 1 minute load average = " + str(cur_proc_load) + \
+			";  proc_load_lim = " + str(proc_load_lim) )
 		return 1
 	else:
 		return 0
@@ -541,7 +629,7 @@ def mem_usage():
 	# free|945512|908692|36820|3732|244416|226828|437448|508064|102396|3064|99332
 
 	if (len(words)) < 11 :
-		print "WARNING:  Expecting 11 tokens from \"free\", but got " + str(mem_pct) 
+		messager( "WARNING:  Expecting 11 tokens from \"free\", but got " + str(mem_pct)  )
 
 	### for iii in range(0, len(words)):
 	### 	___print str(iii) + "  " + words[iii]
@@ -571,17 +659,17 @@ def mem_usage():
 	# This was misleading...
 	# mem_pct = 100 * mem_used / mem_total
 	if mem_pct > mem_usage_lim :
-		print "WARNING:  " + str(mem_pct) + "% mem in use"
+		messager( "WARNING:  " + str(mem_pct) + "% mem in use" )
 
 	free = re.sub(' ', '|', free)                     # Replace each blank with a |
 
 	cpu_temp = read_cpu_temp()
-	data['cpu_temp'] = cpu_temp
+	data['cpu_temp_c'] = cpu_temp
 	cpu_temp_f = ( cpu_temp * 1.8 ) + 32
 	data['cpu_temp_f'] = cpu_temp_f
 
-	return "  {},  {}%,  {},  {}%,  {:4.1f},  {:6.3f},   {:5.1f},".format(effective_used, mem_pct, swap_used, swap_pct, \
-		cpu_temp, cpu_temp, cpu_temp_f ) + \
+	return " {:6d}, {:2d}%, {:6d}, {:2d}%, {:4.1f}c, {:5.1f}f,".format(effective_used, mem_pct, swap_used, swap_pct, \
+		cpu_temp, cpu_temp_f ) + \
 		"\nfree|" + free
 #
 #	return "  {},  {}%,  {},  {}%,".format(effective_used, mem_pct, swap_used, swap_pct) + \
@@ -656,16 +744,21 @@ def rf_dropped() :
 		if "Exception" in lineList[iii] :
 			exception_tstamp = re.sub('[^-\.:0-9]*', '', lineList[iii] )
 			if saved_exception_tstamp == exception_tstamp :
-				print "WARNING:  Cumulus MX Exception thrown (see above)"
+				messager( "WARNING:  Cumulus MX Exception thrown (see above)" )
 			else:
-				print "WARNING:  exception_tstamp = " + exception_tstamp 
-				print "WARNING:  Cumulus MX Exception thrown\n"
-				for jjj in range(iii-1, -1, 1) :
-					print str(jjj-iii+1) + "\t" + lineList[jjj]
+				print ""
+				###   messager( "DEBUG:  exception_tstamp = " + exception_tstamp  )
+				messager( "WARNING:  Cumulus MX Exception thrown:    exception_tstamp = " + \
+					exception_tstamp  )
+				for jjj in range(iii-3, 0, 1) :
+					# Number the lines in the file we read
+					print str(len(lineList)+jjj+1) + "\t" + lineList[jjj].rstrip()
+				messager( "WARNING:    from  /mnt/root/home/pi/Cumulus_MX/MXdiags/" + log_file )
+				print ""
 			saved_exception_tstamp = exception_tstamp 
 		if "Sensor contact lost; ignoring outdoor data" in lineList[iii] :
-			print "WARNING:  Sensor contact lost; ignoring outdoor data.  " + \
-				"Press \"V\" button on WS console"
+			messager( "WARNING:  Sensor contact lost; ignoring outdoor data.  " + \
+				"Press \"V\" button on WS console" )
 			return_value = 1
 			break
 		if "WU Response: OK: success" in lineList[iii] :
@@ -719,7 +812,7 @@ def camera_down():
 		# ------------------------------------------------------------------
 	except:
 		content = "0 0 00:00:00_UTC "
-		print "DEBUG: content = \"" + content + "\""
+		messager( "DEBUG: content = \"" + content + "\"" )
 
 	words = re.split(' +', content)
 	##DEBUG## ___print words[0], words[2]
