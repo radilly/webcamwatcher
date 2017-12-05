@@ -53,6 +53,31 @@
 #
 #
 # ========================================================================================
+#
+#
+#  EXTERNALIZING LOCAL SETTINGS:
+#
+#  exec()
+#  https://docs.python.org/2.0/ref/exec.html
+#
+#  Best way to retrieve variable values from a text file - Python - Json
+#  https://stackoverflow.com/questions/924700/best-way-to-retrieve-variable-values-from-a-text-file-python-json
+#
+#  https://en.wikipedia.org/wiki/YAML#Comparison_with_JSON
+#  https://stackoverflow.com/questions/8525765/load-parameters-from-a-file-in-python
+#  https://docs.python.org/2/library/json.html#module-json
+#  https://docs.python.org/2/library/configparser.html
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+# ========================================================================================
 
 import urllib
 import re
@@ -66,25 +91,32 @@ from os import getpid
 from os import listdir
 
 Relay_channel = [17]
-sleep_for = 300
+# sleep_for = 300
 sleep_for = 24
 sleep_on_recycle = 600
-log_stride = 18
+log_stride = 20
+summary_stride = 3
 
 last_secs = 999999          # This is a sentinel value for startup.
 last_date = ""
 proc_load_lim = 4.0         # See https://www.booleanworld.com/guide-linux-top-command/
 mem_usage_lim = 85
+ws_data_last_secs = 0       # Number of epoch secs at outage start
+saved_contact_lost = 0      # Number of epoch secs when RF contact lost
 
 ### /home/pi/Cumulus_MX/DataStopped.sh
 # data_stop_file = "/home/pi/Cumulus_MX/web/DataStoppedT.txttmp"
+BASE_DIR =       "/mnt/root/home/pi/Cumulus_MX"
 data_stop_file = "/mnt/root/home/pi/Cumulus_MX/web/DataStoppedT.txttmp"
-status_page = "/mnt/root/home/pi/Cumulus_MX/web/status.html"
+ambient_temp_file = "/mnt/root/home/pi/Cumulus_MX/web/ambient_tempT.txttmp"
+status_page =    "/mnt/root/home/pi/Cumulus_MX/web/status.html"
+mxdiags_dir =    "/mnt/root/home/pi/Cumulus_MX/MXdiags"
 
 logger_file = sys.argv[0]
 logger_file = re.sub('\.py', '.log', logger_file)
 
-strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
+# strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
+strftime_FMT = "%Y/%m/%d %H:%M:%S"
 saved_exception_tstamp = "9999-99-9999:00:00.999:....."
 
 pcyc_holdoff_time = 0
@@ -95,13 +127,65 @@ pcyc_holdoff_time = 0
 #
 data = { 'pid' : getpid() }
 
-data_keys = [ "pid", "server_stalled", "ws_data_stopped", "rf_dropped", "realtime_stalled",
-	"proc_load", "proc_load_5m", "camera_down", "effective_used", "mem_pct", "swap_used",
-	"swap_pct", "cpu_temp_c", "cpu_temp_f"]
+data_keys = [
+	"pid",
+	"last_restarted",
+	"server_stalled",
+	"ws_data_stopped",
+	"rf_dropped",
+	"realtime_stalled",
+	"proc_load",
+	"proc_load_5m",
+	"camera_down",
+	"mono_threads",
+	"effective_used",
+	"mem_pct",
+	"swap_used",
+	"swap_pct",
+	"cpu_temp_c",
+	"cpu_temp_f" ]
+	# ambient_temp   {}
 
-data_format = [ "{}", "{}", "{}", "{}", "{}",
-	"{:7.2f}", "{:7.2f}", "{}", "{}", "{}&percnt;", "{}",
-	"{}&percnt;", "{:6.1f}&deg; C", "{:6.1f}&deg; F" ]
+data_format = [
+	"{}",
+	"{} ago",
+	"{}",
+	"{}",
+	"{}",
+	"{}",
+	"{:7.2f}",
+	"{:7.2f}",
+	"{}",
+	"{}",
+	"{}",
+	"{}&percnt;",
+	"{}",
+	"{}&percnt;",
+	"{:6.1f}",
+	"{:6.1f}" ]
+
+	#  Went to just the numbers for temps...  was
+	#     "{:6.1f} &deg;C",
+	#     "{:6.1f} &deg;F" ]
+
+thresholds = [
+	-1,
+	-1,
+	1,
+	1,
+	1,
+	300,
+	4.0,
+	4.0,
+	1,
+	20,
+	-1,
+	15,
+	512,
+	1,
+	55,
+	125 ]
+	# ambient_temp   {}
 
 #
 #
@@ -139,14 +223,16 @@ def main():
 	exit
 	while True:
 		if 0 == iii % log_stride:
+			###                 print datetime.datetime.now().strftime(strftime_FMT) + \
 			print "date-time, server_stalled, ws_data_stopped, rf_dropped, " + \
-				"realtime_stalled, proc_load, camera_down, " + \
+				"realtime_stalled, proc_load, camera_down, mono_threads, " + \
 				"effective_used, mem_pct, swap_used, swap_pct, " + \
-				"cpu_temp_c, cpu_temp_f "
+				"cpu_temp_c, cpu_temp_f,"
 
-		print datetime.datetime.utcnow().strftime(strftime_GMT) + \
-			", {}, {}, {}, {:3d}, {:7.2f}, {},".format( server_stalled(), ws_data_stopped(), \
-			rf_dropped(), realtime_stalled(), proc_load(), camera_down() ) + \
+		# NOTE: This could be built from the data[] array....
+		print datetime.datetime.utcnow().strftime(strftime_FMT) + \
+			", {}, {}, {}, {:3d}, {:7.2f}, {}, {:5d},".format( server_stalled(), ws_data_stopped(), \
+			rf_dropped(), realtime_stalled(), proc_load(), camera_down(), mono_threads() ) + \
 			 mem_usage()
 		############################################################
 		### ___print datetime.datetime.utcnow().strftime("%Y/%m/%d %H:%M:%S GMT") + \
@@ -174,7 +260,7 @@ def main():
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# if 999 == iii % 5 :
-		if 0 == iii % 3 :
+		if 0 == iii % summary_stride :
 			summarize()
 #			print "<TABLE>"
 #			for iii in range(0, len(data)):
@@ -223,13 +309,15 @@ def mono_threads():
 	for iii in range(0, len(lines)):
 		if re.search('mono$', lines[iii]) :
 			jjj += 1
+	data['mono_threads'] = jjj
 	return jjj
 
 
 
 # ----------------------------------------------------------------------------------------
 def summarize():
-	timestamp = datetime.datetime.utcnow().strftime(strftime_GMT)
+	timestamp = datetime.datetime.utcnow().strftime(strftime_FMT)
+	last_restarted()
 
 	FH = open(status_page , "w")
 
@@ -238,19 +326,58 @@ def summarize():
 	FH.write( "</TITLE></HEAD><BODY BGCOLOR=\"#555555\" TEXT=\"#FFFFFF\" LINK=\"#FFFF00\" VLINK=\"#FFBB00\" ALINK=\"#FFAAFF\"><H1>\n" )
 	FH.write( "Raspberry Pi / Cumulus MX Health\n" )
 	FH.write( "</H1>\n\n" )
-	FH.write( "<P> &nbsp;\n\n" )
+	# FH.write( "<P> &nbsp;\n\n" )
 	
-	FH.write( "<TABLE>\n" )
-	for iii in range(0, len(data)):
-		format_str = "<TR><TD> {} </TD><TD ALIGN=right> " + data_format[iii]  + " </TD></TR>\n"
-		FH.write( format_str.format( data_keys[iii], data[ data_keys[iii] ] ) )
+	FH.write( "<CENTER>\n")
+	FH.write( "<TABLE CELLPADDING=7><TR><TD VALIGN=\"TOP\">\n\n")
+
+	FH.write( "<TABLE BORDER=1>\n" )
+	FH.write( "<TR><TH> Parameter </TH><TH> Current Value </TH><TH> Threshold </TH</TR>\n" )
+	# NOTE: We may not choose to print everything in data[]
+	for iii in range(0, len(data_keys)):
+		bgcolor = ""
+		if thresholds[iii] > -1 :
+			# print "   data {}  threshold {}".format( data[data_keys[iii]], thresholds[iii] )
+			if data[data_keys[iii]] > thresholds[iii] :
+				bgcolor = " BGCOLOR=\"red\""
+		
+		# format_str = "<TR><TD> {} </TD><TD ALIGN=right> " + data_format[iii]  + " </TD></TR>\n"
+		# FH.write( format_str.format( data_keys[iii], data[ data_keys[iii] ] ) )
+		# thresholds
+		format_str = "<TR><TD{}> {} </TD><TD ALIGN=right{}> " + data_format[iii]  + " </TD><TD ALIGN=right{}> {} </TD></TR>\n"
+		FH.write( format_str.format( bgcolor, data_keys[iii], bgcolor, data[data_keys[iii]], bgcolor, thresholds[iii] ) )
+
+	# format_str = "<TR><TD> Ambient Temp </TD><TD ALIGN=right> {} </TD></TR>\n"
+	# thresholds
+	format_str = "<TR><TD> Ambient Temp &deg;F </TD><TD ALIGN=right> {} </TD><TD ALIGN=right> -1 </TD></TR>\n"
+	## >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> FH.write( format_str.format( ambient_temp() ) )
+	ambient_temp()
+	FH.write( format_str.format( data['ambient_temp'] ) )
+
+
+	FH.write( "<TR><TD COLSPAN=3 ALIGN=center><FONT SIZE=-1>\n" )
+	FH.write( datetime.datetime.utcnow().strftime(strftime_FMT) + " GMT" )
+	FH.write( "<BR> " + datetime.datetime.now().strftime(strftime_FMT) + " Local" )
+	FH.write( "</FONT></TD></TR>\n" )
+
 	FH.write( "</TABLE>\n" )
+
+	# This is how often the page updates locally, but only to the web server every 5 minutes.
+	# FH.write( "<P ALIGN=center><FONT SIZE=-3> Updated every {} secs </FONT>".format( sleep_for * summary_stride ) )
+
+	FH.write( "</TD><TD>\n")
+	FH.write( "<IMG SRC=\"Dilly_WX_Indoor.jpg\">\n")
+	FH.write( "</TD></TR></TABLE>\n")
+	FH.write( "</CENTER>\n\n")
 
 	FH.write( "<P> &nbsp;\n" )
 	FH.write( "<center><table style=\"width:100%;border-collapse: collapse; border-spacing: 0;\" >\n" )
   	FH.write( "  <tr>\n" )
-    	FH.write( "    <td align=center colspan=\"4\" class=\"td_navigation_bar\">:<a href=\"index.htm\">now</a>::<a href=\"gauges.htm\">gauges</a>::<a href=\"today.htm\">today</a>::<a href=\"yesterday.htm\">yesterday</a>::<a href=\"thismonth.htm\">this&nbsp;month</a>::<a href=\"thisyear.htm\">this&nbsp;year</a>:\n" )
-	FH.write( "      <br>:<a href=\"record.htm\">records</a>::<a href=\"monthlyrecord.htm\">monthly&nbsp;records</a>::<a href=\"trends.htm\">trends</a>::<a href=\"http://sandaysoft.com/forum/\">forum</a>::<a href=\"http://dillys.org/WX/NW_View.html\">webcam</a>:::<a href=\"status.html\">pi status</a></td>\n" )
+
+	FH.write( "    <td align=\"center\" class=\"td_navigation_bar\">:<a href=\"index.htm\">now</a>::<a href=\"gauges.htm\">gauges</a>::<a href=\"today.htm\">today</a>::<a href=\"yesterday.htm\">yesterday</a>::<a href=\"thismonth.htm\">this&nbsp;month</a>::<a href=\"thisyear.htm\">this&nbsp;year</a>:\n" )
+	FH.write( "    <br>:<a href=\"record.htm\">records</a>::<a href=\"monthlyrecord.htm\">monthly&nbsp;records</a>::<a href=\"trends.htm\">trends</a>::<a href=\"http://sandaysoft.com/forum/\">forum</a>::<a href=\"http://dillys.org/WX/NW_View.html\">webcam</a>:\n" )
+	FH.write( "    <br>:<a href=\"status.html\">Pi status</a>::<a href=\"https://www.wunderground.com/personal-weather-station/dashboard?ID=KPAMCMUR4\">KPAMCMUR4</a>:</td>\n" )
+
   	FH.write( "  </tr>\n" )
 	FH.write( " </table></center>\n" )
 
@@ -258,6 +385,12 @@ def summarize():
 	FH.write( "<P ALIGN=CENTER> Updated: " + timestamp + "\n" )
 
 	FH.close
+
+
+
+
+
+
 
 #	print "<HEAD><TITLE>"
 #	print "Raspberry Pi / Cumulus MX Health"
@@ -338,7 +471,7 @@ def destroy():
 
 # ----------------------------------------------------------------------------------------
 def logger(message):
-	timestamp = datetime.datetime.utcnow().strftime(strftime_GMT)
+	timestamp = datetime.datetime.utcnow().strftime(strftime_FMT)
 
 	print timestamp + " " + message
 
@@ -349,7 +482,7 @@ def logger(message):
 
 # ----------------------------------------------------------------------------------------
 def messager(message):
-	timestamp = datetime.datetime.utcnow().strftime(strftime_GMT)
+	timestamp = datetime.datetime.utcnow().strftime(strftime_FMT)
 	print timestamp + " " + message
 
 # ----------------------------------------------------------------------------------------
@@ -378,45 +511,33 @@ def ws_data_stopped():
 	data_status = int( FH.readline() )
 	FH.close
 	if data_status > 0 :
-		messager( "WARNING:  CumulusMX reports data_stopped (<#DataStopped> == 1)." )
+		if ws_data_last_secs < 1 :
+			ws_data_last_secs = int( datetime.datetime.utcnow().strftime("%s") )
+			# Long message the first time we see this...
+			messager( "WARNING:  CumulusMX reports data_stopped (<#DataStopped> == 1)." )
+		else:
+			elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  ws_data_last_secs 
+			# Short message while this status continues
+			messager( "WARNING:  data_stopped ... " + str(elapsed) + " sec" )
+	else:
+		ws_data_last_secs = 0
 	data['ws_data_stopped'] = data_status
 	return data_status
 
 # ----------------------------------------------------------------------------------------
-# Code on the server records checksum of the past 10 values of
+# Code on the server records checksum of the past 12 values of realtime.txt (after
+# stripping off the timestamp). WS_Updates.txt is a count of the unique checksums
+# in this mini log, across the past 12 updates to realtime.txt (12 minutes).
+#
+# Returms:
 #   1 ==> data has stopped
 #   0 ==> OK
-#
 # ----------------------------------------------------------------------------------------
 def server_stalled():
 	global data
 	# --------------------------------------------------------------------------------
 	#   2017/10/11 13:01:56 GMT,  0,  0,  0,  24,   0.01,  0,  89248,  9%,  0,  0%,  46.2,  46.160,   115.1,
 	#   free|945512|271656|673856|6796|55352|127056|89248|856264|102396|0|102396
-	#   Traceback (most recent call last):
-	#     File "/mnt/root/home/pi/watchdog.py", line 759, in <module>
-	#       main()
-	#     File "/mnt/root/home/pi/watchdog.py", line 130, in main
-	#       rf_dropped(), realtime_stalled(), proc_load(), camera_down() ) + \
-	#     File "/mnt/root/home/pi/watchdog.py", line 306, in server_stalled
-	#       response = urllib.urlopen('http://dillys.org/wx/WS_Updates.txt')
-	#     File "/usr/lib/python2.7/urllib.py", line 87, in urlopen
-	#       return opener.open(url)
-	#     File "/usr/lib/python2.7/urllib.py", line 213, in open
-	#       return getattr(self, name)(url)
-	#     File "/usr/lib/python2.7/urllib.py", line 350, in open_http
-	#       h.endheaders(data)
-	#     File "/usr/lib/python2.7/httplib.py", line 1035, in endheaders
-	#       self._send_output(message_body)
-	#     File "/usr/lib/python2.7/httplib.py", line 879, in _send_output
-	#       self.send(msg)
-	#     File "/usr/lib/python2.7/httplib.py", line 841, in send
-	#       self.connect()
-	#     File "/usr/lib/python2.7/httplib.py", line 822, in connect
-	#       self.timeout, self.source_address)
-	#     File "/usr/lib/python2.7/socket.py", line 553, in create_connection
-	#       for res in getaddrinfo(host, port, 0, SOCK_STREAM):
-	#   IOError: [Errno socket error] [Errno -2] Name or service not known
 	# --------------------------------------------------------------------------------
 	try:
 		response = urllib.urlopen('http://dillys.org/wx/WS_Updates.txt')
@@ -465,14 +586,31 @@ def server_stalled():
 #
 # ----------------------------------------------------------------------------------------
 def realtime_stalled():
+	global data
 	global last_secs
 	global last_date
 	#  ---------------------------------------------------------------------
 	#  09/10/17 12:02:47 73.0 92 70.6 3.1 4.5 270 ...
 	#  09/10/17 12:03:11 73.0 92 70.6 3.1 4.5 270 ...
 	#  ---------------------------------------------------------------------
-	response = urllib.urlopen('http://dillys.org/wx/realtime.txt')
-	content = response.read()
+	try :
+		response = urllib.urlopen('http://dillys.org/wx/realtime.txt')
+		content = response.read()
+	except:
+		print "Unexpected ERROR:", sys.exc_info()[0]
+		# --------------------------------------------------------------
+		#  https://docs.python.org/2/tutorial/errors.html
+		#  https://docs.python.org/2/library/sys.html
+		#  https://docs.python.org/3/library/traceback.html
+		#  https://docs.python.org/2/library/traceback.html
+		#  
+		#
+		#
+		#  https://stackoverflow.com/questions/8238360/how-to-save-traceback-sys-exc-info-values-in-a-variable
+		# --------------------------------------------------------------
+		content = "00/00/00 00:00:00 45.5 80 39.7 0.0 0.7 360 0.00 0.05 30.14 N 0 mph ..."
+		messager( "DEBUG: content = \"" + content + "\"" )
+
 	words = re.split(' +', content)
 
 	#  ---------------------------------------------------------------------
@@ -490,12 +628,13 @@ def realtime_stalled():
 	#       *** File may not have been completely written
 	#  ---------------------------------------------------------------------
 	if (len(words)) < 2 :
-		date_str = "0000/00/00"
+		date_str = "00/00/00"
 		timestamp = "00:00:00"
 		seconds = last_secs
 		diff_secs = -1
 	else:
 		date_str = words[0]
+		ddd = re.split('/', date_str)
 		timestamp = words[1]
 		########## ___print timestamp
 		words = re.split(':', timestamp)
@@ -504,15 +643,11 @@ def realtime_stalled():
 
 	#  ---------------------------------------------------------------------
 	#  date-time, server_stalled, ws_data_stopped, rf_dropped, realtime_stalled, proc_load, 
-	#  2017/09/17 22:11:35 GMT,  0,  0,  0,  24,  0.0,  101092,  10%,  0,  0%,
-	#  free|945512|560028|385484|6768|317364|141572|101092|844420|102396|0|102396
 	#  2017/09/17 22:11:59 GMT,  0,  0,  0,  -65471,  0.0,  101244,  10%,  0,  0%,
 	#  free|945512|560184|385328|6768|317368|141572|101244|844268|102396|0|102396
 	#  WARNING: 65543 elapsed since realtime.txt was updated.
 	#  2017/09/17 22:12:24 GMT,  0,  0,  0,  65543,  0.0,  101148,  10%,  0,  0%,
 	#  free|945512|560088|385424|6768|317368|141572|101148|844364|102396|0|102396
-	#  2017/09/17 22:12:48 GMT,  0,  0,  0,  24,  0.0,  101180,  10%,  0,  0%,
-	#  free|945512|560136|385376|6768|317380|141576|101180|844332|102396|0|102396
 	#  
     	#  Because above, when we get an incomplete file, lacking a timestamp
     	#  we set the time to "00:00:00" and we get a weird number for
@@ -535,9 +670,15 @@ def realtime_stalled():
 #		for item in content :
 #			___print "    " + item
 		if last_date != date_str :
+			#  -----------------------------------------------------
+			#  Timestamp in realtime.txt is in "local" time.
+			#  -----------------------------------------------------
 			messager( "DEBUG: Likely the day rolled over as save date does not match..." )
 			if seconds < 300 :
-				messager( "DEBUG:    ... and seconds = ${seconds}" )
+				messager( "DEBUG:    ... and seconds = " + str(seconds) )
+			if diff_secs == -86376 :
+				messager( "DEBUG:    ... yep, the date on the Pi rolled over" )
+			last_date = date_str
 	else:
 		stat_text = "ok"
 		status = 0
@@ -545,9 +686,10 @@ def realtime_stalled():
 
 	#########################  ___print "  {}    {}    {}   {}".format(timestamp,seconds,diff_secs,status)
 	last_secs = seconds
-	last_date = date_str
 	data['realtime_stalled'] = diff_secs
 	return diff_secs       # For now we track this number. Later should return status.
+
+
 
 
 # ----------------------------------------------------------------------------------------
@@ -560,6 +702,7 @@ def realtime_stalled():
 # https://docs.python.org/2/library/re.html#module-contents
 # ----------------------------------------------------------------------------------------
 def proc_load():
+	global data
 	load = subprocess.check_output('/usr/bin/uptime')
 	load = re.sub('.*average: *', '', load)
 	load = load.rstrip()
@@ -592,6 +735,18 @@ def proc_load():
 
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
+#               CURRENTLY RETURNS A STRING RATHER THAN A BINARY
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# NOTE: Data is stored into the data[] array, so this could be converted to returning
+#       a binary return code.
+#
+#
+# Examine the output from the free command - particularly focusing on swap usage.
+#
+# Empirically, after running about a month, it seems we start using swap a little
+# at a time.  Literally a few bytes a day or half-day are added - far less than 1%
+# after a week perhaps.
 #
 #                total       used       free     shared    buffers     cached
 #   Mem:        945512     307040     638472       6768      83880     128100
@@ -616,6 +771,7 @@ def proc_load():
 #
 # ----------------------------------------------------------------------------------------
 def mem_usage():
+	global data
 	free = subprocess.check_output('/usr/bin/free')
 	#                       Remove all the text portions - we want just the numbers
 	free = re.sub('.*total *used *free *shared *buffers *cached\n.*Mem: *', '', free)
@@ -661,7 +817,7 @@ def mem_usage():
 	if mem_pct > mem_usage_lim :
 		messager( "WARNING:  " + str(mem_pct) + "% mem in use" )
 
-	free = re.sub(' ', '|', free)                     # Replace each blank with a |
+	# free = re.sub(' ', '|', free)                     # Replace each blank with a |
 
 	cpu_temp = read_cpu_temp()
 	data['cpu_temp_c'] = cpu_temp
@@ -669,8 +825,11 @@ def mem_usage():
 	data['cpu_temp_f'] = cpu_temp_f
 
 	return " {:6d}, {:2d}%, {:6d}, {:2d}%, {:4.1f}c, {:5.1f}f,".format(effective_used, mem_pct, swap_used, swap_pct, \
-		cpu_temp, cpu_temp_f ) + \
-		"\nfree|" + free
+		cpu_temp, cpu_temp_f )
+#
+#	return " {:6d}, {:2d}%, {:6d}, {:2d}%, {:4.1f}c, {:5.1f}f,".format(effective_used, mem_pct, swap_used, swap_pct, \
+#		cpu_temp, cpu_temp_f ) + \
+#		"\nfree|" + free
 #
 #	return "  {},  {}%,  {},  {}%,".format(effective_used, mem_pct, swap_used, swap_pct) + \
 #		"\nfree|" + free
@@ -683,16 +842,35 @@ def mem_usage():
 
 
 # ----------------------------------------------------------------------------------------
+# Check the Cumulus MX Diags log for anything strange going on.
 #
+# If "WU Response: OK: success" is the last line we should be OK.
+# Cumulus will throw an exception once in a while, one of which looks like an
+# unexpected/unhandled response from Weather Underground, plus others.
+# The most challenging one is when the base station loses (RF) contact
+# with the remote sensor unit (as in example below). There's a "down"
+# on the base console that will sometimes re-acquire the RF connection.
+#   I've not yet figured out out to make the Pi press the button -
+#   perform the equivalent reset....
+#
+# The logs are dated, but the filenames should sort numerically....
 # "MXdiags/20170912-202909.txt"
 #
-# To Do: Should externalize or "calculate" the path to the diag logs.
-#
+# ----------------------------------------------------------------------------------------
+# Looking for this in the Diags log....
+#   2017-09-15 20:26:45.616 Sensor contact lost; ignoring outdoor data
+#   2017-09-15 20:26:55.616 Sensor contact lost; ignoring outdoor data
+#   2017-09-15 20:27:00.666 WU Response: OK: success
+#   
 # ----------------------------------------------------------------------------------------
 def rf_dropped() :
 	global saved_exception_tstamp
+	global saved_contact_lost
+	global data
+	check_lines = 12
 	return_value = 0
-	file_list = listdir("/mnt/root/home/pi/Cumulus_MX/MXdiags/")
+	file_list = listdir( mxdiags_dir )
+
 	file_list.sort()
 
 	#for iii in range(0, len(file_list)):
@@ -702,21 +880,15 @@ def rf_dropped() :
 	# ___print log_file
 
 	# --------------------------------------------------------------------------------
-	#   2017-09-15 20:26:45.616 Sensor contact lost; ignoring outdoor data
-	#   2017-09-15 20:26:55.616 Sensor contact lost; ignoring outdoor data
-	#   2017-09-15 20:27:00.666 WU Response: OK: success
-	#   
-	#   2017-09-15 20:28:00.677 WU Response: OK: success
-	#   
-	# --------------------------------------------------------------------------------
 	# Work backwards from the end of the most recent file looking for
 	# one of the lines above.
 	# --------------------------------------------------------------------------------
-	fileHandle = open ( "/mnt/root/home/pi/Cumulus_MX/MXdiags/" + log_file,"r" )
+
+	fileHandle = open ( mxdiags_dir + "/" + log_file,"r" )
 	lineList = fileHandle.readlines()
 	fileHandle.close()
 
-	for iii in range(-1, -12, -1):
+	for iii in range(-1, (-1 * check_lines), -1):
 		lineList[iii] = re.sub('\n', ' ', lineList[iii])        # Remove any newline which might be left
 		# ___print str(iii) + " \t" + lineList[iii]
 		# ------------------------------------------------------------------------
@@ -741,33 +913,81 @@ def rf_dropped() :
 		# ------------------------------------------------------------------------
 		#      WARNING:  exception_tstamp = 2017-10-0210:57:00.626:.....
 
+
+		#   2017/11/09 18:28:07 GMT WARNING:  Cumulus MX Exception thrown:    exception_tstamp =
+		#   2017-11-0913:28:00.388:.....
+		#   2017-11-09 13:28:00.388 WU update:    at System.Net.WebConnection.HandleError(WebExceptionStatus st, System.Exception e, System.String where)
+
 		if "Exception" in lineList[iii] :
-			exception_tstamp = re.sub('[^-\.:0-9]*', '', lineList[iii] )
+			exception_tstamp = re.sub(r'([-0-9]+ [\.:0-9]+).*', r'\1', lineList[iii] )
 			if saved_exception_tstamp == exception_tstamp :
-				messager( "WARNING:  Cumulus MX Exception thrown (see above)" )
+				messager( "WARNING:  Cumulus MX Exception thrown (see above) @ " + \
+					exception_tstamp )
 			else:
 				print ""
 				###   messager( "DEBUG:  exception_tstamp = " + exception_tstamp  )
 				messager( "WARNING:  Cumulus MX Exception thrown:    exception_tstamp = " + \
-					exception_tstamp  )
+					exception_tstamp )
 				for jjj in range(iii-3, 0, 1) :
 					# Number the lines in the file we read
 					print str(len(lineList)+jjj+1) + "\t" + lineList[jjj].rstrip()
-				messager( "WARNING:    from  /mnt/root/home/pi/Cumulus_MX/MXdiags/" + log_file )
+				messager( "WARNING:    from  " + mxdiags_dir + "/" + log_file )
 				print ""
 			saved_exception_tstamp = exception_tstamp 
-		if "Sensor contact lost; ignoring outdoor data" in lineList[iii] :
-			messager( "WARNING:  Sensor contact lost; ignoring outdoor data.  " + \
-				"Press \"V\" button on WS console" )
+			break
+
+		# ------------------------------------------------------------------------
+		#   2017-09-15 20:26:45.616 Sensor contact lost; ignoring outdoor data
+		#   2017-09-15 20:26:55.616 Sensor contact lost; ignoring outdoor data
+		#   2017-09-15 20:27:00.666 WU Response: OK: success
+		#   
+		#   2017-09-15 20:28:00.677 WU Response: OK: success
+		#   
+		# See example block below. It is possible to see the good message in 
+		# the middle of a period of disconnect because CumulusMX continues to
+		# report to Weather Underground. (Only the indoor data is valid.)
+		# ------------------------------------------------------------------------
+		########### if "Sensor contact lost; ignoring outdoor data" in lineList[iii] :
+		### 2017-11-05 07:36:59.373 Sensor contact lost; ignoring outdoor data
+		elif "Sensor contact lost" in lineList[iii] :
+			if saved_contact_lost < 1 :
+				saved_contact_lost = int( datetime.datetime.utcnow().strftime("%s") )
+				# Long message the first time we see this...
+				messager( "WARNING:  Sensor contact lost; ignoring outdoor data.  " + \
+					"Press \"V\" button on WS console" )
+			else:
+				elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  saved_contact_lost 
+				# Shorter message while this status continues
+				messager( "WARNING:  Sensor contact lost; ... " + str(elapsed) + " sec" )
+
 			return_value = 1
 			break
-		if "WU Response: OK: success" in lineList[iii] :
+
+		# ------------------------------------------------------------------------
+		# See the block below for a "Sensor contact lost" example.
+		# It is possible to get some "good" messages in the midst of a string
+		# of these "bad" messages.
+		# 11/05/17 - Added an if to skip the break until at least a few lines
+		#            have been checked.
+		# ------------------------------------------------------------------------
+		elif "WU Response: OK: success" in lineList[iii] :
 		# 	___print "Data OK"
-			break
+			if iii < -3 :
+				saved_contact_lost = 0
+				break
+
+		else :
+			if iii < (-1 * check_lines) + 1 :
+				messager( "WARNING:  Unknow status from  " + mxdiags_dir + "/" + log_file )
+				for jjj in range(iii-3, 0, 1) :
+					# Number the lines in the file we read
+					print str(len(lineList)+jjj+1) + "\t" + lineList[jjj].rstrip()
+
+
 	# --------------------------------------------------------------------------------
 	#   Not sure what to do with "None", or where exactly this comes from.
 	#   Added return_value to make sure there is a value returned.
-	#   Increased the number of records cecked too.
+	#   Increased the number of records checked too.
 	#   
 	#  date-time, server_stalled, ws_data_stopped, rf_dropped, realtime_stalled, proc_load, camera_down, effective_used, mem_pct, swap_used, swap_pct
 	#  2017/09/20 12:49:57 GMT,  0,  0,  0,  24,  0.01,  0,  107120,  11%,  0,  0%,
@@ -784,6 +1004,32 @@ def rf_dropped() :
 
 
 
+	# --------------------------------------------------------------------------------
+	# Appears that CumulusMX retries to read the sensor approximately every 10 seconds
+	#     2017-11-05 07:33:49.373 Sensor contact lost; ignoring outdoor data
+	#     2017-11-05 07:33:59.373 Sensor contact lost; ignoring outdoor data
+	#     2017-11-05 07:34:00.946 WU Response: OK: success
+	#     
+	#     2017-11-05 07:34:09.372 Sensor contact lost; ignoring outdoor data
+	#     2017-11-05 07:34:19.472 Sensor contact lost; ignoring outdoor data
+	#     2017-11-05 07:34:29.472 Sensor contact lost; ignoring outdoor data
+	#     2017-11-05 07:34:39.373 Sensor contact lost; ignoring outdoor data
+	#     2017-11-05 07:34:49.373 Sensor contact lost; ignoring outdoor data
+	#     2017-11-05 07:34:59.373 Sensor contact lost; ignoring outdoor data
+	#     2017-11-05 07:35:00.348 Writing log entry for 11/5/2017 7:35:00 AM
+	#     2017-11-05 07:35:00.350 Written log entry for 11/5/2017 7:35:00 AM
+	#     2017-11-05 07:35:00.353 Writing today.ini, LastUpdateTime = 11/5/2017 7:35:00 AM raindaystart = 32.81102358858 rain counter = 33.05905508439
+	#     2017-11-05 07:35:00.353 Latest reading: 21F0: 09 3D CA 00 FF FF FF 33 26 FF FF FF 84 EF 0A C0
+	#     2017-11-05 07:35:00.946 WU Response: OK: success
+	#     
+	#     2017-11-05 07:35:09.373 Sensor contact lost; ignoring outdoor data
+	#     2017-11-05 07:35:19.373 Sensor contact lost; ignoring outdoor data
+	#     2017-11-05 07:35:29.373 Sensor contact lost; ignoring outdoor data
+	# --------------------------------------------------------------------------------
+
+
+
+
 # ----------------------------------------------------------------------------------------
 #  Check web cam status.
 #
@@ -792,10 +1038,13 @@ def rf_dropped() :
 #  runs every 5 minutes... but empirically, up to 10 minutes - accounting for
 #  each 5 minutes....?
 #
-#
+# NOTE: I have similar code running as a service as of this writing, which
+#       drives a relay which interrupts the power to the web cam -
+#       a power-cycle.  Eventually, that functionality will go here...
 #
 # ----------------------------------------------------------------------------------------
 def camera_down():
+	global data
 	global pcyc_holdoff_time
 
 	#___# # <<<<<<<<<<<<<<<<<<<< COMMENTED OUT THE RELAY STUFF
@@ -833,7 +1082,13 @@ def camera_down():
 	# --------------------------------------------------------------------------------
 
 	##### interval = int(result.group(1))
-	interval = int(words[0])
+	try:
+		interval = int(words[0])
+	except:
+		interval = -99999
+		messager( "DEBUG: camera_down(): interval looked invalid, \"" + words[0] + "\"" )
+
+
 	if interval > 3000:
 		#___# power_cycle()
 
@@ -856,11 +1111,12 @@ def camera_down():
 			pcyc_holdoff_time = int(time.strftime("%s")) + 600
 			logger(words[0] + " " + words[2] + " power cycled")
 
-
+		# ------------------------------------------------------------------------
 		# Give the cam time to reset, and the webserver crontab to fire.
 		# The camera comes up pretty quickly, but it seems to resynch to
 		# the 5-minute interval, and the server crontab only fires every
 		# 5 minutes (unsyncronized as a practical matter).  So 10 min max.
+		# ------------------------------------------------------------------------
 
 		#___# sleep(sleep_on_recycle)
 		data['camera_down'] = 1
@@ -869,6 +1125,67 @@ def camera_down():
 		pcyc_holdoff_time = 0
 		data['camera_down'] = 0
 		return 0
+
+
+
+# ----------------------------------------------------------------------------------------
+# For reporting, get the "time" of last start from systemctl.  It's really a pretty
+# human-readable string.  A timestamp is also available.
+# ----------------------------------------------------------------------------------------
+#
+#      $ systemctl status cumulusmx | grep since
+#        Active: active (running) since Thu 2017-10-19 17:34:34 EDT; 2 weeks 3 days ago
+#                                                                    ~~~~~~~~~~~~~~
+#
+# ----------------------------------------------------------------------------------------
+def last_restarted():
+	global data
+	######## load = subprocess.check_output(["/usr/bin/top", "-H", "-w", "125", "-n", "1", "-b", "-o", "+RES"])
+	output = subprocess.check_output(["/bin/systemctl", "status", "cumulusmx"])
+	lines = re.split('\n', output)
+
+	for iii in range(0, len(lines)):
+		if re.search('since', lines[iii]) :
+
+			start_time = re.sub('.* since ... ', '', lines[iii])
+			start_time = re.sub(';.*', '', start_time)
+			duration = re.sub('.*; ', '', lines[iii])
+			duration = re.sub(' ago', '', duration)
+			#  TO STRIP TIMEZONE #####  start_time = re.sub('...;.*', '', start_time)
+			break
+
+	# messager( "DEBUG: CumulusXM service started at " + start_time )
+	# messager( "DEBUG: CumulusXM service was started " + duration )
+	timestamp = datetime.datetime.utcnow().strptime(start_time, "%Y-%m-%d %H:%M:%S %Z")
+	# print timestamp.strftime(strftime_FMT)
+
+	data['last_restarted'] = duration
+	return duration
+
+
+# ----------------------------------------------------------------------------------------
+# Read the ambient temperature from "/web/ambient_tempT.txttmp"
+#
+# NOTE: This could just return the numeric portion, but then one would need to know
+#       the units.  The "interesting metric" could be the difference between
+#       ambient temp, and the temp of the processor.
+#
+# Returns an HTML string generated from ambient_tempT.txt which contains:
+#    <#intemp> <#tempunit>
+# or     
+#    <#intemp> <#tempunitnodeg>
+#
+# ----------------------------------------------------------------------------------------
+def ambient_temp():
+	FH = open(ambient_temp_file, "r")
+	# data_string = FH.readline()
+	# data_string = re.sub('\n', '', data_string)
+	data_string = re.sub('\n', '', FH.readline() )
+	# lines = re.split('\n', data_string)
+	FH.close
+	data['ambient_temp'] = float( re.sub(r' .*', r'', data_string ) )
+	return data_string
+
 
 
 # ----------------------------------------------------------------------------------------
@@ -880,6 +1197,7 @@ if __name__ == '__main__':
 	#### if sys.argv[1] = "stop"
 	this_script = sys.argv[0]
 	messager("  Starting " + this_script + "  PID=" + str(getpid()))
+	messager("Python version: " + str(sys.version))
 	# logger( "Starting " + this_script + "  PID=" + str(getpid()))
 	write_pid_file()
 	try:

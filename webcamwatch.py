@@ -47,6 +47,8 @@ sleep_for = 300
 sleep_on_recycle = 600 - sleep_for
 log_stride = 12
 log_file = ""
+restart_file = ""
+iii = 0
 
 # ----------------------------------------------------------------------------------------
 # See https://www.sunfounder.com/modules/input-module/relay/2-channel-dc-5v-relay-module-with-optocoupler-low-level-trigger-expansion-board-for-arduino-uno-r3-mega-2560-1280-dsp-arm-pic-avr-stm32-raspberry-pi.html
@@ -82,6 +84,9 @@ def setup():
 	log_file = sys.argv[0]
 	log_file = re.sub('\.py', '.log', log_file)
 
+	restart_file = sys.argv[0]
+	restart_file = re.sub('\.py', '.html', restart_file)
+
 # ----------------------------------------------------------------------------------------
 def power_cycle():
 	##DEBUG## ___print '...Relay channel %d on' % 1
@@ -110,6 +115,14 @@ def logger(message):
 	FH.close
 
 # ----------------------------------------------------------------------------------------
+def log_restart(message):
+	global restart_file
+	timestamp = datetime.datetime.utcnow().strftime("%Y%m%d %H:%M:%S %z")
+	FH = open(restart_file, "a")
+	FH.write("<TR><TD> " + timestamp + " </TD><TD> " + message + "</TD></TR>\n")
+	FH.close
+
+# ----------------------------------------------------------------------------------------
 def messager(message):
 	timestamp = datetime.datetime.utcnow().strftime("%Y%m%d %H:%M:%S")
 	print timestamp + " " + message
@@ -129,7 +142,7 @@ def write_pid_file():
 #  Check web cam status.
 # ----------------------------------------------------------------------------------------
 def camera_down():
-	iii = 0
+	global iii
 	try:
 		response = urllib.urlopen('http://dillys.org/wx/N_Since_Updated.txt')
 		content = response.read()
@@ -148,15 +161,21 @@ def camera_down():
 	##DEBUG## ___print words[0], words[2]
 
 	# Periodically put a record into the log for reference.
-	if 0 == iii % log_stride:
-		logger(words[0] + " " + words[2])
+	if 0 == (iii % log_stride) :
+		# logger("INFO: interval: " + words[0] + "  timestamp: " + words[2] + "  DEBUG: iii=" + str(iii) )
+		logger("INFO: interval: " + words[0] + "  timestamp: " + words[2] )
+
 	iii += 1
 
 	##### interval = int(result.group(1))
 	interval = int(words[0])
-	if interval > 3000:
+	# 20171106 - Adjusted the web cam clock for DST which tripped the old
+	#            limit of 3000 secs.  4200 allows for 1 hour + 10 minutes
+	#            or approximately 2 additional uploads.
+	if interval > 4200:
+		log_restart( "webcam power-cycled, interval: " + words[0] )
 		power_cycle()
-		logger(words[0] + " " + words[2] + " power cycled")
+		logger("WARNING: interval: " + words[0] + "  timestamp: " + words[2])
 		# Give the cam time to reset, and the webserver crontab to fire.
 		# The camera comes up pretty quickly, but it seems to resynch to
 		# the 5-minute interval, and the server crontab only fires every
@@ -169,7 +188,6 @@ def camera_down():
 
 # ----------------------------------------------------------------------------------------
 def main():
-	iii = 0
 	##DEBUG## ___print "Starting " + sys.argv[0] + "\n"
 	logger("Starting " + sys.argv[0] +  "  PID=" + str(getpid()))
 	messager("Starting " + sys.argv[0] +  "  PID=" + str(getpid()))
