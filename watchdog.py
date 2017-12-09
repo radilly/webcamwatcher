@@ -127,9 +127,13 @@ pcyc_holdoff_time = 0
 #
 data = { 'pid' : getpid() }
 
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+# For HTML Table-style output lines
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 data_keys = [
 	"pid",
 	"last_restarted",
+	"cmx_svc_runtime",
 	"server_stalled",
 	"ws_data_stopped",
 	"rf_dropped",
@@ -149,6 +153,7 @@ data_keys = [
 data_format = [
 	"{}",
 	"{} ago",
+	"{} days",
 	"{}",
 	"{}",
 	"{}",
@@ -171,6 +176,7 @@ data_format = [
 thresholds = [
 	-1,
 	-1,
+	-1,
 	1,
 	1,
 	1,
@@ -181,11 +187,48 @@ thresholds = [
 	20,
 	-1,
 	15,
-	512,
+	1024,
 	1,
 	55,
 	125 ]
 	# ambient_temp   {}
+
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+# For CSV-style output line
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	#    "date-time",
+CSV_keys = [
+	"server_stalled",
+	"ws_data_stopped",
+	"rf_dropped",
+	"realtime_stalled",
+	"proc_load",
+	"camera_down",
+	"mono_threads",
+	"effective_used",
+	"mem_pct",
+	"swap_used",
+	"swap_pct",
+	"cpu_temp_c",
+	"cpu_temp_f"
+	"cmx_svc_runtime" ]
+
+CSV_format = [
+	"{}",
+	"{}",
+	"{}",
+	"{:3d}",
+	"{:7.2f}",
+	"{}",
+	"{:5d}",
+	"{:6d}",
+	"{:2d}%",
+	"{:6d}",
+	"{:2d}%",
+	"{:4.1f}c",
+	"{:5.1f}f",
+	"{:f}" ]
 
 #
 #
@@ -225,15 +268,31 @@ def main():
 		if 0 == iii % log_stride:
 			###                 print datetime.datetime.now().strftime(strftime_FMT) + \
 			print "date-time, server_stalled, ws_data_stopped, rf_dropped, " + \
-				"realtime_stalled, proc_load, camera_down, mono_threads, " + \
+				"realtime_stalled, proc_load, camera_down, mono_threads, cmx_svc_runtime," + \
 				"effective_used, mem_pct, swap_used, swap_pct, " + \
 				"cpu_temp_c, cpu_temp_f,"
 
 		# NOTE: This could be built from the data[] array....
 		print datetime.datetime.utcnow().strftime(strftime_FMT) + \
-			", {}, {}, {}, {:3d}, {:7.2f}, {}, {:5d},".format( server_stalled(), ws_data_stopped(), \
-			rf_dropped(), realtime_stalled(), proc_load(), camera_down(), mono_threads() ) + \
-			 mem_usage()
+			", {}, {}, {}, {:3d}, {:7.2f}, {}, {:5d}, {:f},".format( server_stalled(), \
+				ws_data_stopped(), \
+				rf_dropped(), \
+				realtime_stalled(), \
+				proc_load(), \
+				camera_down(), \
+				mono_threads(), \
+				cmx_svc_runtime() ) \
+			+ mem_usage()
+		############################################################
+		# NOTE: This could be built from the data[] array....
+#		print datetime.datetime.utcnow().strftime(strftime_FMT) + \
+#			", {}, {}, {}, {:3d}, {:7.2f}, {}, {:5d}, {:f},".format( server_stalled(), ws_data_stopped(), \
+#			rf_dropped(), realtime_stalled(), proc_load(), camera_down(), mono_threads(), + \
+#			cmx_svc_runtime() ) + \
+#			mem_usage()
+		############################################################
+		############################################################
+		############################################################
 		############################################################
 		### ___print datetime.datetime.utcnow().strftime("%Y/%m/%d %H:%M:%S GMT") + \
 		### 	mem_usage() + \
@@ -331,6 +390,7 @@ def summarize():
 	FH.write( "<CENTER>\n")
 	FH.write( "<TABLE CELLPADDING=7><TR><TD VALIGN=\"TOP\">\n\n")
 
+	FH.write( "<CENTER>\n")
 	FH.write( "<TABLE BORDER=1>\n" )
 	FH.write( "<TR><TH> Parameter </TH><TH> Current Value </TH><TH> Threshold </TH</TR>\n" )
 	# NOTE: We may not choose to print everything in data[]
@@ -365,8 +425,9 @@ def summarize():
 	# This is how often the page updates locally, but only to the web server every 5 minutes.
 	# FH.write( "<P ALIGN=center><FONT SIZE=-3> Updated every {} secs </FONT>".format( sleep_for * summary_stride ) )
 
-	FH.write( "</TD><TD>\n")
+	FH.write( "<P> &nbsp;\n" )
 	FH.write( "<IMG SRC=\"Dilly_WX_Indoor.jpg\">\n")
+	FH.write( "</CENTER>\n\n")
 	FH.write( "</TD></TR></TABLE>\n")
 	FH.write( "</CENTER>\n\n")
 
@@ -1161,6 +1222,38 @@ def last_restarted():
 
 	data['last_restarted'] = duration
 	return duration
+
+# ----------------------------------------------------------------------------------------
+# Return run-time of cumulusmx service as fractional days - Excel-style date.
+#
+# ----------------------------------------------------------------------------------------
+#      $ systemctl status cumulusmx | grep since
+#        Active: active (running) since Thu 2017-10-19 17:34:34 EDT; 2 weeks 3 days ago
+# ----------------------------------------------------------------------------------------
+def cmx_svc_runtime():
+	strftime_pattern = "%Y-%m-%d %H:%M:%S %Z"
+	output = subprocess.check_output(["/bin/systemctl", "status", "cumulusmx"])
+	lines = re.split('\n', output)
+
+	for iii in range(0, len(lines)):
+		if re.search('since', lines[iii]) :
+
+			start_time = re.sub('.* since ... ', '', lines[iii])
+			start_time = re.sub(';.*', '', start_time)
+			#  TO STRIP TIMEZONE #####  start_time = re.sub('...;.*', '', start_time)
+			break
+
+	timestamp = datetime.datetime.utcnow().strptime(start_time, strftime_pattern)
+	start_secs = int(timestamp.strftime("%s"))
+	now_secs = int(datetime.datetime.utcnow().strftime("%s"))
+	duration = now_secs - start_secs
+	in_days = float(duration) / float( 60*60*24 )
+
+	data['cmx_svc_runtime'] = in_days
+	return in_days
+
+
+
 
 
 # ----------------------------------------------------------------------------------------
