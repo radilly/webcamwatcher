@@ -100,14 +100,7 @@ mem_usage_lim = 85
 ws_data_last_secs = 0       # Number of epoch secs at outage start
 saved_contact_lost = 0      # Number of epoch secs when RF contact lost
 
-### /home/pi/Cumulus_MX/DataStopped.sh
-# data_stop_file = "/home/pi/Cumulus_MX/web/DataStoppedT.txttmp"
 BASE_DIR =              "/mnt/root/home/pi/Cumulus_MX"
-###############################################################################   data_stop_file =        "mnt/root/home/pi/Cumulus_MX/web/DataStoppedT.txttmp"
-###############################################################################   ambient_temp_file =     "mnt/root/home/pi/Cumulus_MX/web/ambient_tempT.txttmp"
-###############################################################################   status_page =           "mnt/root/home/pi/Cumulus_MX/web/status.html"
-###############################################################################   mxdiags_dir =           "mnt/root/home/pi/Cumulus_MX/MXdiags"
-
 data_stop_file =        BASE_DIR + "/web/DataStoppedT.txttmp"
 ambient_temp_file =     BASE_DIR + "/web/ambient_tempT.txttmp"
 status_page =           BASE_DIR + "/web/status.html"
@@ -128,11 +121,10 @@ saved_exception_tstamp = "9999-99-9999:00:00.999:....."
 
 pcyc_holdoff_time = 0
 
-
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-# This is the global data value dictionary
+# This is the global data value dictionary.   This is written into by many of
+# the routines which follow.
 # Most of the keys map to a function name...
-#
 #
 # https://www.python-course.eu/dictionaries.php
 # https://docs.python.org/2/tutorial/datastructures.html#dictionaries
@@ -147,7 +139,7 @@ data_keys = [
 	"server_stalled",
 	"ws_data_stopped",
 	"rf_dropped",
-	"realtime_stalled",
+	"last_realtime",
 	"proc_pct",
 	"proc_load",
 	"proc_load_5m",
@@ -188,10 +180,6 @@ data_format = [
 	"{:6.1f}",
 	"{}" ]
 
-	#  Went to just the numbers for temps...  was
-	#     "{:6.1f} &deg;C",
-	#     "{:6.1f} &deg;F" ]
-
 thresholds = [
 	-1,
 	-1,
@@ -216,15 +204,15 @@ thresholds = [
 	# amb_temp   {}
 
 
-# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+# ----------------------------------------------------------------------------------------
 # For CSV-style output line
-# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	#    "date-time",
+# ----------------------------------------------------------------------------------------
+#       "date-time",
 CSV_keys = [
 	"server_stalled",
 	"ws_data_stopped",
 	"rf_dropped",
-	"realtime_stalled",
+	"last_realtime",
 	"proc_load",
 	"camera_down",
 	"mono_threads",
@@ -266,7 +254,7 @@ CSV_format = [
 #
 #
 #  To Do:
-#		realtime_stalled() return value should be leveraged <<<  OBSOLETE???????????????
+#		last_realtime() return value should be leveraged <<<  OBSOLETE???????????????
 # ----------------------------------------------------------------------------------------
 def main():
 	global data
@@ -293,7 +281,7 @@ def main():
 		server_stalled()
 		ws_data_stopped()
 		rf_dropped()
-		realtime_stalled()
+		last_realtime()
 		proc_load()
 		proc_pct()
 		camera_down()
@@ -331,7 +319,7 @@ def main():
 		#		effective_used 323012
 		#		watcher_pid 16978
 		#		cpu_temp_f 100.5602
-		#		realtime_stalled -2
+		#		last_realtime -2
 		#		proc_load 0.24
 		#		server_stalled 0
 		#		ws_data_stopped 0
@@ -424,27 +412,6 @@ def mono_threads():
 	data['mono_threads'] = int(tok[19])
 	return int(tok[19])
 
-# ----------------------------------------------------------------------------------------
-# OLD Count the mono threads running
-# 
-#  NOTE: 15 is s good number, but this seems to grow after a few weeks...
-# ----------------------------------------------------------------------------------------
-def OLD_mono_threads():
-	global data
-	load = subprocess.check_output(["/usr/bin/top", "-H", "-w", "125", "-n", "1", "-b", "-o", "+RES"])
-	lines = re.split('\n', load)
-	jjj = 0
-	for iii in range(0, len(lines)):
-		if re.search('mono$', lines[iii]) :
-			jjj += 1
-	data['mono_threads'] = jjj
-	return jjj
-
-
-
-
-
-
 
 # ----------------------------------------------------------------------------------------
 # Appends an event table line (HTML) to the event list.
@@ -470,7 +437,7 @@ def log_event(ID, description, code):
 # ----------------------------------------------------------------------------------------
 def summarize():
 	timestamp = datetime.datetime.utcnow().strftime(strftime_FMT)
-	last_restarted()
+	cmx_svc_runtime()
 
 	FH = open(status_page , "w")
 
@@ -740,7 +707,8 @@ def server_stalled():
 #              Return value should be like status, 0 or 1, FALSE or TRUE
 #
 # ----------------------------------------------------------------------------------------
-def realtime_stalled():
+##########################################        def realtime_stalled():
+def last_realtime():
 	global data
 	global last_secs
 	global last_date
@@ -776,8 +744,8 @@ def realtime_stalled():
   	#  File "./watchdog.py", line 166, in <module>
     	#  main()
   	#  File "./watchdog.py", line 156, in main
-    	#  realtime_stalled()
-  	#  File "./watchdog.py", line 124, in realtime_stalled
+    	#  last_realtime()
+  	#  File "./watchdog.py", line 124, in last_realtime
     	#  timestamp = words[1]
 	#  IndexError: list index out of range
 	#       *** File may not have been completely written
@@ -797,7 +765,7 @@ def realtime_stalled():
 		diff_secs = seconds - last_secs
 
 	#  ---------------------------------------------------------------------
-	#  date-time, server_stalled, ws_data_stopped, rf_dropped, realtime_stalled, proc_load, 
+	#  date-time, server_stalled, ws_data_stopped, rf_dropped, last_realtime, proc_load, 
 	#  2017/09/17 22:11:59 GMT,  0,  0,  0,  -65471,  0.0,  101244,  10%,  0,  0%,
 	#  free|945512|560184|385328|6768|317368|141572|101244|844268|102396|0|102396
 	#  WARNING: 65543 elapsed since realtime.txt was updated.
@@ -806,7 +774,7 @@ def realtime_stalled():
 	#  
     	#  Because above, when we get an incomplete file, lacking a timestamp
     	#  we set the time to "00:00:00" and we get a weird number for
-	#  realtime_stalled.  The nominal value we expect is 24, or perhaps
+	#  last_realtime.  The nominal value we expect is 24, or perhaps
 	#  48 - 48 being the transmit interval for the remote sensors.
 	#  
 	#  ---------------------------------------------------------------------
@@ -841,7 +809,7 @@ def realtime_stalled():
 
 	#########################  ___print "  {}    {}    {}   {}".format(timestamp,seconds,diff_secs,status)
 	last_secs = seconds
-	data['realtime_stalled'] = diff_secs
+	data['last_realtime'] = diff_secs
 	return diff_secs       # For now we track this number. Later should return status.
 
 
@@ -852,6 +820,8 @@ def realtime_stalled():
 # how long the system has been running, how many users are currently logged on,  and
 # the system load averages for the past 1, 5, and 15 minutes.
 #   [' 08:39:19 up 3 days, 8 min,  2 users,  load average: 0.00, 0.00, 0.00\n']
+#
+# Could also read this from /proc/loadavg
 #
 # https://docs.python.org/2/library/subprocess.html
 # https://docs.python.org/2/library/re.html#module-contents
@@ -896,8 +866,8 @@ def proc_load():
 # NOTE: Data is stored into the data[] array, so this could be converted to returning
 #       a binary return code.
 #
-#
 # Examine the output from the free command - particularly focusing on swap usage.
+# Could also read /proc/meminfo
 #
 # Empirically, after running about a month, it seems we start using swap a little
 # at a time.  Literally a few bytes a day or half-day are added - far less than 1%
@@ -1141,15 +1111,11 @@ def rf_dropped() :
 	#   Added return_value to make sure there is a value returned.
 	#   Increased the number of records checked too.
 	#   
-	#  date-time, server_stalled, ws_data_stopped, rf_dropped, realtime_stalled, proc_load, camera_down, effective_used, mem_pct, swap_used, swap_pct
-	#  2017/09/20 12:49:57 GMT,  0,  0,  0,  24,  0.01,  0,  107120,  11%,  0,  0%,
-	#  free|945512|648688|296824|6764|392836|148732|107120|838392|102396|0|102396
 	#  2017/09/20 12:50:21 GMT,  0,  0,  None,  24,  0.16,  0,  122740,  12%,  0,  0%,
 	#  free|945512|664316|281196|6764|392848|148728|122740|822772|102396|0|102396
 	#  2017/09/20 12:50:46 GMT,  0,  0,  None,  24,  0.1,  0,  122608,  12%,  0,  0%,
 	#  free|945512|664200|281312|6764|392860|148732|122608|822904|102396|0|102396
 	#  2017/09/20 12:51:11 GMT,  0,  0,  0,  24,  0.07,  0,  122696,  12%,  0,  0%,
-	#  free|945512|664296|281216|6764|392868|148732|122696|822816|102396|0|102396
 	# --------------------------------------------------------------------------------
 	data['rf_dropped'] = return_value
 	return return_value
@@ -1169,7 +1135,7 @@ def rf_dropped() :
 	#     2017-11-05 07:34:59.373 Sensor contact lost; ignoring outdoor data
 	#     2017-11-05 07:35:00.348 Writing log entry for 11/5/2017 7:35:00 AM
 	#     2017-11-05 07:35:00.350 Written log entry for 11/5/2017 7:35:00 AM
-	#     2017-11-05 07:35:00.353 Writing today.ini, LastUpdateTime = 11/5/2017 7:35:00 AM raindaystart = 32.81102358858 rain counter = 33.05905508439
+	#     2017-11-05 07:35:00.353 Writing today.ini, LastUpdateTime = 11/5/2017 7:35:00 AM raindaystart = 32.811...
 	#     2017-11-05 07:35:00.353 Latest reading: 21F0: 09 3D CA 00 FF FF FF 33 26 FF FF FF 84 EF 0A C0
 	#     2017-11-05 07:35:00.946 WU Response: OK: success
 	#     
@@ -1224,7 +1190,7 @@ def camera_down():
 	#       File "/mnt/root/home/pi/watchdog.py", line 672, in <module>		##
 	#         write_pid_file()							##
 	#       File "/mnt/root/home/pi/watchdog.py", line 125, in main			##
-	#         rf_dropped(), realtime_stalled(), proc_load(), camera_down() ) + \	##
+	#         rf_dropped(), last_realtime(), proc_load(), camera_down() ) + \	##
 	#       File "/mnt/root/home/pi/watchdog.py", line 643, in camera_down		##
 	#     										##
 	#     ValueError: invalid literal for int() with base 10: ''			##
@@ -1278,23 +1244,20 @@ def camera_down():
 		return 0
 
 
-
 # ----------------------------------------------------------------------------------------
-# For reporting, get the "time" of last start from systemctl.  It's really a pretty
-# human-readable string.  A timestamp is also available.
-# ----------------------------------------------------------------------------------------
-# NOTE: This and cmx_svc_runtime() could be combined.
-# ----------------------------------------------------------------------------------------
+# Return run-time of cumulusmx service as fractional days - Excel-style date.
 #
+# 2017-12-22 def last_restarted() was rolled into this routine.
+# ----------------------------------------------------------------------------------------
 #      $ systemctl status cumulusmx | grep since
 #        Active: active (running) since Thu 2017-10-19 17:34:34 EDT; 2 weeks 3 days ago
-#
 # ----------------------------------------------------------------------------------------
-def last_restarted():
+def cmx_svc_runtime():
 	global data
-	######## load = subprocess.check_output(["/usr/bin/top", "-H", "-w", "125", "-n", "1", "-b", "-o", "+RES"])
 	output = subprocess.check_output(["/bin/systemctl", "status", "cumulusmx"])
 	lines = re.split('\n', output)
+
+
 
 	for iii in range(0, len(lines)):
 		if re.search('Main PID:', lines[iii]) :
@@ -1308,51 +1271,20 @@ def last_restarted():
 			start_time = re.sub(';.*', '', start_time)
 			duration = re.sub('.*; ', '', lines[iii])
 			duration = re.sub(' ago', '', duration)
-			#  TO STRIP TIMEZONE #####  start_time = re.sub('...;.*', '', start_time)
-			##########################################                                  break
 
-	# messager( "DEBUG: CumulusXM service started at " + start_time )
-	# messager( "DEBUG: CumulusXM service was started " + duration )
+
+
+
 	timestamp = datetime.datetime.now().strptime(start_time, "%Y-%m-%d %H:%M:%S %Z")
-	# print timestamp.strftime(strftime_FMT)
-
-	data['mono_pid'] = mono_pid
-	data['last_restarted'] = duration
-	return duration
-
-# ----------------------------------------------------------------------------------------
-# Return run-time of cumulusmx service as fractional days - Excel-style date.
-#
-# ----------------------------------------------------------------------------------------
-# NOTE: This and last_restarted() could be combined.
-# ----------------------------------------------------------------------------------------
-#      $ systemctl status cumulusmx | grep since
-#        Active: active (running) since Thu 2017-10-19 17:34:34 EDT; 2 weeks 3 days ago
-# ----------------------------------------------------------------------------------------
-def cmx_svc_runtime():
-	global data
-	strftime_pattern = "%Y-%m-%d %H:%M:%S %Z"
-	output = subprocess.check_output(["/bin/systemctl", "status", "cumulusmx"])
-	lines = re.split('\n', output)
-
-	for iii in range(0, len(lines)):
-		if re.search('since', lines[iii]) :
-
-			start_time = re.sub('.* since ... ', '', lines[iii])
-			start_time = re.sub(';.*', '', start_time)
-			#  TO STRIP TIMEZONE #####  start_time = re.sub('...;.*', '', start_time)
-			break
-
-	timestamp = datetime.datetime.now().strptime(start_time, strftime_pattern)
 	start_secs = int(timestamp.strftime("%s"))
 	now_secs = int(datetime.datetime.now().strftime("%s"))
 	duration = now_secs - start_secs
 	in_days = float(duration) / float( 60*60*24 )
 
 	data['cmx_svc_runtime'] = in_days
+	data['mono_pid'] = mono_pid
+	data['last_restarted'] = duration
 	return in_days
-
-
 
 
 
@@ -1394,7 +1326,7 @@ if __name__ == '__main__':
 	messager("  Starting " + this_script + "  PID=" + str(getpid()))
 
 	write_pid_file()
-	last_restarted()	# This reads the PID for the main mono process
+	cmx_svc_runtime()	# This reads the PID for the main mono process
 	try:
 		main()
 	except KeyboardInterrupt:
