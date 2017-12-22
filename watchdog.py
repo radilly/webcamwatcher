@@ -29,6 +29,9 @@
 # reducing the output.
 #
 # ========================================================================================
+# 20171209 RAD Added cmx_svc_runtime().  Changed the method or writing the CSV-style
+#              output lines to leverage the data[] array.
+#              NOTE: 
 # 20171012 RAD Started writing status.html, which CMX copies up to the web-server.
 #              It's pretty simple yet, but now I can at least check the current
 #              status remoted via web-browser.
@@ -70,13 +73,6 @@
 #
 #
 #
-#
-#
-#
-#
-#
-#
-#
 # ========================================================================================
 
 import urllib
@@ -106,14 +102,25 @@ saved_contact_lost = 0      # Number of epoch secs when RF contact lost
 
 ### /home/pi/Cumulus_MX/DataStopped.sh
 # data_stop_file = "/home/pi/Cumulus_MX/web/DataStoppedT.txttmp"
-BASE_DIR =       "/mnt/root/home/pi/Cumulus_MX"
-data_stop_file = "/mnt/root/home/pi/Cumulus_MX/web/DataStoppedT.txttmp"
-ambient_temp_file = "/mnt/root/home/pi/Cumulus_MX/web/ambient_tempT.txttmp"
-status_page =    "/mnt/root/home/pi/Cumulus_MX/web/status.html"
-mxdiags_dir =    "/mnt/root/home/pi/Cumulus_MX/MXdiags"
+BASE_DIR =              "/mnt/root/home/pi/Cumulus_MX"
+###############################################################################   data_stop_file =        "mnt/root/home/pi/Cumulus_MX/web/DataStoppedT.txttmp"
+###############################################################################   ambient_temp_file =     "mnt/root/home/pi/Cumulus_MX/web/ambient_tempT.txttmp"
+###############################################################################   status_page =           "mnt/root/home/pi/Cumulus_MX/web/status.html"
+###############################################################################   mxdiags_dir =           "mnt/root/home/pi/Cumulus_MX/MXdiags"
+
+data_stop_file =        BASE_DIR + "/web/DataStoppedT.txttmp"
+ambient_temp_file =     BASE_DIR + "/web/ambient_tempT.txttmp"
+status_page =           BASE_DIR + "/web/status.html"
+events_page =           BASE_DIR + "/web/events.html"
+mxdiags_dir =           BASE_DIR + "/MXdiags"
 
 logger_file = sys.argv[0]
 logger_file = re.sub('\.py', '.log', logger_file)
+
+proc_stat_busy = -1		# Sentinal value
+proc_stat_idle = -1
+proc_stat_hist = []		# Holds last proc_stat_hist_n samples
+proc_stat_hist_n = 10		# Control length of history array to keep
 
 # strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
 strftime_FMT = "%Y/%m/%d %H:%M:%S"
@@ -122,22 +129,26 @@ saved_exception_tstamp = "9999-99-9999:00:00.999:....."
 pcyc_holdoff_time = 0
 
 
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+# This is the global data value dictionary
+# Most of the keys map to a function name...
+#
+#
 # https://www.python-course.eu/dictionaries.php
 # https://docs.python.org/2/tutorial/datastructures.html#dictionaries
-#
-data = { 'pid' : getpid() }
-
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-# For HTML Table-style output lines
-# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+data = []
+data = { 'watcher_pid' : getpid() }
 data_keys = [
-	"pid",
+	"watcher_pid",
+	"mono_pid",
 	"last_restarted",
 	"cmx_svc_runtime",
 	"server_stalled",
 	"ws_data_stopped",
 	"rf_dropped",
 	"realtime_stalled",
+	"proc_pct",
 	"proc_load",
 	"proc_load_5m",
 	"camera_down",
@@ -147,17 +158,24 @@ data_keys = [
 	"swap_used",
 	"swap_pct",
 	"cpu_temp_c",
-	"cpu_temp_f" ]
-	# ambient_temp   {}
+	"cpu_temp_f",
+	"python_version" ]
+	# amb_temp   {}
 
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+# For HTML Table-style output lines
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+# https://pyformat.info/
 data_format = [
 	"{}",
+	"{}",
 	"{} ago",
-	"{} days",
+	"{:8.4f} days",
 	"{}",
 	"{}",
 	"{}",
 	"{}",
+	"{:5.1f}%",
 	"{:7.2f}",
 	"{:7.2f}",
 	"{}",
@@ -167,7 +185,8 @@ data_format = [
 	"{}",
 	"{}&percnt;",
 	"{:6.1f}",
-	"{:6.1f}" ]
+	"{:6.1f}",
+	"{}" ]
 
 	#  Went to just the numbers for temps...  was
 	#     "{:6.1f} &deg;C",
@@ -177,10 +196,12 @@ thresholds = [
 	-1,
 	-1,
 	-1,
+	-1,
 	1,
 	1,
 	1,
-	300,
+	120,
+	10.0,
 	4.0,
 	4.0,
 	1,
@@ -190,8 +211,9 @@ thresholds = [
 	1024,
 	1,
 	55,
-	125 ]
-	# ambient_temp   {}
+	125,
+	-1 ]
+	# amb_temp   {}
 
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -211,9 +233,12 @@ CSV_keys = [
 	"swap_used",
 	"swap_pct",
 	"cpu_temp_c",
-	"cpu_temp_f"
-	"cmx_svc_runtime" ]
+	"cpu_temp_f",
+	"amb_temp",
+	"proc_pct",
+	"cmx_svc_runtime", ]
 
+# https://pyformat.info/
 CSV_format = [
 	"{}",
 	"{}",
@@ -228,87 +253,65 @@ CSV_format = [
 	"{:2d}%",
 	"{:4.1f}c",
 	"{:5.1f}f",
-	"{:f}" ]
+	"{:5.1f}f",
+	"{:5.1f}%",
+	"{:16.10f}" ]
 
-#
-#
-#                          pid
-#                          >>>                    date-time
-#                          server_stalled
-#                          ws_data_stopped
-#                          rf_dropped
-#                          realtime_stalled
-#                          proc_load
-#                          camera_down
-#                          effective_used
-#                          mem_pct
-#                          swap_used
-#                          swap_pct
-#                          >>>                    cpu_t
-#                          cpu_temp
-#                          cpu_temp_f
-#
-#
-#
-
-# exit
 
 # ----------------------------------------------------------------------------------------
 #
 # Main loop
 #
+# ----------------------------------------------------------------------------------------
+#
+#
 #  To Do:
-#		realtime_stalled() return value should be leveraged
+#		realtime_stalled() return value should be leveraged <<<  OBSOLETE???????????????
 # ----------------------------------------------------------------------------------------
 def main():
+	global data
+
+	python_version = "v " + str(sys.version)
+	python_version = re.sub(' *\n *', '<BR>', python_version )
+	python_version = re.sub(' *\(', '<BR>(', python_version )
+
+	messager("Python version: " + str(sys.version))
+	data['python_version'] = python_version
+
 	iii = 0
-	### logger("Staring " + sys.argv[0])
-	exit
 	while True:
 		if 0 == iii % log_stride:
-			###                 print datetime.datetime.now().strftime(strftime_FMT) + \
-			print "date-time, server_stalled, ws_data_stopped, rf_dropped, " + \
-				"realtime_stalled, proc_load, camera_down, mono_threads, cmx_svc_runtime," + \
-				"effective_used, mem_pct, swap_used, swap_pct, " + \
-				"cpu_temp_c, cpu_temp_f,"
+			amb_temp()        # This won't / shouldn't change rapidly so sample periodically
 
-		# NOTE: This could be built from the data[] array....
-		print datetime.datetime.utcnow().strftime(strftime_FMT) + \
-			", {}, {}, {}, {:3d}, {:7.2f}, {}, {:5d}, {:f},".format( server_stalled(), \
-				ws_data_stopped(), \
-				rf_dropped(), \
-				realtime_stalled(), \
-				proc_load(), \
-				camera_down(), \
-				mono_threads(), \
-				cmx_svc_runtime() ) \
-			+ mem_usage()
-		############################################################
-		# NOTE: This could be built from the data[] array....
-#		print datetime.datetime.utcnow().strftime(strftime_FMT) + \
-#			", {}, {}, {}, {:3d}, {:7.2f}, {}, {:5d}, {:f},".format( server_stalled(), ws_data_stopped(), \
-#			rf_dropped(), realtime_stalled(), proc_load(), camera_down(), mono_threads(), + \
-#			cmx_svc_runtime() ) + \
-#			mem_usage()
-		############################################################
-		############################################################
-		############################################################
-		############################################################
-		### ___print datetime.datetime.utcnow().strftime("%Y/%m/%d %H:%M:%S GMT") + \
-		### 	mem_usage() + \
-		############################################################
-		### 	" server_stalled() = " + str( server_stalled() ) + \
-		### 	" ws_data_stopped = " + str( ws_data_stopped() ) + \
-		### 	" proc_load = " + str( proc_load() ) + \
-		### 	mem_usage() + \
-		### 	"| rf_dropped() = " + str(rf_dropped())
-		############################################################
-		###  ___print datetime.datetime.utcnow().strftime("%Y%m%d %H:%M:%S GMT")
-		###  ___print "server_stalled() = " + str( server_stalled())
-		###  ___print "ws_data_stopped = " + str( ws_data_stopped() )
-		############################################################
+			hdr = "date-time,"
+			for jjj in range(0, len(CSV_keys)):
+				hdr = hdr + " {},".format( CSV_keys[jjj] )
+
+			print hdr
+
+		# Capture the data by calling functions.  Ignore return values.
+		server_stalled()
+		ws_data_stopped()
+		rf_dropped()
+		realtime_stalled()
+		proc_load()
+		proc_pct()
+		camera_down()
+		mono_threads()
+		cmx_svc_runtime()
+		mem_usage()
+
+		CSV_rec = datetime.datetime.utcnow().strftime(strftime_FMT) + ","
+
+		for jjj in range(0, len(CSV_keys)):
+			format_str = " " + CSV_format[jjj] + ","
+			CSV_rec = CSV_rec + format_str.format( data[CSV_keys[jjj]] )
+
+		print CSV_rec
 
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# NOTE: Would be great to output data and use highcharts
+		#
 		#  https://pythonspot.com/en/ftp-client-in-python/
 		#  https://docs.python.org/2/library/ftplib.html
 		#  http://api.highcharts.com/highstock/Highcharts.stockChart
@@ -316,22 +319,9 @@ def main():
 		#  https://www.highcharts.com/products/highcharts/
 		#  https://www.highcharts.com/docs/working-with-data/data-module
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		# if 999 == iii % 5 :
 		if 0 == iii % summary_stride :
 			summarize()
-#			print "<TABLE>"
-#			for iii in range(0, len(data)):
-#				print "<TR><TD> {} </TD><TD> {} </TD></TR>".format( data_keys[iii], data[ data_keys[iii] ] )
-#			print "</TABLE>"
 
-	#		for key in data :
-	#			print key, data[key]
-
-
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		#		swap_pct 0
 		#		swap_used 500
@@ -339,7 +329,7 @@ def main():
 		#		mem_pct 34
 		#		rf_dropped 0
 		#		effective_used 323012
-		#		pid 16978
+		#		watcher_pid 16978
 		#		cpu_temp_f 100.5602
 		#		realtime_stalled -2
 		#		proc_load 0.24
@@ -348,20 +338,99 @@ def main():
 		#		camera_down 0
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
-
-
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		# Periodically put a record into the log for reference.
-		#___# if 0 == iii % log_stride:
-			#___# logger(words[0] + " " + words[2])
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-
 		iii += 1
 		sleep(sleep_for)
 
 
+
+
+
+
+# ----------------------------------------------------------------------------------------
+#  Read and parse the first line of "/proc/stat", the cpu line, and calulate the
+#  average cpu utilization as a percentage.
+#
+#  First call is the initialization - usage since boot-up.
+#  Subsequent calls find the avergae utilization since the previous call.
+#
+# ----------------------------------------------------------------------------------------
+def proc_pct() :
+	global proc_stat_busy
+	global proc_stat_idle
+	global proc_stat_hist
+	global data
+
+	# --------------------------------------------------------------------------------
+	# Work backwards from the end of the most recent file looking for
+	# one of the lines above.
+	# --------------------------------------------------------------------------------
+
+	fileHandle = open ( "/proc/stat","r" )
+	lineList = fileHandle.readlines()
+	fileHandle.close()
+
+	lineList[0] = re.sub('\n', '', lineList[0])        # Remove any newline which might be left
+
+	tok = re.split(' *', lineList[0])
+
+	idle = int(tok[4]) + int(tok[5])
+	busy = int(tok[1]) + int(tok[2]) + int(tok[3]) + int(tok[6]) + int(tok[7]) + int(tok[8])
+
+	if proc_stat_busy < 0 :
+		### print "Since last boot:  {} * 100 / {}".format( busy, idle+busy )
+		### print "{:6.3f}%".format( float(busy * 100) / float(idle + busy) )
+		### print "========"
+		pct_util = float(busy * 100) / float(idle + busy)
+
+	else :
+		delta_busy = busy - proc_stat_busy 
+		delta_idle = idle - proc_stat_idle
+		timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+		pct_util = float(delta_busy * 100) / float(delta_idle + delta_busy)
+		### print "{} {:6.3f}%".format( timestamp, pct_util )
+		# ------------------------------------------------------------------------
+		# Unused for now.  Here in case we want to look at a rolling average...
+		# ------------------------------------------------------------------------
+		if len(proc_stat_hist) > (proc_stat_hist_n -1) :
+			proc_stat_hist = proc_stat_hist[1:]
+		proc_stat_hist.append( pct_util )
+
+	proc_stat_busy = busy
+	proc_stat_idle = idle
+	data['proc_pct'] = pct_util
+	return pct_util
+
+
+# ----------------------------------------------------------------------------------------
+# Count the mono threads running
+# 
+#  NOTE: 15 is s good number, but this seems to grow after a few weeks...
 # ----------------------------------------------------------------------------------------
 def mono_threads():
+	global data
+
+	PID = str( data['mono_pid'] )
+
+	# --------------------------------------------------------------------------------
+	#
+	# --------------------------------------------------------------------------------
+	fileHandle = open ( "/proc/" + str(PID) + "/stat","r" )
+	lineList = fileHandle.readlines()
+	fileHandle.close()
+
+	lineList[0] = re.sub('\n', '', lineList[0])        # Remove any newline which might be left
+	tok = re.split(' *', lineList[0])
+
+	data['mono_threads'] = int(tok[19])
+	return int(tok[19])
+
+# ----------------------------------------------------------------------------------------
+# OLD Count the mono threads running
+# 
+#  NOTE: 15 is s good number, but this seems to grow after a few weeks...
+# ----------------------------------------------------------------------------------------
+def OLD_mono_threads():
+	global data
 	load = subprocess.check_output(["/usr/bin/top", "-H", "-w", "125", "-n", "1", "-b", "-o", "+RES"])
 	lines = re.split('\n', load)
 	jjj = 0
@@ -373,6 +442,31 @@ def mono_threads():
 
 
 
+
+
+
+
+# ----------------------------------------------------------------------------------------
+# Appends an event table line (HTML) to the event list.
+# Has to be maintained manually.
+#
+# ----------------------------------------------------------------------------------------
+def log_event(ID, description, code):
+	# Supply timestamp if no ID was given
+	if len(ID) < 1 :
+		ID = datetime.datetime.now().strftime(strftime_FMT + " (local)")
+
+	FH = open(events_page , "a")
+
+	format_str = "<TR><TD> {} </TD><TD> {} </TD><TD> {} </TD></TR>\n"
+	FH.write( format_str.format( ID, description, code ) )
+
+	FH.close
+
+# ----------------------------------------------------------------------------------------
+# This generates a Raspberry Pi Status page, which Cumulus MX ftp's to the server.
+# It is mostly an HTML table.
+#
 # ----------------------------------------------------------------------------------------
 def summarize():
 	timestamp = datetime.datetime.utcnow().strftime(strftime_FMT)
@@ -382,7 +476,7 @@ def summarize():
 
 	FH.write( "<HEAD><TITLE>\n" )
 	FH.write( "Raspberry Pi / Cumulus MX Health\n" )
-	FH.write( "</TITLE></HEAD><BODY BGCOLOR=\"#555555\" TEXT=\"#FFFFFF\" LINK=\"#FFFF00\" VLINK=\"#FFBB00\" ALINK=\"#FFAAFF\"><H1>\n" )
+	FH.write( "</TITLE></HEAD><BODY BGCOLOR=\"#555555\" TEXT=\"#FFFFFF\" LINK=\"#FFFF00\" VLINK=\"#FFBB00\" ALINK=\"#FFAAFF\"><H1 ALIGN=center>\n" )
 	FH.write( "Raspberry Pi / Cumulus MX Health\n" )
 	FH.write( "</H1>\n\n" )
 	# FH.write( "<P> &nbsp;\n\n" )
@@ -410,9 +504,8 @@ def summarize():
 	# format_str = "<TR><TD> Ambient Temp </TD><TD ALIGN=right> {} </TD></TR>\n"
 	# thresholds
 	format_str = "<TR><TD> Ambient Temp &deg;F </TD><TD ALIGN=right> {} </TD><TD ALIGN=right> -1 </TD></TR>\n"
-	## >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> FH.write( format_str.format( ambient_temp() ) )
-	ambient_temp()
-	FH.write( format_str.format( data['ambient_temp'] ) )
+	## >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> FH.write( format_str.format( amb_temp() ) )
+	FH.write( format_str.format( data['amb_temp'] ) )
 
 
 	FH.write( "<TR><TD COLSPAN=3 ALIGN=center><FONT SIZE=-1>\n" )
@@ -426,7 +519,8 @@ def summarize():
 	# FH.write( "<P ALIGN=center><FONT SIZE=-3> Updated every {} secs </FONT>".format( sleep_for * summary_stride ) )
 
 	FH.write( "<P> &nbsp;\n" )
-	FH.write( "<IMG SRC=\"Dilly_WX_Indoor.jpg\">\n")
+	FH.write( "<A HREF=\"Dilly_WX_Indoor.jpg\"><IMG SRC=\"Dilly_WX_Indoor_050.jpg\"></A>\n")
+	FH.write( "<BR><FONT SIZE=-3>CLICK TO ENLARGE</FONT>\n")
 	FH.write( "</CENTER>\n\n")
 	FH.write( "</TD></TR></TABLE>\n")
 	FH.write( "</CENTER>\n\n")
@@ -435,9 +529,14 @@ def summarize():
 	FH.write( "<center><table style=\"width:100%;border-collapse: collapse; border-spacing: 0;\" >\n" )
   	FH.write( "  <tr>\n" )
 
-	FH.write( "    <td align=\"center\" class=\"td_navigation_bar\">:<a href=\"index.htm\">now</a>::<a href=\"gauges.htm\">gauges</a>::<a href=\"today.htm\">today</a>::<a href=\"yesterday.htm\">yesterday</a>::<a href=\"thismonth.htm\">this&nbsp;month</a>::<a href=\"thisyear.htm\">this&nbsp;year</a>:\n" )
-	FH.write( "    <br>:<a href=\"record.htm\">records</a>::<a href=\"monthlyrecord.htm\">monthly&nbsp;records</a>::<a href=\"trends.htm\">trends</a>::<a href=\"http://sandaysoft.com/forum/\">forum</a>::<a href=\"http://dillys.org/WX/NW_View.html\">webcam</a>:\n" )
-	FH.write( "    <br>:<a href=\"status.html\">Pi status</a>::<a href=\"https://www.wunderground.com/personal-weather-station/dashboard?ID=KPAMCMUR4\">KPAMCMUR4</a>:</td>\n" )
+	FH.write( "    <td align=\"center\" class=\"td_navigation_bar\">:<a href=\"index.htm\">now</a>::<a href=\"gauges.htm\">gauges</a>:" + \
+		":<a href=\"today.htm\">today</a>::<a href=\"yesterday.htm\">yesterday</a>::<a href=\"thismonth.htm\">this&nbsp;month</a>:" + \
+		":<a href=\"thisyear.htm\">this&nbsp;year</a>:\n" )
+	FH.write( "    <br>:<a href=\"record.htm\">records</a>::<a href=\"monthlyrecord.htm\">monthly&nbsp;records</a>:" + \
+		":<a href=\"trends.htm\">trends</a>::<a href=\"http://sandaysoft.com/forum/\">forum</a>:" + \
+		":<a href=\"http://dillys.org/WX/NW_View.html\">webcam</a>:\n" )
+	FH.write( "    <br>:<a href=\"status.html\">Pi status</a>:" + \
+		":<a href=\"https://www.wunderground.com/personal-weather-station/dashboard?ID=KPAMCMUR4\">KPAMCMUR4</a>:</td>\n" )
 
   	FH.write( "  </tr>\n" )
 	FH.write( " </table></center>\n" )
@@ -448,40 +547,13 @@ def summarize():
 	FH.close
 
 
-
-
-
-
-
-#	print "<HEAD><TITLE>"
-#	print "Raspberry Pi / Cumulus MX Health"
-#	print "</TITLE></HEAD><BODY BGCOLOR="#555555" TEXT="#FFFFFF" LINK="#FFFF00" VLINK="#FFBB00" ALINK="#FFAAFF"><H1>"
-#	print "Raspberry Pi / Cumulus MX Health"
-#	print "</H1>"
-#	print "<P> &nbsp;"
-	
-#	print "<TABLE>"
-#	for iii in range(0, len(data)):
-#		print "<TR><TD> {} </TD><TD> {} </TD></TR>".format( data_keys[iii], data[ data_keys[iii] ] )
-#	print "</TABLE>"
-
-#	print "<P> &nbsp;"
-#	print "<P> &nbsp;"
-#	print "<P ALIGN=CENTER> Updated timestamp"
-
-
-
 # ----------------------------------------------------------------------------------------
-#
-#
 #
 #   https://www.cyberciti.biz/faq/linux-find-out-raspberry-pi-gpu-and-arm-cpu-temperature-command/
 #   https://www.raspberrypi.org/forums/viewtopic.php?t=47469
 #   https://www.raspberrypi.org/forums/viewtopic.php?t=190489 - Temp and Freq !!
 #   https://www.raspberrypi.org/forums/viewtopic.php?t=39953
 #   https://raspberrypi.stackexchange.com/questions/56611/is-this-idle-temperature-normal-for-the-rpi-3
-#
-#
 #
 #  We could definately round this.   It appears to be quantized .... and maybe close to Farherheit
 # ----------------------------------------------------------------------------------------
@@ -493,7 +565,10 @@ def read_cpu_temp():
 
 
 # ----------------------------------------------------------------------------------------
-def setup():
+# Copied from the SunFounder example to configure the GPIO ports.
+#
+# ----------------------------------------------------------------------------------------
+def GPIO_setup():
 	GPIO.setmode(GPIO.BCM)
 	GPIO.setup(17, GPIO.OUT, initial=GPIO.HIGH)
 	GPIO.setup(18, GPIO.OUT, initial=GPIO.HIGH)
@@ -512,6 +587,9 @@ def setup():
 	'''
 
 # ----------------------------------------------------------------------------------------
+# This power-cycles the web cam by triggering the rely for a period.
+#
+# ----------------------------------------------------------------------------------------
 def power_cycle():
 	##DEBUG## ___print '...Relay channel %d on' % 1
 	##DEBUG## ___print '...open leftmost pair of connectors.'
@@ -524,12 +602,20 @@ def power_cycle():
 	GPIO.output(17, GPIO.HIGH)
 
 # ----------------------------------------------------------------------------------------
+# Clean up the GPIO configure on exit
+#
+# ----------------------------------------------------------------------------------------
 def destroy():
 	##DEBUG## ___print "\nShutting down..."
 	logger("Shutting down...\n")
 	GPIO.output(17, GPIO.HIGH)
 	GPIO.cleanup()
 
+# ----------------------------------------------------------------------------------------
+# Write message to the log file with a leading timestamp.
+#
+# NOTE: Most of the call to messager() should be converted to logger() at some point.
+#       especially if we want to turn this into a service.
 # ----------------------------------------------------------------------------------------
 def logger(message):
 	timestamp = datetime.datetime.utcnow().strftime(strftime_FMT)
@@ -542,10 +628,16 @@ def logger(message):
 		FH.close
 
 # ----------------------------------------------------------------------------------------
+# Print message with a leading timestamp.
+#
+# ----------------------------------------------------------------------------------------
 def messager(message):
 	timestamp = datetime.datetime.utcnow().strftime(strftime_FMT)
 	print timestamp + " " + message
 
+# ----------------------------------------------------------------------------------------
+# Write the PID of this Python script to a .PID file by the name name.
+# This gets run at script start-up.
 # ----------------------------------------------------------------------------------------
 def write_pid_file():
 	PID = str(getpid()) + "\n"
@@ -568,6 +660,7 @@ def write_pid_file():
 #   0 ==> OK
 # ----------------------------------------------------------------------------------------
 def ws_data_stopped():
+	global data
 	FH = open(data_stop_file, "r")
 	data_status = int( FH.readline() )
 	FH.close
@@ -576,6 +669,7 @@ def ws_data_stopped():
 			ws_data_last_secs = int( datetime.datetime.utcnow().strftime("%s") )
 			# Long message the first time we see this...
 			messager( "WARNING:  CumulusMX reports data_stopped (<#DataStopped> == 1)." )
+			log_event("", "CumulusMX reports data_stopped (<#DataStopped> == 1).", 101 )
 		else:
 			elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  ws_data_last_secs 
 			# Short message while this status continues
@@ -887,19 +981,6 @@ def mem_usage():
 
 	return " {:6d}, {:2d}%, {:6d}, {:2d}%, {:4.1f}c, {:5.1f}f,".format(effective_used, mem_pct, swap_used, swap_pct, \
 		cpu_temp, cpu_temp_f )
-#
-#	return " {:6d}, {:2d}%, {:6d}, {:2d}%, {:4.1f}c, {:5.1f}f,".format(effective_used, mem_pct, swap_used, swap_pct, \
-#		cpu_temp, cpu_temp_f ) + \
-#		"\nfree|" + free
-#
-#	return "  {},  {}%,  {},  {}%,".format(effective_used, mem_pct, swap_used, swap_pct) + \
-#		"\nfree|" + free
-#
-#	return " mem_used={} ({}%) swap_used={} ({}%)".format(effective_used, mem_pct, swap_used, swap_pct) + \
-#		"\nfree|" + free
-#
-#	return " mem_used={} ({}%) swap_used={} ({}%)".format(effective_used, mem_pct, swap_used, swap_pct) + \
-#		"  {}/{}/{}/{}/{}".format(bu_ca_used, bu_ca_free, shared, buffers, cached)
 
 
 # ----------------------------------------------------------------------------------------
@@ -984,16 +1065,24 @@ def rf_dropped() :
 			if saved_exception_tstamp == exception_tstamp :
 				messager( "WARNING:  Cumulus MX Exception thrown (see above) @ " + \
 					exception_tstamp )
+				###############################################################               log_event(exception_tstamp, "Cumulus MX Exception thrown (see above)"
 			else:
 				print ""
 				###   messager( "DEBUG:  exception_tstamp = " + exception_tstamp  )
 				messager( "WARNING:  Cumulus MX Exception thrown:    exception_tstamp = " + \
 					exception_tstamp )
+
+				log_fragment = "<BR><FONT SIZE=-1><PRE>\n"
 				for jjj in range(iii-3, 0, 1) :
 					# Number the lines in the file we read
 					print str(len(lineList)+jjj+1) + "\t" + lineList[jjj].rstrip()
+					log_fragment = log_fragment + \
+						"{:06d}  {}\n".format( (len(lineList)+jjj+1), lineList[jjj].rstrip())
+
+				log_fragment = log_fragment + "</PRE></FONT>\n"
 				messager( "WARNING:    from  " + mxdiags_dir + "/" + log_file )
 				print ""
+				log_event(exception_tstamp, "Cumulus MX Exception thrown:" + log_fragment, 110 )
 			saved_exception_tstamp = exception_tstamp 
 			break
 
@@ -1016,6 +1105,7 @@ def rf_dropped() :
 				# Long message the first time we see this...
 				messager( "WARNING:  Sensor contact lost; ignoring outdoor data.  " + \
 					"Press \"V\" button on WS console" )
+				log_event("", "Sensor contact lost; ignoring outdoor data.", 115)
 			else:
 				elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  saved_contact_lost 
 				# Shorter message while this status continues
@@ -1039,10 +1129,11 @@ def rf_dropped() :
 
 		else :
 			if iii < (-1 * check_lines) + 1 :
-				messager( "WARNING:  Unknow status from  " + mxdiags_dir + "/" + log_file )
+				messager( "WARNING:  Unknown status from  " + mxdiags_dir + "/" + log_file )
 				for jjj in range(iii-3, 0, 1) :
 					# Number the lines in the file we read
 					print str(len(lineList)+jjj+1) + "\t" + lineList[jjj].rstrip()
+				log_event("", "Unknown status from  " + mxdiags_dir + "/" + log_file, 199 )
 
 
 	# --------------------------------------------------------------------------------
@@ -1062,7 +1153,6 @@ def rf_dropped() :
 	# --------------------------------------------------------------------------------
 	data['rf_dropped'] = return_value
 	return return_value
-
 
 
 	# --------------------------------------------------------------------------------
@@ -1193,10 +1283,11 @@ def camera_down():
 # For reporting, get the "time" of last start from systemctl.  It's really a pretty
 # human-readable string.  A timestamp is also available.
 # ----------------------------------------------------------------------------------------
+# NOTE: This and cmx_svc_runtime() could be combined.
+# ----------------------------------------------------------------------------------------
 #
 #      $ systemctl status cumulusmx | grep since
 #        Active: active (running) since Thu 2017-10-19 17:34:34 EDT; 2 weeks 3 days ago
-#                                                                    ~~~~~~~~~~~~~~
 #
 # ----------------------------------------------------------------------------------------
 def last_restarted():
@@ -1206,6 +1297,11 @@ def last_restarted():
 	lines = re.split('\n', output)
 
 	for iii in range(0, len(lines)):
+		if re.search('Main PID:', lines[iii]) :
+			mono_pid = re.sub('.*Main PID:.', '', lines[iii])
+			mono_pid = re.sub(' \(.*', '', mono_pid)
+			break
+
 		if re.search('since', lines[iii]) :
 
 			start_time = re.sub('.* since ... ', '', lines[iii])
@@ -1213,13 +1309,14 @@ def last_restarted():
 			duration = re.sub('.*; ', '', lines[iii])
 			duration = re.sub(' ago', '', duration)
 			#  TO STRIP TIMEZONE #####  start_time = re.sub('...;.*', '', start_time)
-			break
+			##########################################                                  break
 
 	# messager( "DEBUG: CumulusXM service started at " + start_time )
 	# messager( "DEBUG: CumulusXM service was started " + duration )
-	timestamp = datetime.datetime.utcnow().strptime(start_time, "%Y-%m-%d %H:%M:%S %Z")
+	timestamp = datetime.datetime.now().strptime(start_time, "%Y-%m-%d %H:%M:%S %Z")
 	# print timestamp.strftime(strftime_FMT)
 
+	data['mono_pid'] = mono_pid
 	data['last_restarted'] = duration
 	return duration
 
@@ -1227,10 +1324,13 @@ def last_restarted():
 # Return run-time of cumulusmx service as fractional days - Excel-style date.
 #
 # ----------------------------------------------------------------------------------------
+# NOTE: This and last_restarted() could be combined.
+# ----------------------------------------------------------------------------------------
 #      $ systemctl status cumulusmx | grep since
 #        Active: active (running) since Thu 2017-10-19 17:34:34 EDT; 2 weeks 3 days ago
 # ----------------------------------------------------------------------------------------
 def cmx_svc_runtime():
+	global data
 	strftime_pattern = "%Y-%m-%d %H:%M:%S %Z"
 	output = subprocess.check_output(["/bin/systemctl", "status", "cumulusmx"])
 	lines = re.split('\n', output)
@@ -1243,9 +1343,9 @@ def cmx_svc_runtime():
 			#  TO STRIP TIMEZONE #####  start_time = re.sub('...;.*', '', start_time)
 			break
 
-	timestamp = datetime.datetime.utcnow().strptime(start_time, strftime_pattern)
+	timestamp = datetime.datetime.now().strptime(start_time, strftime_pattern)
 	start_secs = int(timestamp.strftime("%s"))
-	now_secs = int(datetime.datetime.utcnow().strftime("%s"))
+	now_secs = int(datetime.datetime.now().strftime("%s"))
 	duration = now_secs - start_secs
 	in_days = float(duration) / float( 60*60*24 )
 
@@ -1269,30 +1369,32 @@ def cmx_svc_runtime():
 #    <#intemp> <#tempunitnodeg>
 #
 # ----------------------------------------------------------------------------------------
-def ambient_temp():
+def amb_temp():
+	global data
 	FH = open(ambient_temp_file, "r")
 	# data_string = FH.readline()
 	# data_string = re.sub('\n', '', data_string)
 	data_string = re.sub('\n', '', FH.readline() )
 	# lines = re.split('\n', data_string)
 	FH.close
-	data['ambient_temp'] = float( re.sub(r' .*', r'', data_string ) )
+	data['amb_temp'] = float( re.sub(r' .*', r'', data_string ) )
 	return data_string
 
 
 
 # ----------------------------------------------------------------------------------------
-# 
-# 
+# The function main contains a "do forever..." (and is called in a try block here)
+#
+# This handles the startup and shutdown of the script.
 # ----------------------------------------------------------------------------------------
 if __name__ == '__main__':
-###	setup()
+###	GPIO_setup()
 	#### if sys.argv[1] = "stop"
 	this_script = sys.argv[0]
 	messager("  Starting " + this_script + "  PID=" + str(getpid()))
-	messager("Python version: " + str(sys.version))
-	# logger( "Starting " + this_script + "  PID=" + str(getpid()))
+
 	write_pid_file()
+	last_restarted()	# This reads the PID for the main mono process
 	try:
 		main()
 	except KeyboardInterrupt:
@@ -1300,6 +1402,8 @@ if __name__ == '__main__':
 #		destroy()
 
 # ----------------------------------------------------------------------------------------
+#   2.7.9 (default, Sep 17 2016, 20:26:04)
+#   [GCC 4.9.2]
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
