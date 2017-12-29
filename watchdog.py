@@ -132,18 +132,18 @@ pcyc_holdoff_time = 0
 data = []
 data = { 'watcher_pid' : getpid() }
 data_keys = [
-	"watcher_pid",
 	"mono_pid",
+	"watcher_pid",
 	"last_restarted",
 	"cmx_svc_runtime",
 	"server_stalled",
 	"ws_data_stopped",
 	"rf_dropped",
+	"camera_down",
 	"last_realtime",
 	"proc_pct",
 	"proc_load",
 	"proc_load_5m",
-	"camera_down",
 	"mono_threads",
 	"effective_used",
 	"mem_pct",
@@ -151,7 +151,9 @@ data_keys = [
 	"swap_pct",
 	"cpu_temp_c",
 	"cpu_temp_f",
-	"python_version" ]
+	"amb_temp",
+	"python_version"
+	]
 	# amb_temp   {}
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -167,18 +169,20 @@ data_format = [
 	"{}",
 	"{}",
 	"{}",
+	"{} sec",
 	"{:5.1f}%",
 	"{:7.2f}",
 	"{:7.2f}",
 	"{}",
-	"{}",
-	"{}",
+	"{} bytes",
 	"{}&percnt;",
-	"{}",
+	"{} bytes",
 	"{}&percnt;",
-	"{:6.1f}",
-	"{:6.1f}",
-	"{}" ]
+	"{:6.1f} &deg;C",
+	"{:6.1f} &deg;F",
+	"{:6.1f} &deg;F",
+	"{}"
+	]
 
 thresholds = [
 	-1,
@@ -188,19 +192,21 @@ thresholds = [
 	1,
 	1,
 	1,
+	1,
 	120,
 	10.0,
 	4.0,
 	4.0,
-	1,
 	20,
 	-1,
 	15,
 	1024,
 	1,
 	55,
-	125,
-	-1 ]
+	131,
+	100,
+	-1
+	]
 	# amb_temp   {}
 
 
@@ -224,7 +230,8 @@ CSV_keys = [
 	"cpu_temp_f",
 	"amb_temp",
 	"proc_pct",
-	"cmx_svc_runtime", ]
+	"cmx_svc_runtime"
+	]
 
 # https://pyformat.info/
 CSV_format = [
@@ -243,7 +250,8 @@ CSV_format = [
 	"{:5.1f}f",
 	"{:5.1f}f",
 	"{:5.1f}%",
-	"{:16.10f}" ]
+	"{:16.10f}"
+	]
 
 
 # ----------------------------------------------------------------------------------------
@@ -419,14 +427,20 @@ def mono_threads():
 #
 # ----------------------------------------------------------------------------------------
 def log_event(ID, description, code):
+	bgcolor = "TD"
 	# Supply timestamp if no ID was given
 	if len(ID) < 1 :
 		ID = datetime.datetime.now().strftime(strftime_FMT + " (local)")
 
-	FH = open(events_page , "a")
+	if code == 101 :
+		bgcolor = "TD BGCOLOR=blue"
+	if code == 115 :
+		bgcolor = "TD BGCOLOR=red"
 
-	format_str = "<TR><TD> {} </TD><TD> {} </TD><TD> {} </TD></TR>\n"
-	FH.write( format_str.format( ID, description, code ) )
+	format_str = "<TR><TD> {} </TD>\n<TD> {} </TD>\n<{}> {} </TD></TR>\n"
+
+	FH = open(events_page , "a")
+	FH.write( format_str.format( ID, description, bgcolor, code) )
 
 	FH.close
 
@@ -467,13 +481,6 @@ def summarize():
 		# thresholds
 		format_str = "<TR><TD{}> {} </TD><TD ALIGN=right{}> " + data_format[iii]  + " </TD><TD ALIGN=right{}> {} </TD></TR>\n"
 		FH.write( format_str.format( bgcolor, data_keys[iii], bgcolor, data[data_keys[iii]], bgcolor, thresholds[iii] ) )
-
-	# format_str = "<TR><TD> Ambient Temp </TD><TD ALIGN=right> {} </TD></TR>\n"
-	# thresholds
-	format_str = "<TR><TD> Ambient Temp &deg;F </TD><TD ALIGN=right> {} </TD><TD ALIGN=right> -1 </TD></TR>\n"
-	## >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> FH.write( format_str.format( amb_temp() ) )
-	FH.write( format_str.format( data['amb_temp'] ) )
-
 
 	FH.write( "<TR><TD COLSPAN=3 ALIGN=center><FONT SIZE=-1>\n" )
 	FH.write( datetime.datetime.utcnow().strftime(strftime_FMT) + " GMT" )
@@ -1278,8 +1285,8 @@ def cmx_svc_runtime():
 	timestamp = datetime.datetime.now().strptime(start_time, "%Y-%m-%d %H:%M:%S %Z")
 	start_secs = int(timestamp.strftime("%s"))
 	now_secs = int(datetime.datetime.now().strftime("%s"))
-	duration = now_secs - start_secs
-	in_days = float(duration) / float( 60*60*24 )
+	secs_running = now_secs - start_secs
+	in_days = float(secs_running) / float( 60*60*24 )
 
 	data['cmx_svc_runtime'] = in_days
 	data['mono_pid'] = mono_pid
