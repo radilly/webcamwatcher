@@ -29,6 +29,9 @@
 # reducing the output.
 #
 # ========================================================================================
+# 20180108 RAD When I restarted the cumulusmx service the change of PID caused a
+#              failure.  cmx_svc_runtime() moved up in the do forever loop to
+#              handle this case.
 # 20171209 RAD Added cmx_svc_runtime().  Changed the method or writing the CSV-style
 #              output lines to leverage the data[] array.
 #              NOTE: 
@@ -90,7 +93,7 @@ Relay_channel = [17]
 # sleep_for = 300
 sleep_for = 24
 sleep_on_recycle = 600
-log_stride = 20
+log_header_stride = 10
 summary_stride = 3
 
 last_secs = 999999          # This is a sentinel value for startup.
@@ -98,7 +101,7 @@ last_date = ""
 proc_load_lim = 4.0         # See https://www.booleanworld.com/guide-linux-top-command/
 mem_usage_lim = 85
 ws_data_last_secs = 0       # Number of epoch secs at outage start
-saved_contact_lost = 0      # Number of epoch secs when RF contact lost
+saved_contact_lost = -1     # Number of epoch secs when RF contact lost
 
 BASE_DIR =              "/mnt/root/home/pi/Cumulus_MX"
 data_stop_file =        BASE_DIR + "/web/DataStoppedT.txttmp"
@@ -276,7 +279,7 @@ def main():
 
 	iii = 0
 	while True:
-		if 0 == iii % log_stride:
+		if 0 == iii % log_header_stride:
 			amb_temp()        # This won't / shouldn't change rapidly so sample periodically
 
 			hdr = "date-time,"
@@ -293,8 +296,8 @@ def main():
 		proc_load()
 		proc_pct()
 		camera_down()
-		mono_threads()
 		cmx_svc_runtime()
+		mono_threads()
 		mem_usage()
 
 		CSV_rec = datetime.datetime.utcnow().strftime(strftime_FMT) + ","
@@ -408,7 +411,20 @@ def mono_threads():
 	PID = str( data['mono_pid'] )
 
 	# --------------------------------------------------------------------------------
+	#  This failed 01/08/18 when I restarted the "cumulusmx" service.  I reordered
+	#  the calls in the do forever loop which should avoid this...
+	#        Traceback (most recent call last):
+	#          File "/mnt/root/home/pi/watchdog.py", line 1362, in <module>
+	#            main()
+	#          File "/mnt/root/home/pi/watchdog.py", line 296, in main
+	#            mono_threads()
+	#          File "/mnt/root/home/pi/watchdog.py", line 413, in mono_threads
+	#            fileHandle = open ( "/proc/" + str(PID) + "/stat","r" )
+	#        IOError: [Errno 2] No such file or directory: '/proc/540/stat'
 	#
+	#  We could check that we have the right process via cmdline...
+	#    $ cat /proc/13899/cmdline
+	#    /usr/bin/mono/mnt/root/home/pi/Cumulus_MX/CumulusMX.exe
 	# --------------------------------------------------------------------------------
 	fileHandle = open ( "/proc/" + str(PID) + "/stat","r" )
 	lineList = fileHandle.readlines()
@@ -432,10 +448,21 @@ def log_event(ID, description, code):
 	if len(ID) < 1 :
 		ID = datetime.datetime.now().strftime(strftime_FMT + " (local)")
 
+	# http://htmlcolorcodes.com/
 	if code == 101 :
 		bgcolor = "TD BGCOLOR=blue"
+	if code == 103 :
+		bgcolor = "TD BGCOLOR=#BA37C7"    # Violet-Pink
+	if code == 104 :
+		bgcolor = "TD BGCOLOR=#6137C7"    # Blue-Purple
+	if code == 105 :
+		bgcolor = "TD BGCOLOR=#0E7135"    # Dark Green
+	if code == 111 :
+		bgcolor = "TD BGCOLOR=#1F838A"    # Dark Turquoise
 	if code == 115 :
 		bgcolor = "TD BGCOLOR=red"
+	if code == 116 :
+		bgcolor = "TD BGCOLOR=green"
 
 	format_str = "<TR><TD> {} </TD>\n<TD> {} </TD>\n<{}> {} </TD></TR>\n"
 
@@ -642,7 +669,7 @@ def ws_data_stopped():
 		if ws_data_last_secs < 1 :
 			ws_data_last_secs = int( datetime.datetime.utcnow().strftime("%s") )
 			# Long message the first time we see this...
-			messager( "WARNING:  CumulusMX reports data_stopped (<#DataStopped> == 1)." )
+			messager( "WARNING:  CumulusMX reports data_stopped (<#DataStopped> == 1).   (code 101)" )
 			log_event("", "CumulusMX reports data_stopped (<#DataStopped> == 1).", 101 )
 		else:
 			elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  ws_data_last_secs 
@@ -988,6 +1015,7 @@ def rf_dropped() :
 	global data
 	check_lines = 12
 	return_value = 0
+	logger_code =111
 	file_list = listdir( mxdiags_dir )
 
 	file_list.sort()
@@ -1044,10 +1072,14 @@ def rf_dropped() :
 					exception_tstamp )
 				###############################################################               log_event(exception_tstamp, "Cumulus MX Exception thrown (see above)"
 			else:
+				if "at System.Net.WebConnection.HandleError(WebExceptionStatus" in lineList[iii] :
+					logger_code =110
+				else :
+					logger_code =111
 				print ""
 				###   messager( "DEBUG:  exception_tstamp = " + exception_tstamp  )
 				messager( "WARNING:  Cumulus MX Exception thrown:    exception_tstamp = " + \
-					exception_tstamp )
+					exception_tstamp + "  (" + str(logger_code) + ")" )
 
 				log_fragment = "<BR><FONT SIZE=-1><PRE>\n"
 				for jjj in range(iii-3, 0, 1) :
@@ -1059,7 +1091,8 @@ def rf_dropped() :
 				log_fragment = log_fragment + "</PRE></FONT>\n"
 				messager( "WARNING:    from  " + mxdiags_dir + "/" + log_file )
 				print ""
-				log_event(exception_tstamp, "Cumulus MX Exception thrown:" + log_fragment, 110 )
+
+				log_event(exception_tstamp, "Cumulus MX Exception thrown:" + log_fragment, logger_code )
 			saved_exception_tstamp = exception_tstamp 
 			break
 
@@ -1081,7 +1114,7 @@ def rf_dropped() :
 				saved_contact_lost = int( datetime.datetime.utcnow().strftime("%s") )
 				# Long message the first time we see this...
 				messager( "WARNING:  Sensor contact lost; ignoring outdoor data.  " + \
-					"Press \"V\" button on WS console" )
+					"Press \"V\" button on WS console   (code 115)" )
 				log_event("", "Sensor contact lost; ignoring outdoor data.", 115)
 			else:
 				elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  saved_contact_lost 
@@ -1101,12 +1134,16 @@ def rf_dropped() :
 		elif "WU Response: OK: success" in lineList[iii] :
 		# 	___print "Data OK"
 			if iii < -3 :
-				saved_contact_lost = 0
+				if saved_contact_lost > 2 :
+					elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  saved_contact_lost 
+					log_event("", "Sensor contact RESTORED; receiving telemetry again.", 116)
+					messager( "WARNING:  Sensor contact RESTORED; ... lost for " + str(elapsed) + " sec   (code 116)" )
+				saved_contact_lost = -1
 				break
 
 		else :
 			if iii < (-1 * check_lines) + 1 :
-				messager( "WARNING:  Unknown status from  " + mxdiags_dir + "/" + log_file )
+				messager( "WARNING:  Unknown status from  " + mxdiags_dir + "/" + log_file + "   (code 199)" )
 				for jjj in range(iii-3, 0, 1) :
 					# Number the lines in the file we read
 					print str(len(lineList)+jjj+1) + "\t" + lineList[jjj].rstrip()
@@ -1231,9 +1268,11 @@ def camera_down():
 			if int(time.strftime("%s")) > pcyc_holdoff_time :
 				# holdoff has expired
 				logger(words[0] + " " + words[2] + " waiting on webcam image update.")
+				log_event("", " waiting on webcam image update.", 104 )
 		else:
 			pcyc_holdoff_time = int(time.strftime("%s")) + 600
 			logger(words[0] + " " + words[2] + " power cycled")
+			log_event("", " Webcam image update stalled.", 103 )
 
 		# ------------------------------------------------------------------------
 		# Give the cam time to reset, and the webserver crontab to fire.
@@ -1248,6 +1287,7 @@ def camera_down():
 	else:
 		pcyc_holdoff_time = 0
 		data['camera_down'] = 0
+		## log_event("", " Webcam image updating!.", 105 )
 		return 0
 
 
