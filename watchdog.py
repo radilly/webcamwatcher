@@ -29,12 +29,13 @@
 # reducing the output.
 #
 # ========================================================================================
+#              NOTE: Don't necessarily need "Cumulus MX Exception thrown (see above)"
+#                    messages.  Added end message 01/08/2018.
 # 20180108 RAD When I restarted the cumulusmx service the change of PID caused a
 #              failure.  cmx_svc_runtime() moved up in the do forever loop to
 #              handle this case.
 # 20171209 RAD Added cmx_svc_runtime().  Changed the method or writing the CSV-style
 #              output lines to leverage the data[] array.
-#              NOTE: 
 # 20171012 RAD Started writing status.html, which CMX copies up to the web-server.
 #              It's pretty simple yet, but now I can at least check the current
 #              status remoted via web-browser.
@@ -121,6 +122,7 @@ proc_stat_hist_n = 10		# Control length of history array to keep
 # strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
 strftime_FMT = "%Y/%m/%d %H:%M:%S"
 saved_exception_tstamp = "9999-99-9999:00:00.999:....."
+saved_exception_tstamp = "X"
 
 pcyc_holdoff_time = 0
 
@@ -134,6 +136,8 @@ pcyc_holdoff_time = 0
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 data = []
 data = { 'watcher_pid' : getpid() }
+data['camera_down'] = 0
+
 data_keys = [
 	"mono_pid",
 	"watcher_pid",
@@ -155,7 +159,8 @@ data_keys = [
 	"cpu_temp_c",
 	"cpu_temp_f",
 	"amb_temp",
-	"python_version"
+	"python_version",
+	"webcamwatch_down"
 	]
 	# amb_temp   {}
 
@@ -184,6 +189,7 @@ data_format = [
 	"{:6.1f} &deg;C",
 	"{:6.1f} &deg;F",
 	"{:6.1f} &deg;F",
+	"{}",
 	"{}"
 	]
 
@@ -208,7 +214,8 @@ thresholds = [
 	55,
 	131,
 	100,
-	-1
+	-1,
+	0
 	]
 	# amb_temp   {}
 
@@ -233,7 +240,8 @@ CSV_keys = [
 	"cpu_temp_f",
 	"amb_temp",
 	"proc_pct",
-	"cmx_svc_runtime"
+	"cmx_svc_runtime",
+	"webcamwatch_down"
 	]
 
 # https://pyformat.info/
@@ -253,7 +261,8 @@ CSV_format = [
 	"{:5.1f}f",
 	"{:5.1f}f",
 	"{:5.1f}%",
-	"{:16.10f}"
+	"{:16.10f}",
+	"{}"
 	]
 
 
@@ -299,6 +308,7 @@ def main():
 		cmx_svc_runtime()
 		mono_threads()
 		mem_usage()
+		webcamwatch_down()
 
 		CSV_rec = datetime.datetime.utcnow().strftime(strftime_FMT) + ","
 
@@ -459,6 +469,8 @@ def log_event(ID, description, code):
 		bgcolor = "TD BGCOLOR=#0E7135"    # Dark Green
 	if code == 111 :
 		bgcolor = "TD BGCOLOR=#1F838A"    # Dark Turquoise
+	if code == 112 :
+		bgcolor = "TD BGCOLOR=#0E7135"    # Dark Green
 	if code == 115 :
 		bgcolor = "TD BGCOLOR=red"
 	if code == 116 :
@@ -699,6 +711,7 @@ def server_stalled():
 		response = urllib.urlopen('http://dillys.org/wx/WS_Updates.txt')
 		content = response.read()
 	except:
+		print "Unexpected ERROR in server_stalled:", sys.exc_info()[0]
 		content = "12"      # Assume a good answer...
 	# .................................................................
 	# Strip off the trailing newline which is helpf when catting on the other
@@ -754,7 +767,7 @@ def last_realtime():
 		response = urllib.urlopen('http://dillys.org/wx/realtime.txt')
 		content = response.read()
 	except:
-		print "Unexpected ERROR:", sys.exc_info()[0]
+		print "Unexpected ERROR in last_realtime:", sys.exc_info()[0]
 		# --------------------------------------------------------------
 		#  https://docs.python.org/2/tutorial/errors.html
 		#  https://docs.python.org/2/library/sys.html
@@ -766,7 +779,7 @@ def last_realtime():
 		#  https://stackoverflow.com/questions/8238360/how-to-save-traceback-sys-exc-info-values-in-a-variable
 		# --------------------------------------------------------------
 		content = "00/00/00 00:00:00 45.5 80 39.7 0.0 0.7 360 0.00 0.05 30.14 N 0 mph ..."
-		messager( "DEBUG: content = \"" + content + "\"" )
+		messager( "DEBUG: content = \"" + content + "\" in last_realtime()" )
 
 	words = re.split(' +', content)
 
@@ -1067,17 +1080,15 @@ def rf_dropped() :
 
 		if "Exception" in lineList[iii] :
 			exception_tstamp = re.sub(r'([-0-9]+ [\.:0-9]+).*', r'\1', lineList[iii] )
-			if saved_exception_tstamp == exception_tstamp :
-				messager( "WARNING:  Cumulus MX Exception thrown (see above) @ " + \
-					exception_tstamp )
-				###############################################################               log_event(exception_tstamp, "Cumulus MX Exception thrown (see above)"
-			else:
+			if saved_exception_tstamp != exception_tstamp :
+				# This is the signature of the most common exception we seem to see.
 				if "at System.Net.WebConnection.HandleError(WebExceptionStatus" in lineList[iii] :
 					logger_code =110
+					saved_exception_tstamp = exception_tstamp 
 				else :
 					logger_code =111
+
 				print ""
-				###   messager( "DEBUG:  exception_tstamp = " + exception_tstamp  )
 				messager( "WARNING:  Cumulus MX Exception thrown:    exception_tstamp = " + \
 					exception_tstamp + "  (" + str(logger_code) + ")" )
 
@@ -1093,7 +1104,10 @@ def rf_dropped() :
 				print ""
 
 				log_event(exception_tstamp, "Cumulus MX Exception thrown:" + log_fragment, logger_code )
-			saved_exception_tstamp = exception_tstamp 
+###			else:
+###				messager( "WARNING:  Cumulus MX Exception thrown (see above) @ " + \
+###				check_lines = 12
+###					exception_tstamp )
 			break
 
 		# ------------------------------------------------------------------------
@@ -1130,15 +1144,20 @@ def rf_dropped() :
 		# of these "bad" messages.
 		# 11/05/17 - Added an if to skip the break until at least a few lines
 		#            have been checked.
+		# 01/08/18 - Chnaged that check from -3 to -2
 		# ------------------------------------------------------------------------
 		elif "WU Response: OK: success" in lineList[iii] :
 		# 	___print "Data OK"
-			if iii < -3 :
+			if iii < 0 :    #################################################  HACKED -----   ALWAYS TRUE
 				if saved_contact_lost > 2 :
 					elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  saved_contact_lost 
 					log_event("", "Sensor contact RESTORED; receiving telemetry again.", 116)
-					messager( "WARNING:  Sensor contact RESTORED; ... lost for " + str(elapsed) + " sec   (code 116)" )
+					messager( "INFO:  Sensor contact RESTORED; ... lost for " + str(elapsed) + " sec   (code 116)" )
 				saved_contact_lost = -1
+				if len( saved_exception_tstamp ) > 3 :
+					messager( "INFO: \"WU Response: OK: success\"; clearing pending exception flag.   (code 112)" )
+					log_event("","\"WU Response: OK: success\"; clearing pending exception flag.", 112)
+				saved_exception_tstamp = "X"    # Set this flag back to the sentinal value
 				break
 
 		else :
@@ -1221,8 +1240,9 @@ def camera_down():
 		#     Maybe content = "0 0 00:00:00_UTC" if urlopen fails??
 		# ------------------------------------------------------------------
 	except:
+		print "Unexpected ERROR in camera_down:", sys.exc_info()[0]
 		content = "0 0 00:00:00_UTC "
-		messager( "DEBUG: content = \"" + content + "\"" )
+		messager( "DEBUG: content = \"" + content + "\" in camera_down()" )
 
 	words = re.split(' +', content)
 	##DEBUG## ___print words[0], words[2]
@@ -1268,7 +1288,8 @@ def camera_down():
 			if int(time.strftime("%s")) > pcyc_holdoff_time :
 				# holdoff has expired
 				logger(words[0] + " " + words[2] + " waiting on webcam image update.")
-				log_event("", " waiting on webcam image update.", 104 )
+				###### if data['camera_down'] == 0 :
+				######	log_event("", " waiting on webcam image update.", 104 )
 		else:
 			pcyc_holdoff_time = int(time.strftime("%s")) + 600
 			logger(words[0] + " " + words[2] + " power cycled")
@@ -1285,9 +1306,10 @@ def camera_down():
 		data['camera_down'] = 1
 		return 1
 	else:
+		if data['camera_down'] == 1 :
+			log_event("", " Webcam image updating!.", 105 )
 		pcyc_holdoff_time = 0
 		data['camera_down'] = 0
-		## log_event("", " Webcam image updating!.", 105 )
 		return 0
 
 
@@ -1332,6 +1354,36 @@ def cmx_svc_runtime():
 	data['mono_pid'] = mono_pid
 	data['last_restarted'] = duration
 	return in_days
+
+
+
+
+# ----------------------------------------------------------------------------------------
+# Return status of wxwatchdog service 
+#
+# ----------------------------------------------------------------------------------------
+#   $ systemctl status wxwatchdog 
+#     Active: active (running) since Thu 2017-10-19 17:34:34 EDT; 2 weeks 3 days ago
+#     Active: inactive (dead) (Result: exit-code) since Tue 2018-01-16 12:54:10 EST; 8h ago
+# ----------------------------------------------------------------------------------------
+def webcamwatch_down():
+	global data
+	ret_val = 1
+	output = subprocess.check_output(["/bin/systemctl", "status", "wxwatchdog"])
+	lines = re.split('\n', output)
+
+	for iii in range(0, len(lines)):
+		if re.search('Active:', lines[iii]) :
+			### print lines[iii]
+			status = re.sub('.*Active:', '', lines[iii])
+			### print status
+			status = re.sub(' *since.*', '', status)
+			### print status
+			if re.search(' active .running.', status) :
+				ret_val = 0
+
+	data['webcamwatch_down'] = ret_val
+	return ret_val
 
 
 

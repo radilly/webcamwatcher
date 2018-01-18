@@ -16,6 +16,10 @@
 # reducing the output.
 #
 # ========================================================================================
+# 20180118 RAD Added "global restart_file" to setup().  "sudo journalctl -u wxwatchdog"
+#              was needed to see "IOError: [Errno 2] No such file or directory: ''",
+#              that filename wasn't being setup. This in turn caused the service
+#              to attempt many restarts.
 # 20170711 RAD Wired up the relay board to AC and got this working with the hardware
 #              by overwriting N_Since_Updated.txt to trip the power cycle.
 #
@@ -56,6 +60,7 @@ iii = 0
 # ----------------------------------------------------------------------------------------
 def setup():
 	global log_file
+	global restart_file
 	GPIO.setwarnings(False)
 	#  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 	#  systemd logs this on restart...
