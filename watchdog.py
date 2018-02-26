@@ -9,6 +9,10 @@
 # Start with ...
 #   nohup /usr/bin/python -u /mnt/root/home/pi/watchdog.py >> /mnt/root/home/pi/watchdog.log 2>&1 &
 #
+#   NOTE: It would be interesting to see if we could log any "significant"
+#         change to a parameter being tracked.  mono_threads comes to mind.
+#         It seems to change in "jumps."  Link more than 2X in a few minutes.
+#
 #
 # This is a first hack to see if I can prove the concept of, basically a
 # watchdog running on a Pi that will detect when images stopped uploading
@@ -31,6 +35,8 @@
 # ========================================================================================
 #              NOTE: Don't necessarily need "Cumulus MX Exception thrown (see above)"
 #                    messages.  Added end message 01/08/2018.
+# 20180224 RAD Had a case when the readline() in ws_data_stopped() returned ''
+#              which could not be converted to an integer. Somewhat kludgy fix.
 # 20180108 RAD When I restarted the cumulusmx service the change of PID caused a
 #              failure.  cmx_svc_runtime() moved up in the do forever loop to
 #              handle this case.
@@ -94,7 +100,15 @@ Relay_channel = [17]
 # sleep_for = 300
 sleep_for = 24
 sleep_on_recycle = 600
-log_header_stride = 10
+# ----------------------------
+#    stride    secs    minutes
+#  	1	24	0.4
+#       2	48	0.8
+#       3	72	1.2
+#       4	96	1.6
+#       5	120	2
+# ----------------------------
+log_header_stride = 15
 summary_stride = 3
 
 last_secs = 999999          # This is a sentinel value for startup.
@@ -198,10 +212,10 @@ thresholds = [
 	-1,
 	-1,
 	-1,
-	1,
-	1,
-	1,
-	1,
+	0,
+	0,
+	0,
+	0,
 	120,
 	10.0,
 	4.0,
@@ -475,6 +489,8 @@ def log_event(ID, description, code):
 		bgcolor = "TD BGCOLOR=red"
 	if code == 116 :
 		bgcolor = "TD BGCOLOR=green"
+	if code == 118 :
+		bgcolor = "TD BGCOLOR=#CC04BD"    # Dark Hot Pink-purple
 
 	format_str = "<TR><TD> {} </TD>\n<TD> {} </TD>\n<{}> {} </TD></TR>\n"
 
@@ -555,7 +571,7 @@ def summarize():
 	FH.write( " </table></center>\n" )
 
 	FH.write( "<P> &nbsp;\n" )
-	FH.write( "<P ALIGN=CENTER> Updated: " + timestamp + "\n" )
+	FH.write( "<P ALIGN=CENTER> Last updated: " + timestamp + " UTC\n" )
 
 	FH.close
 
@@ -674,8 +690,17 @@ def write_pid_file():
 # ----------------------------------------------------------------------------------------
 def ws_data_stopped():
 	global data
+	# Had a case where this file was empty so the string returned was "", which caused
+	# a "ValueError: invalid literal for int() with base 10: ''" from readline().
+	# NOTE: Here I added logic to use a -1 value, but the better answer might be
+	# to try to reread the file several times, with some timeout of course.
 	FH = open(data_stop_file, "r")
-	data_status = int( FH.readline() )
+	text = FH.readline()
+	if re.search('^[01]', text) :
+		data_status = int( text )
+	else:
+		data_status = -1
+
 	FH.close
 	if data_status > 0 :
 		if ws_data_last_secs < 1 :
@@ -1036,7 +1061,15 @@ def rf_dropped() :
 	#for iii in range(0, len(file_list)):
 	#	___print str(iii) + "  " + file_list[iii]
 
-	log_file = file_list[len(file_list)-1]           # Last file in the list
+	for iii in range(-1, -5, -1):
+		### messager( "DEBUG:  Checking in diags file, " + file_list[iii])
+		if re.search('^20', file_list[iii]) :
+			log_file = file_list[iii]
+			break
+
+
+
+	### messager( "DEBUG:  log_file = " + log_file )
 	# ___print log_file
 
 	# --------------------------------------------------------------------------------
@@ -1050,6 +1083,7 @@ def rf_dropped() :
 
 	for iii in range(-1, (-1 * check_lines), -1):
 		lineList[iii] = re.sub('\n', ' ', lineList[iii])        # Remove any newline which might be left
+		### messager( "DEBUG:  lineList[" + str(iii) + "] = \"" + lineList[iii] + "\"" )
 		# ___print str(iii) + " \t" + lineList[iii]
 		# ------------------------------------------------------------------------
 		# We may print the same exception multiple times.  It could be identified
@@ -1092,6 +1126,11 @@ def rf_dropped() :
 				messager( "WARNING:  Cumulus MX Exception thrown:    exception_tstamp = " + \
 					exception_tstamp + "  (" + str(logger_code) + ")" )
 
+				# --------------------------------------------------------
+				# --------------------------------------------------------
+				#  NOTE: This should be moved to a function.
+				# --------------------------------------------------------
+				# --------------------------------------------------------
 				log_fragment = "<BR><FONT SIZE=-1><PRE>\n"
 				for jjj in range(iii-3, 0, 1) :
 					# Number the lines in the file we read
@@ -1124,12 +1163,13 @@ def rf_dropped() :
 		########### if "Sensor contact lost; ignoring outdoor data" in lineList[iii] :
 		### 2017-11-05 07:36:59.373 Sensor contact lost; ignoring outdoor data
 		elif "Sensor contact lost" in lineList[iii] :
+			### messager( "DEBUG:  Sensor contact lost; " + lineList[iii])
 			if saved_contact_lost < 1 :
 				saved_contact_lost = int( datetime.datetime.utcnow().strftime("%s") )
 				# Long message the first time we see this...
 				messager( "WARNING:  Sensor contact lost; ignoring outdoor data.  " + \
 					"Press \"V\" button on WS console   (code 115)" )
-				log_event("", "Sensor contact lost; ignoring outdoor data.", 115)
+				log_event("", "Sensor contact lost; ignoring outdoor data.", 115 )
 			else:
 				elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  saved_contact_lost 
 				# Shorter message while this status continues
@@ -1137,6 +1177,85 @@ def rf_dropped() :
 
 			return_value = 1
 			break
+
+
+
+		# ------------------------------------------------------------------------
+		# 01/22/18 - This type of message caused a problem for Weather Underground
+		#            which required a restart/reboot to clear.
+		#
+		# NOTE: Find unexpected messages really needs some analysis and thought.
+		#
+		# This is a grep of the diags logs for "WU" when CMX got stuck...
+		#   2018-01-22 05:54:01.173 WU Response: OK: success
+		#   2018-01-22 05:55:01.213 WU Response: OK: success
+		#   2018-01-22 05:57:40.987 WU update: The Task was canceled
+		#   2018-01-22 05:59:40.996 WU update: The Task was canceled
+		#   2018-01-22 06:01:41.021 WU update: The Task was canceled
+		#   2018-01-22 06:03:41.006 WU update: The Task was canceled
+		#
+		# I also looked for unique WeatherCloud messages
+		#   WeatherCloud Response: InternalServerError: <h1>CException</h1>
+		#   WeatherCloud Response: OK: 200
+		#   WeatherCloud Response: OK: 429
+		#   WeatherCloud update: The Task was canceled
+		#
+		# ------------------------------------------------------------------------
+		elif "The Task was canceled" in lineList[iii] :
+			# ----------------------------------------------------------------
+			# ----------------------------------------------------------------
+			#  NOTE: This should be moved to a function.
+			# ----------------------------------------------------------------
+			# ----------------------------------------------------------------
+			log_fragment = "<BR><FONT SIZE=-1><PRE>\n"
+			for jjj in range(iii-3, 0, 1) :
+				# Number the lines in the file we read
+				# Here we do NOT use the messager() function.
+				print str(len(lineList)+jjj+1) + "\t" + lineList[jjj].rstrip()
+				log_fragment = log_fragment + \
+					"{:06d}  {}\n".format( (len(lineList)+jjj+1), lineList[jjj].rstrip())
+
+			log_fragment = log_fragment + "</PRE></FONT>\n"
+			messager( "WARNING:   \"The Task was canceled\"  from  " + mxdiags_dir + "/" + log_file )
+			print ""
+
+			log_event("", "Cumulus MX: \"The Task was canceled\"" + log_fragment, 118 )
+
+			break  #####  <<<<<<  NOTE: Not sure this is right.  Check when it fires...
+			# ----------------------------------------------------------------
+			# NOTE: I think the breaks need to be looked at carefully...
+			# Example of resulting log output ... looks reasonable I think.
+			#
+			#   705	
+			#   706	2018-01-22 13:21:00.429 WU Response: OK: success
+			#   707	
+			#   708	2018-01-22 13:21:40.234 WeatherCloud update: The Task was canceled
+			#   2018/01/22 18:21:43 WARNING:   "The Task was canceled"  from  /mnt/root/home/pi/Cumulus_MX/MXdiags/20180122-095424.txt
+			#
+			# ----------------------------------------------------------------
+
+
+
+
+		# ------------------------------------------------------------------------
+		# This message, "Data input appears to have stopped" occurs when
+		# the USB link is lost.  It doesn seem like CumulusMX ever recovers,
+		# but hase to be restarted.
+		#
+		#
+		# ------------------------------------------------------------------------
+		elif "Data input appears to have stopped" in lineList[iii] :
+			# ----------------------------------------------------------------
+			log_event("", "Data input appears to have stopped, USB likely disconnected.", 120 )
+			messager( "INFO: \"Data input appears to have stopped\", USB likely disconnected.   (code 120)" )
+			return_value = 1
+			break
+
+
+
+
+
+
 
 		# ------------------------------------------------------------------------
 		# See the block below for a "Sensor contact lost" example.
@@ -1151,12 +1270,12 @@ def rf_dropped() :
 			if iii < 0 :    #################################################  HACKED -----   ALWAYS TRUE
 				if saved_contact_lost > 2 :
 					elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  saved_contact_lost 
-					log_event("", "Sensor contact RESTORED; receiving telemetry again.", 116)
+					log_event("", "Sensor contact RESTORED; receiving telemetry again.", 116 )
 					messager( "INFO:  Sensor contact RESTORED; ... lost for " + str(elapsed) + " sec   (code 116)" )
 				saved_contact_lost = -1
 				if len( saved_exception_tstamp ) > 3 :
 					messager( "INFO: \"WU Response: OK: success\"; clearing pending exception flag.   (code 112)" )
-					log_event("","\"WU Response: OK: success\"; clearing pending exception flag.", 112)
+					log_event("","\"WU Response: OK: success\"; clearing pending exception flag.", 112 )
 				saved_exception_tstamp = "X"    # Set this flag back to the sentinal value
 				break
 

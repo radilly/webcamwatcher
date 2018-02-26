@@ -49,7 +49,7 @@ from os import getpid
 webcam_channel = 21
 sleep_for = 300
 sleep_on_recycle = 600 - sleep_for
-log_stride = 12
+log_stride = 6
 log_file = ""
 restart_file = ""
 iii = 0
@@ -177,10 +177,25 @@ def camera_down():
 	# 20171106 - Adjusted the web cam clock for DST which tripped the old
 	#            limit of 3000 secs.  4200 allows for 1 hour + 10 minutes
 	#            or approximately 2 additional uploads.
+	# ================================================================================
+	#
+	#  It might be desirable to break up the sleep_on_recycle or something
+	#  so that we do more logging when the camera is not updating. This is
+	#  a log fragment from when the script was failing on restart.
+	#
+	#     20180116 15:10:00 INFO: interval: 316  timestamp: 15:05:02_UTC
+	#     20180116 16:10:03 INFO: interval: 314  timestamp: 16:10:01_UTC
+	#     20180116 17:10:05 INFO: interval: 3615  timestamp: 17:05:02_UTC
+	#     20180116 17:20:26 Starting /mnt/root/home/pi/webcamwatch.py  PID=11850
+	#     20180116 17:20:26 INFO: interval: 4514  timestamp: 17:20:01_UTC
+	#     20180116 17:20:47 Starting /mnt/root/home/pi/webcamwatch.py  PID=11857
+	#     20180116 17:20:47 INFO: interval: 4514  timestamp: 17:20:01_UTC
+	#
+	# ================================================================================
 	if interval > 4200:
-		log_restart( "webcam power-cycled, interval: " + words[0] )
 		power_cycle()
 		logger("WARNING: interval: " + words[0] + "  timestamp: " + words[2])
+		log_restart( "webcam power-cycled, interval: " + words[0] )
 		# Give the cam time to reset, and the webserver crontab to fire.
 		# The camera comes up pretty quickly, but it seems to resynch to
 		# the 5-minute interval, and the server crontab only fires every
