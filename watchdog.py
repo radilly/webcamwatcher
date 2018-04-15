@@ -31,7 +31,8 @@
 # the command line.  My concern though, on a Pi, is that without buffering
 # you're going to hammer the SD Card over time.  Buffering might help, or
 # reducing the output.
-#
+# ========================================================================================
+#      See MXdiags sample at the end of this file
 # ========================================================================================
 #              NOTE: Don't necessarily need "Cumulus MX Exception thrown (see above)"
 #                    messages.  Added end message 01/08/2018.
@@ -562,10 +563,16 @@ def summarize():
 		":<a href=\"today.htm\">today</a>::<a href=\"yesterday.htm\">yesterday</a>::<a href=\"thismonth.htm\">this&nbsp;month</a>:" + \
 		":<a href=\"thisyear.htm\">this&nbsp;year</a>:\n" )
 	FH.write( "    <br>:<a href=\"record.htm\">records</a>::<a href=\"monthlyrecord.htm\">monthly&nbsp;records</a>:" + \
-		":<a href=\"trends.htm\">trends</a>::<a href=\"http://sandaysoft.com/forum/\">forum</a>:" + \
+		":<a href=\"trends.htm\">trends</a>::<a TARGET=\"_blank\" HREF=\"http://sandaysoft.com/forum/\">forum</a>:" + \
 		":<a href=\"http://dillys.org/WX/NW_View.html\">webcam</a>:\n" )
+	FH.write( "    <br>:<a TARGET=\"_blank\" HREF=\"https://app.weathercloud.net/d0208473809#current\">Weathercloud</a>:" + \
+		":<a TARGET=\"_blank\" HREF=\"https://www.pwsweather.com/obs/RADILLY.html\">PWS&nbsp;Weather</a>:" + \
+		":<a TARGET=\"_blank\" HREF=\"https://wx.aerisweather.com/local/us/pa/mcmurray\">AerisWeather</a>:" + \
+		":<a TARGET=\"_blank\" HREF=\"https://radar.weather.gov/Conus/full_loop.php\">NWS&nbsp;Composite&nbsp;US&nbsp;Radar</a>:\n" + \
+		":<a TARGET=\"_blank\" HREF=\"https://www.windy.com/40.279/-80.089?39.317,-80.089,7,m:eMiadVG\">Windy</a>:\n" )
 	FH.write( "    <br>:<a href=\"status.html\">Pi status</a>:" + \
-		":<a href=\"https://www.wunderground.com/personal-weather-station/dashboard?ID=KPAMCMUR4\">KPAMCMUR4</a>:</td>\n" )
+		":<a href=\"events.html\">Event&nbsp;Log</a>:\n" + \
+		":<a TARGET=\"_blank\" HREF=\"https://www.wunderground.com/personal-weather-station/dashboard?ID=KPAMCMUR4\">KPAMCMUR4</a>:</td>\n" )
 
   	FH.write( "  </tr>\n" )
 	FH.write( " </table></center>\n" )
@@ -1026,6 +1033,41 @@ def mem_usage():
 
 
 # ----------------------------------------------------------------------------------------
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# ----------------------------------------------------------------------------------------
+def WX_RF_Restored(cur_line, lineList):
+	global saved_contact_lost
+	countOKs = 0
+	restored = 0
+	# If this is only called when an OK record is already seen, then
+	# cur_line will index that record; we have 1 countOKs
+	for iii in range(cur_line, (cur_line - 12), -1):
+		if "Sensor contact lost" in lineList[iii] :
+			restored = 0
+			break
+		elif "WU Response: OK: success" in lineList[iii] :
+			countOKs += 1
+			if countOKs > 1 :
+				restored = 1
+				messager( "DEBUG:  Sensor contact appears to have been restored after " + str(elapsed) + " sec  (code 116)")
+				log_event("", "DEBUG:  Sensor contact <B>appears</B> to have been restored. Out for " + str(elapsed) + " sec", 116 )
+				break
+		else :
+			messager( "DEBUG:  Sensor RF status indeterminate.")
+
+	return restored
+
+
+# ----------------------------------------------------------------------------------------
 # Check the Cumulus MX Diags log for anything strange going on.
 #
 # If "WU Response: OK: success" is the last line we should be OK.
@@ -1165,6 +1207,8 @@ def rf_dropped() :
 		elif "Sensor contact lost" in lineList[iii] :
 			### messager( "DEBUG:  Sensor contact lost; " + lineList[iii])
 			if saved_contact_lost < 1 :
+				# 20180226 - Just testing at this point....
+				WX_RF_Restored(iii, lineList)
 				saved_contact_lost = int( datetime.datetime.utcnow().strftime("%s") )
 				# Long message the first time we see this...
 				messager( "WARNING:  Sensor contact lost; ignoring outdoor data.  " + \
@@ -1263,14 +1307,20 @@ def rf_dropped() :
 		# of these "bad" messages.
 		# 11/05/17 - Added an if to skip the break until at least a few lines
 		#            have been checked.
-		# 01/08/18 - Chnaged that check from -3 to -2
+		# 01/08/18 - Changed that check from -3 to -2
 		# ------------------------------------------------------------------------
 		elif "WU Response: OK: success" in lineList[iii] :
 		# 	___print "Data OK"
 			if iii < 0 :    #################################################  HACKED -----   ALWAYS TRUE
+				# --------------------------------------------------------
+				# This is not quite right. CMX sends stuck data to WU.
+				# See the block below with starts:
+				#    Pulling these Latest reading records out, I notice a ...
+				# See the block below with starts:
+				# --------------------------------------------------------
 				if saved_contact_lost > 2 :
 					elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  saved_contact_lost 
-					log_event("", "Sensor contact RESTORED; receiving telemetry again.", 116 )
+					log_event("", "Sensor contact RESTORED; receiving telemetry again." + str(elapsed) + " sec", 116 )
 					messager( "INFO:  Sensor contact RESTORED; ... lost for " + str(elapsed) + " sec   (code 116)" )
 				saved_contact_lost = -1
 				if len( saved_exception_tstamp ) > 3 :
@@ -1303,6 +1353,75 @@ def rf_dropped() :
 	return return_value
 
 
+	# --------------------------------------------------------------------------------
+	# Pulling these Latest reading records out, I notice a pattern when the RF seems
+	# to be down of "FF FF FF" as shown, but it isn't quite right because we didn't
+	# have around 20 minutes of changing data from looking at the graphs.
+	# 
+	#  2018-02-26 05:25:00.424 Latest reading: 75A0: 18 35 B1 00 FF FF FF 6A 26 FF FF FF 80 45 0E C0
+	#  2018-02-26 05:30:00.439 Latest reading: 75A0: 1D 35 B2 00 FF FF FF 6C 26 FF FF FF 80 45 0E C0
+	#  2018-02-26 05:35:00.453 Latest reading: 75B0: 04 35 B2 00 47 28 00 6C 26 00 00 00 00 45 0E 80
+	#  2018-02-26 05:40:00.469 Latest reading: 75B0: 09 35 B2 00 47 28 00 6B 26 00 00 00 00 45 0E 80
+	#  2018-02-26 05:45:00.483 Latest reading: 75B0: 0E 35 B3 00 47 28 00 6B 26 00 00 00 00 45 0E 80
+	#  2018-02-26 05:50:00.498 Latest reading: 75B0: 11 36 B5 00 47 28 00 6F 26 00 00 00 00 45 0E 80
+	#  2018-02-26 05:55:00.513 Latest reading: 75B0: 18 36 B6 00 FF FF FF 6D 26 FF FF FF 80 45 0E C0
+	#  2018-02-26 06:00:00.539 Latest reading: 75B0: 1D 36 B7 00 FF FF FF 6D 26 FF FF FF 80 45 0E C0
+	#                                                            ^^^^^^^^
+	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+	# Looking at the charts, there appears to be a single jump in values between
+	# 5:32 and 5:33.   In the data log the shift shows up this way, with a string
+	# before and after 5:33 of the same values.
+	#
+	#  26/02/18,05:30,40.6,72,32.3,3.1,5.4,360,0.00,0.00,30.42,43.15,64.0,53,5.4,38.9,40.6,0.0,0,0.000,0.000,35.4,0,0.0,360,0.00,0.00
+	#  26/02/18,05:35,39.2,71,30.6,0.0,0.0,0,0.00,0.00,30.42,43.15,64.0,53,0.0,39.2,39.2,0.0,0,0.000,0.000,35.4,0,0.0,360,0.00,0.00
+	#
+	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+	# Looking at the details of the Diags log around this time, the "Sensor contact lost"
+	# one might think the data is updating for something like 18 minutes, but that's not
+	# what the temperature chart shows, which is just a single jag in the plot at 5:33.
+	# CMX is still sending data, even though it is stuck.
+	#
+	#  2018-02-26 05:31:49.202 Sensor contact lost; ignoring outdoor data
+	#  2018-02-26 05:31:59.150 Sensor contact lost; ignoring outdoor data
+	#  2018-02-26 05:32:00.666 WU Response: OK: success
+	#
+	#  2018-02-26 05:32:09.150 Sensor contact lost; ignoring outdoor data
+	#  2018-02-26 05:33:00.681 WU Response: OK: success
+	#
+	#  2018-02-26 05:34:00.667 WU Response: OK: success
+	#
+	#  2018-02-26 05:35:00.448 Writing log entry for 2/26/2018 5:35:00 AM
+	#  2018-02-26 05:35:00.449 Written log entry for 2/26/2018 5:35:00 AM
+	#  2018-02-26 05:35:00.453 Writing today.ini, LastUpdateTime = 2/26/2018 5:35:00 AM raindaystart = 43.14566924733 rain counter = 43.14566924733
+	#  2018-02-26 05:35:00.453 Latest reading: 75B0: 04 35 B2 00 47 28 00 6C 26 00 00 00 00 45 0E 80
+	#  2018-02-26 05:35:00.682 WU Response: OK: success
+	#
+	#      ..... Gap here .....
+	#
+	#  2018-02-26 05:48:00.694 WU Response: OK: success
+	#
+	#  2018-02-26 05:49:00.674 WU Response: OK: success
+	#
+	#  2018-02-26 05:50:00.492 Writing log entry for 2/26/2018 5:50:00 AM
+	#  2018-02-26 05:50:00.494 Written log entry for 2/26/2018 5:50:00 AM
+	#  2018-02-26 05:50:00.497 Writing today.ini, LastUpdateTime = 2/26/2018 5:50:00 AM raindaystart = 43.14566924733 rain counter = 43.14566924733
+	#  2018-02-26 05:50:00.498 Latest reading: 75B0: 11 36 B5 00 47 28 00 6F 26 00 00 00 00 45 0E 80
+	#  2018-02-26 05:50:00.707 WU Response: OK: success
+	#
+	#  2018-02-26 05:50:01.010 WeatherCloud Response: OK: 200
+	#  2018-02-26 05:50:49.156 Sensor contact lost; ignoring outdoor data
+	#  2018-02-26 05:50:59.578 Sensor contact lost; ignoring outdoor data
+	#  2018-02-26 05:51:00.979 WU Response: OK: success
+	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+	# 
+	# Maybe we can't conclude the RF has restarted unless we see a minimum
+	# of two "WU Response: OK: success" records in a row.  Or, if we do see
+	# such a record, the one before cannot be "Sensor contact lost." But there
+	# is an exception to that as well, when proceeded by a "Latest reading"
+	# record, we still might have dropped RF.  Its also possible a
+	# "WeatherCloud Response" record could be in there depending on the
+	# response time from the server.
+	# 
 	# --------------------------------------------------------------------------------
 	# Appears that CumulusMX retries to read the sensor approximately every 10 seconds
 	#     2017-11-05 07:33:49.373 Sensor contact lost; ignoring outdoor data
@@ -1554,6 +1673,56 @@ if __name__ == '__main__':
 # ----------------------------------------------------------------------------------------
 #   2.7.9 (default, Sep 17 2016, 20:26:04)
 #   [GCC 4.9.2]
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# NOTE: Examples from /mnt/root/home/pi/Cumulus_MX/MXdiags logs
+# ----------------------------------------------------------------------------------------
+# NOTE: Bad (out-of-range) data detected.  Probably result of RF issues.
+#   2018-03-03 19:36:00.941 WU Response: OK: success
+#
+#   2018-03-03 19:36:12.777 Ignoring bad data: pressure = 6381.9
+#   2018-03-03 19:36:12.778                    offset = 0
+#   2018-03-03 19:36:12.778 Sensor contact lost; ignoring outdoor data
+#   2018-03-03 19:37:01.194 WU Response: OK: success
+#
+# ----------------------------------------------------------------------------------------
+# NOTE: Very short period of "Sensor contact lost; ignoring outdoor data"
+#   2018-03-03 15:16:03.595 WU Response: OK: success
+#
+#   2018-03-03 15:16:12.714 Sensor contact lost; ignoring outdoor data
+#   2018-03-03 15:17:01.291 WU Response: OK: success
+#
+#   2018-03-03 15:18:01.087 WU Response: OK: success
+# ----------------------------------------------------------------------------------------
+# NOTE: At startup, communicating with various sites...
+#   2018-02-04 15:01:17.360 Creating WU URL #1
+#   2018-02-04 15:01:17.360 http://weatherstation.wunderground.com/weatherstation/updateweatherstation.php?ID=KPAMCMUR4&PASSWORD=**********&dateutc=2018-02-04+20%3A00%3A16&winddir=180&windspeedmph=1.6&windgustmph=3.8&windspdmph_avg2m=0.7&winddir_avg2m=195&humidity=82&tempf=37.0&rainin=0.00&dailyrainin=0.06&baromin=29.988&dewptf=32.1&indoortempf=68.5&indoorhumidity=36&softwaretype=Cumulus%20v3.0.0&action=updateraw
+#   2018-02-04 15:01:17.363 Creating PWS URL #1
+#   2018-02-04 15:01:17.363 http://www.pwsweather.com/pwsupdate/pwsupdate.php?ID=RADILLY&PASSWORD=**********&dateutc=2018-02-04+20%3A00%3A16&winddir=195&windspeedmph=0.7&windgustmph=3.8&humidity=82&tempf=37.0&rainin=0.00&dailyrainin=0.06&baromin=29.988&dewptf=32.1&softwaretype=Cumulus%20v3.0.0&action=updateraw
+#   2018-02-04 15:01:17.364 End processing history data
+#   2018-02-04 15:01:17.373 Start Timers
+#   2018-02-04 15:01:17.373 Starting 1-minute timer
+#   2018-02-04 15:01:17.376 Attempting realtime FTP connect
+#   2018-02-04 15:01:18.436 Starting Realtime timer, interval = 24 seconds
+#   2018-02-04 15:01:18.441 Uploading WU archive #1
+#   2018-02-04 15:01:18.626 Uploading PWS archive #1
+#   2018-02-04 15:01:18.988 PWS Response: OK: 
+#   <html>
+#   <head>
+#      <title>PWS Weather Station Update</title>
+#   </head>
+#   <body>
+#   Data Logged and posted in METAR mirror.
+#
+#   </body>
+#   </html>
+#   2018-02-04 15:01:18.989 End of PWS archive upload
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
