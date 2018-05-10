@@ -697,6 +697,7 @@ def write_pid_file():
 # ----------------------------------------------------------------------------------------
 def ws_data_stopped():
 	global data
+	global ws_data_last_secs
 	# Had a case where this file was empty so the string returned was "", which caused
 	# a "ValueError: invalid literal for int() with base 10: ''" from readline().
 	# NOTE: Here I added logic to use a -1 value, but the better answer might be
@@ -1320,7 +1321,7 @@ def rf_dropped() :
 				# --------------------------------------------------------
 				if saved_contact_lost > 2 :
 					elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  saved_contact_lost 
-					log_event("", "Sensor contact RESTORED; receiving telemetry again." + str(elapsed) + " sec", 116 )
+					log_event("", "Sensor contact RESTORED; receiving telemetry again. " + str(elapsed) + " sec", 116 )
 					messager( "INFO:  Sensor contact RESTORED; ... lost for " + str(elapsed) + " sec   (code 116)" )
 				saved_contact_lost = -1
 				if len( saved_exception_tstamp ) > 3 :

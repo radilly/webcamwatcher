@@ -41,6 +41,7 @@
 import urllib
 import re
 import datetime
+import time
 import RPi.GPIO as GPIO
 from time import sleep
 import sys
@@ -145,9 +146,17 @@ def write_pid_file():
 
 # ----------------------------------------------------------------------------------------
 #  Check web cam status.
+#
+#
+#  20180415 - Camera didn't stop, but was uploading some garbage periodically.
+#  This file gets an epoch timestamp written to it when we've seen a number of 0-length
+#  or rather short images uploaded from the webcam within a certain period.
+#		response = urllib.urlopen('http://dillys.org/wx/N_cam_reboot_request.txt')
+#
 # ----------------------------------------------------------------------------------------
 def camera_down():
 	global iii
+	NOW_SECS = int(time.time())
 	try:
 		response = urllib.urlopen('http://dillys.org/wx/N_Since_Updated.txt')
 		content = response.read()
