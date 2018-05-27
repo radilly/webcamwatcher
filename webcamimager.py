@@ -4,6 +4,8 @@
 #
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
+#     printf "0\nBOGUS.jpg\n" > webcamimager__.dat
+#
 # Restart using...
 #   kill -9 `cat watchdog.PID` ; nohup /usr/bin/python -u /mnt/root/home/pi/watchdog.py >> /mnt/root/home/pi/watchdog.log 2>&1 &
 #
@@ -145,9 +147,9 @@ ftp_password = ""
 this_script = sys.argv[0]
 image_dir = "/home/pi/images"
 last_image_name = ""
-image_ts_file = re.sub('\.py', '__.dat', this_script)
+image_data_file = re.sub('\.py', '__.dat', this_script)
 last_timestamp = 0
-
+sleep_for = 5
 
 
 
@@ -269,6 +271,8 @@ def main():
 	next_image_file()
 	push_image()
 
+#####	sleep(sleep_for)
+
 
 # ----------------------------------------------------------------------------------------
 #
@@ -285,6 +289,7 @@ def next_image_file() :
 		last_timestamp = get_stored_ts()
 
 	print "DEBUG: last_timestamp = " + last_timestamp
+	print "DEBUG: last processed filename = " + get_stored_filename()
 
 	line = 0
 	file_list = listdir( image_dir )
@@ -318,11 +323,12 @@ def next_image_file() :
 
 	if int(digits) > int(last_timestamp) :
 		print "DEBUG: Earliest unprocessed image file is " + file_list[line]
-		set_stored_ts ( digits )
+		store_file_data ( digits, file_list[line] )
 
 	shutil.copy2( image_dir + '/' + file_list[line], image_dir + '/NW.jpg' )
 
 ###	convert = subprocess.check_output( ['/usr/bin/convert', 'images/NW.jpg', '-resize', '30%', 'images/NW_thumb.jpg'] )
+###	convert = subprocess.check_output( ['/usr/bin/convert', 'images/NW.jpg', '-verbose', '-resize', '30%', 'images/NW_thumb.jpg', '2>&1'] )
 	convert = subprocess.check_output( ['/usr/bin/convert', 'images/NW.jpg', '-verbose', '-resize', '30%', 'images/NW_thumb.jpg'] )
 ###	convert = re.sub('.*average: *', '', convert)
 ###	convert = convert.rstrip()
@@ -352,7 +358,7 @@ def _____________next_image_file() :
 
 #	print "get_stored_ts = " + get_stored_ts()
 
-	set_stored_ts ( digits )
+	store_file_data ( digits )
 
 	print "get_stored_ts = " + get_stored_ts()
 
@@ -365,11 +371,12 @@ def _____________next_image_file() :
 #
 #
 # ----------------------------------------------------------------------------------------
-def set_stored_ts(ts) :
-	global image_ts_file
-	print "DEBUG: write " + image_ts_file
-	FH = open(image_ts_file, "w")
-	FH.write( ts )
+def store_file_data(ts, filename) :
+	global image_data_file
+	print "DEBUG: write " + image_data_file
+	FH = open(image_data_file, "w")
+	FH.write( ts + "\n" )
+	FH.write( filename + "\n" )
 	FH.close
 
 
@@ -382,13 +389,26 @@ def set_stored_ts(ts) :
 #
 # ----------------------------------------------------------------------------------------
 def get_stored_ts() :
-	global image_ts_file
-	print "DEBUG: read " + image_ts_file
-	FH = open(image_ts_file, "r")
+	global image_data_file
+	print "DEBUG: read " + image_data_file
+	FH = open(image_data_file, "r")
 	content = FH.readlines()
 	FH.close
 
-	return content[0]
+	return content[0].strip("\n")
+
+
+# ----------------------------------------------------------------------------------------
+#
+# ----------------------------------------------------------------------------------------
+def get_stored_filename() :
+	global image_data_file
+	print "DEBUG: read " + image_data_file
+	FH = open(image_data_file, "r")
+	content = FH.readlines()
+	FH.close
+
+	return content[1].strip("\n")
 
 
 
@@ -400,9 +420,9 @@ def get_stored_ts() :
 #  https://docs.python.org/2/library/ftplib.html
 # ----------------------------------------------------------------------------------------
 def push_image() :
-	global image_ts_file
+	global image_data_file
 
-	print "DEBUG: read " + image_ts_file
+	###print "DEBUG: read " + image_data_file
 	FH = open(ftp_credentials_file, "r")
 	data = FH.readlines()
 	FH.close
@@ -410,11 +430,11 @@ def push_image() :
 	ftp_login = data[0].strip("\n")
 	ftp_password = data[1].strip("\n")
 
-	print "DEBUG: ftp_login = " + ftp_login + "    ftp_password = " + ftp_password
+	###print "DEBUG: ftp_login = " + ftp_login + "    ftp_password = " + ftp_password
 
 	ftp = FTP('dillys.org')
 	ftp.login( ftp_login, ftp_password )
-	print ftp.pwd()
+###	print ftp.pwd()
 
 	### ftp.retrlines('LIST')
 
