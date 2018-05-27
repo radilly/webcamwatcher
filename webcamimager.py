@@ -149,6 +149,7 @@ image_dir = "/home/pi/images"
 last_image_name = ""
 image_data_file = re.sub('\.py', '__.dat', this_script)
 last_timestamp = 0
+last_filename = ""
 sleep_for = 5
 
 
@@ -267,6 +268,11 @@ def main():
 	global Prob_Track
 
 	python_version = "v " + str(sys.version)
+	print "Python version = " + python_version
+
+
+	# Python v 3.5+
+	# subprocess.run("tar czf arc-2018-05-23_0010.tgz snapshot-2018-05-23*.jpg", shell=True, check=True)
 
 	next_image_file()
 	push_image()
@@ -278,6 +284,36 @@ def main():
 #
 #  Subsequent calls find the avergae utilization since the previous call.
 #
+# ----------------------------------------------------------------------------------------
+def midnight_process() :
+
+	global last_timestamp
+
+	print "DEBUG: Creating tar file"
+	try:
+		subprocess.check_call("tar czf images/arc-2018-05-23_0011.tgz images/snapshot-2018-05-23*.jpg", shell=True)
+	except :
+		print "Unexpected ERROR in ffmpeg:", sys.exc_info()[0]
+
+
+	print "DEBUG: Creating mp4 file"
+	try:
+		subprocess.check_output("cat images/snapshot-2018-05-23-*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 images/20180523_0011.mp4", shell=True)
+	except :
+###	except CalledProcessError, EHandle:
+		print "Unexpected ERROR in ffmpeg:", sys.exc_info()[0]
+###		print "Unexpected ERROR in ffmpeg:", EHandle.returncode
+###		print "Unexpected ERROR in ffmpeg:", subprocess.cmd
+###		print "Unexpected ERROR in ffmpeg:", subprocess.output
+
+	print "DEBUG: Exiting"
+	exit()
+
+
+
+# ----------------------------------------------------------------------------------------
+#
+#  Subsequent calls find the avergae utilization since the previous call.
 #
 # ----------------------------------------------------------------------------------------
 def next_image_file() :
@@ -287,9 +323,13 @@ def next_image_file() :
 	# Should only ever happen at startup...
 	if last_timestamp == 0 :
 		last_timestamp = get_stored_ts()
+		last_filename = get_stored_filename()
 
-	print "DEBUG: last_timestamp = " + last_timestamp
-	print "DEBUG: last processed filename = " + get_stored_filename()
+	print "DEBUG: last processed last_timestamp = " + last_timestamp
+	print "DEBUG: last processed filename = " + last_filename
+	last_day_code = re.sub(r'^......(..)....*', r'\1', last_timestamp)
+	print "DEBUG: last processed day code = " + last_day_code
+
 
 	line = 0
 	file_list = listdir( image_dir )
@@ -310,15 +350,24 @@ def next_image_file() :
 				digits = digits + tok[iii]
 				##### print "DEBUG: " + str(iii) + " digits = " + digits
 
+			day_code = tok[3]
+			print "DEBUG: day = " + tok[3]
+			if last_day_code != day_code :
+				print "DEBUG: MIDNIGHT ROLLOVER!"
+				print "DEBUG: MIDNIGHT ROLLOVER!"
+				print "DEBUG: MIDNIGHT ROLLOVER!"
+				print "DEBUG: MIDNIGHT ROLLOVER!"
+
+
 			print "DEBUG: digits = " + digits
 			if int(digits) > int(last_timestamp) :
 				print "DEBUG: found new image file = " + digits
 				break
 
-			print "DEBUG: Compare..."
-			print "DEBUG:       -  " + last_timestamp
-			print "DEBUG:       -  " + digits
-			sleep(1)
+###			print "DEBUG: Compare..."
+###			print "DEBUG:       -  " + last_timestamp
+###			print "DEBUG:       -  " + digits
+			sleep(0.5)
 
 
 	if int(digits) > int(last_timestamp) :
@@ -379,13 +428,9 @@ def store_file_data(ts, filename) :
 	FH.write( filename + "\n" )
 	FH.close
 
-
-
-
-
 # ----------------------------------------------------------------------------------------
 #
-#
+#@@@
 #
 # ----------------------------------------------------------------------------------------
 def get_stored_ts() :
@@ -395,8 +440,12 @@ def get_stored_ts() :
 	content = FH.readlines()
 	FH.close
 
-	return content[0].strip("\n")
+	ts = str(content[0].strip("\n"))
 
+	day_code = re.sub(r'^......(..)....*', r'\1', ts)
+	print "DEBUG: read day code = " + day_code
+
+	return ts
 
 # ----------------------------------------------------------------------------------------
 #
@@ -408,14 +457,13 @@ def get_stored_filename() :
 	content = FH.readlines()
 	FH.close
 
-	return content[1].strip("\n")
+	filename = str(content[1].strip("\n"))
 
-
+	return filename
 
 # ----------------------------------------------------------------------------------------
 #
 #
-#@@@
 #  https://pythonspot.com/en/ftp-client-in-python/
 #  https://docs.python.org/2/library/ftplib.html
 # ----------------------------------------------------------------------------------------
