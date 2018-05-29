@@ -4,16 +4,16 @@
 #
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
-#     printf "0\nBOGUS.jpg\n" > webcamimager__.dat
+#     printf "20180523214508\nsnapshot-2018-05-23-21-45-08.jpg\n" > webcamimager__.dat
 #
 # Restart using...
-#   kill -9 `cat watchdog.PID` ; nohup /usr/bin/python -u /mnt/root/home/pi/watchdog.py >> /mnt/root/home/pi/watchdog.log 2>&1 &
+#   kill -9 `cat webcamimager.PID` ; nohup /usr/bin/python -u /mnt/root/home/pi/webcamimager.py >> /mnt/root/home/pi/webcamimager.log 2>&1 &
 #
 # Stop with ... 
-#   kill -9 `cat watchdog.PID`
+#   kill -9 `cat webcamimager.PID`
 #
 # Start with ...
-#   nohup /usr/bin/python -u /mnt/root/home/pi/watchdog.py >> /mnt/root/home/pi/watchdog.log 2>&1 &
+#   nohup /usr/bin/python -u /mnt/root/home/pi/webcamimager.py >> /mnt/root/home/pi/webcamimager.log 2>&1 &
 #
 # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 #
@@ -39,72 +39,20 @@
 #      * Create a web page to access video
 #      * Upload the mp4 file and web page to the server
 #
-#
-#
+#   NOTE: This should be able to be run as a service. (systemctl)
 #
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
 #
 #
-#
-#   NOTE: It would be interesting to see if we could log any "significant"
-#         change to a parameter being tracked.  mono_threads comes to mind.
-#         It seems to change in "jumps."  Link more than 2X in a few minutes.
-#
-#
-# This is a first hack to see if I can prove the concept of, basically a
-# watchdog running on a Pi that will detect when images stopped uploading
-# from my webcam, and then power-cycle the sucker.
-#
-# Posted on this to http://sandaysoft.com/forum/viewtopic.php?f=27&t=16448
-#
-# Invoke with ...  python -u ./webcamwatch.py 2>&1 | tee -a webcamwatch.txt
-#       The -u should bypass any I/O caching
-#
-# https://stackoverflow.com/questions/22676/how-do-i-download-a-file-over-http-using-python
-# Inverted signals to use the NC side of the relay...
-#
-# https://stackoverflow.com/questions/21662783/linux-tee-is-not-working-with-python
-# The -u option works fine.  However, sys.stdout.flush() wouldn't depend on
-# the command line.  My concern though, on a Pi, is that without buffering
-# you're going to hammer the SD Card over time.  Buffering might help, or
-# reducing the output.
-# ========================================================================================
-#      See MXdiags sample at the end of this file
 # ========================================================================================
 #              NOTE: Don't necessarily need "Cumulus MX Exception thrown (see above)"
 #                    messages.  Added end message 01/08/2018.
 # 20180224 RAD Had a case when the readline() in ws_data_stopped() returned ''
 #              which could not be converted to an integer. Somewhat kludgy fix.
-# 20180108 RAD When I restarted the cumulusmx service the change of PID caused a
-#              failure.  cmx_svc_runtime() moved up in the do forever loop to
-#              handle this case.
-# 20171209 RAD Added cmx_svc_runtime().  Changed the method or writing the CSV-style
-#              output lines to leverage the data[] array.
-# 20171012 RAD Started writing status.html, which CMX copies up to the web-server.
-#              It's pretty simple yet, but now I can at least check the current
-#              status remoted via web-browser.
-# 20170920 RAD Noticed rf_dropped() was returning "None" in some cases.
-#              Cumulus MX is catching an exception tied to Weather Underground.
-#              See http://sandaysoft.com/forum/viewtopic.php?f=27&t=16510
-#              Added return_value to make sure there is a value returned.
-#              Increased the number of records checked too.
-#              not to hammer the SD card.
-# 20170822 RAD Posted to http://sandaysoft.com/forum/viewtopic.php?f=27&t=16448
-#              about this project because I'm not sure I yet have a handle on what
-#              to track.  Others may have ideas and be interested...
 # 20170712 RAD Want this to run silently (eventually), but log periodically soas
 #              not to hammer the SD card.
 # ========================================================================================
-#
-#
-#  https://stackoverflow.com/questions/21535467/querying-process-load-in-python
-#
-#  I noticed 10-12 active processes at one point when Cumulus was sluggish...
-#
-#
-# ========================================================================================
-#
 #
 #  EXTERNALIZING LOCAL SETTINGS:
 #
@@ -119,25 +67,24 @@
 #  https://docs.python.org/2/library/json.html#module-json
 #  https://docs.python.org/2/library/configparser.html
 #
-#
-#
 # ========================================================================================
-
-
-from os import listdir
-from ftplib import FTP
-import shutil
-import re
 
 import urllib
 import datetime
-import RPi.GPIO as GPIO
 import time
 from time import sleep
 import sys
 import subprocess
-from os import getpid
 
+
+
+# vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+from os import listdir
+from os import getpid
+import os
+from ftplib import FTP
+import shutil
+import re
 
 
 ftp_credentials_file = "/home/pi/.ftp.credentials"
@@ -151,13 +98,11 @@ image_data_file = re.sub('\.py', '__.dat', this_script)
 last_timestamp = 0
 last_filename = ""
 sleep_for = 5
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
 
 
-Relay_channel = [17]
-# sleep_for = 300
-sleep_for = 24
 sleep_on_recycle = 600
 # ----------------------------
 #    stride    secs    minutes
@@ -221,16 +166,6 @@ data_keys = [
 # For HTML Table-style output lines
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 # https://pyformat.info/
-data_format = [
-	"{:8.4f} days",
-	"{}"
-	]
-
-thresholds = [
-	100,
-	0
-	]
-	# amb_temp   {}
 
 
 # ----------------------------------------------------------------------------------------
@@ -260,9 +195,6 @@ Prob_Track = [
 # Main loop
 #
 # ----------------------------------------------------------------------------------------
-#
-#
-# ----------------------------------------------------------------------------------------
 def main():
 	global data
 	global Prob_Track
@@ -270,9 +202,11 @@ def main():
 	python_version = "v " + str(sys.version)
 	print "Python version = " + python_version
 
+	push_to_server('__WORK/arc_2015/2015_missing.txt', 'North')
 
-	# Python v 3.5+
-	# subprocess.run("tar czf arc-2018-05-23_0010.tgz snapshot-2018-05-23*.jpg", shell=True, check=True)
+	exit()
+
+	push_to_server('images/NW_thumb.jpg', 'North')
 
 	next_image_file()
 	push_image()
@@ -281,30 +215,55 @@ def main():
 
 
 # ----------------------------------------------------------------------------------------
-#
 #  Subsequent calls find the avergae utilization since the previous call.
 #
+#  Example argument:   2018-05-23
 # ----------------------------------------------------------------------------------------
-def midnight_process() :
+def midnight_process(date_string) :
+	ffmpeg_failed = False
 
-	global last_timestamp
+	# Example: 20180523 - - - (looks like a number, but a string here.)
+	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
 
 	print "DEBUG: Creating tar file"
 	try:
-		subprocess.check_call("tar czf images/arc-2018-05-23_0011.tgz images/snapshot-2018-05-23*.jpg", shell=True)
+		subprocess.check_call("tar czf images/arc-" + date_string + ".tgz images/snapshot-" + date_string + "*.jpg", shell=True)
 	except :
-		print "Unexpected ERROR in ffmpeg:", sys.exc_info()[0]
+		print "Unexpected ERROR in tar:", sys.exc_info()[0]
 
+	tar_size = os.stat("images/arc-" + date_string + ".tgz").st_size
+	print "DEBUG: taf file size = " + str(tar_size)
 
-	print "DEBUG: Creating mp4 file"
+	# https://stackoverflow.com/questions/82831/how-to-check-whether-a-file-exists?rq=1
+	if os.path.isfile("images/" + date_stamp + ".mp4") :
+		print "WARNING: images/" + date_stamp + ".mp4 already exists"
+		os.unlink("images/" + date_stamp + ".mp4")
+
+	print "DEBUG: Creating mp4 file images/" + date_stamp + ".mp4"
 	try:
-		subprocess.check_output("cat images/snapshot-2018-05-23-*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 images/20180523_0011.mp4", shell=True)
+		subprocess.check_output("cat images/snapshot-" + date_string + "*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 images/" + date_stamp + ".mp4", shell=True)
 	except :
 ###	except CalledProcessError, EHandle:
 		print "Unexpected ERROR in ffmpeg:", sys.exc_info()[0]
 ###		print "Unexpected ERROR in ffmpeg:", EHandle.returncode
-###		print "Unexpected ERROR in ffmpeg:", subprocess.cmd
-###		print "Unexpected ERROR in ffmpeg:", subprocess.output
+		ffmpeg_failed = True
+
+	if ffmpeg_failed :
+		print "WARNING: ffmpeg failed."
+
+	if tar_size <= 5000000 :
+		print "WARNING: Tar is too small to justify deleting jpg files."
+
+	# Could also check if ffmpeg worked ... but if we have a good tar file ...
+	if tar_size > 5000000 :
+		print "INFO: Tar is large enough to delete jpg files."
+
+		try:
+			subprocess.check_output("rm images/snapshot-" + date_string + "*.jpg", shell=True)
+		except :
+			print "Unexpected ERROR in rm:", sys.exc_info()[0]
+	else :
+		print "WARNING: Tar is too small to justify deleting jpg files."
 
 	print "DEBUG: Exiting"
 	exit()
@@ -312,8 +271,7 @@ def midnight_process() :
 
 
 # ----------------------------------------------------------------------------------------
-#
-#  Subsequent calls find the avergae utilization since the previous call.
+#  Find the next "unprocessed" image file ... if any
 #
 # ----------------------------------------------------------------------------------------
 def next_image_file() :
@@ -327,9 +285,13 @@ def next_image_file() :
 
 	print "DEBUG: last processed last_timestamp = " + last_timestamp
 	print "DEBUG: last processed filename = " + last_filename
+	print "DEBUG: date_string = " + re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename)
+	date_string = re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename)
+	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
+	print "DEBUG: date_stamp = " + date_stamp
+
 	last_day_code = re.sub(r'^......(..)....*', r'\1', last_timestamp)
 	print "DEBUG: last processed day code = " + last_day_code
-
 
 	line = 0
 	file_list = listdir( image_dir )
@@ -357,7 +319,8 @@ def next_image_file() :
 				print "DEBUG: MIDNIGHT ROLLOVER!"
 				print "DEBUG: MIDNIGHT ROLLOVER!"
 				print "DEBUG: MIDNIGHT ROLLOVER!"
-
+				# snapshot-2018-05-23-16-57-04.jpg
+				midnight_process(re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename))
 
 			print "DEBUG: digits = " + digits
 			if int(digits) > int(last_timestamp) :
@@ -385,39 +348,13 @@ def next_image_file() :
 
 
 
+# ========================================================================================
 # ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-def _____________next_image_file() :
-
-	print "DEBUG: Earliest unprocessed image file is " + file_list[iii]
-
-	# snapshot-2018-05-23-16-57-04.jpg
-	tok = re.split('-', re.sub('\.jpg', '', file_list[iii]) )
-
-	digits = tok[1]
-	print "DEBUG: digits = " + digits
-	for iii in range(2, 7) :
-		digits = digits + tok[iii]
-		print "DEBUG: " + str(iii) + " digits = " + digits
-
-	print "DEBUG: digits = " + digits
-
-
-#	print "get_stored_ts = " + get_stored_ts()
-
-	store_file_data ( digits )
-
-	print "get_stored_ts = " + get_stored_ts()
-
-	return file_list[iii]
-
-
-
-
-# ----------------------------------------------------------------------------------------
+#  These routines store and fetch information we need to persist between invocations
+#  of this script.  This needs to track what's already been "processed."
 #
+#  The variable last_timestamp is initialized to 0, but otherwise hold the ts for
+#  the file last processed.
 #
 # ----------------------------------------------------------------------------------------
 def store_file_data(ts, filename) :
@@ -431,7 +368,6 @@ def store_file_data(ts, filename) :
 # ----------------------------------------------------------------------------------------
 #
 #@@@
-#
 # ----------------------------------------------------------------------------------------
 def get_stored_ts() :
 	global image_data_file
@@ -462,10 +398,65 @@ def get_stored_filename() :
 	return filename
 
 # ----------------------------------------------------------------------------------------
+#  This pushes the specified file to the (hosted) web server via FTP.
+#
+#
+#  FTP User: camdilly
+#  FTP PWD: /home/content/b/o/b/bobdilly/html/WX
+#
+#  https://pythonspot.com/en/ftp-client-in-python/
+#  https://docs.python.org/2/library/ftplib.html
+# ----------------------------------------------------------------------------------------
+def push_to_server(local_file, remote_path) :
+	global ftp_login
+	global ftp_password
+
+	if re.search('/', local_file) :
+		local_file_bare = re.sub(r'.*/', r'', local_file)
+
+	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+	#  This should go into a separate routine, and only executed at startup
+	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+	FH = open(ftp_credentials_file, "r")
+	data = FH.readlines()
+	FH.close
+
+	ftp_login = data[0].strip("\n")
+	ftp_password = data[1].strip("\n")
+
+	###print "DEBUG: ftp_login = " + ftp_login + "    ftp_password = " + ftp_password
+	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+	ftp = FTP('dillys.org')
+	ftp.login( ftp_login, ftp_password )
+
+	ftp.cwd( remote_path )
+	print "DEBUG: FTP PWD = " + ftp.pwd()
+
+	ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
+
+	data = []
+	ftp.dir(data.append)
+
+	ftp.quit()
+ 
+	for line in data:
+		print "-", line
+
+ 
+#  images/NW_thumb.jpg bobdilly@dillys.org:/home/content/b/o/b/bobdilly/html/WX
+
+
+# ----------------------------------------------------------------------------------------
 #
 #
 #  https://pythonspot.com/en/ftp-client-in-python/
 #  https://docs.python.org/2/library/ftplib.html
+#
+#  FTP User: camdilly
+#  FTP PWD: /home/content/b/o/b/bobdilly/html/WX
 # ----------------------------------------------------------------------------------------
 def push_image() :
 	global image_data_file
@@ -482,9 +473,9 @@ def push_image() :
 
 	ftp = FTP('dillys.org')
 	ftp.login( ftp_login, ftp_password )
-###	print ftp.pwd()
+	print "DEBUG: FTP PWD = " + ftp.pwd()
 
-	### ftp.retrlines('LIST')
+	ftp.retrlines('LIST')
 
 	data = []
 
@@ -500,11 +491,53 @@ def push_image() :
  
 	ftp.quit()
  
-###	for line in data:
-###		print "-", line
+	for line in data:
+		print "-", line
 
 
 #  images/NW_thumb.jpg bobdilly@dillys.org:/home/content/b/o/b/bobdilly/html/WX
+
+
+
+
+
+
+# ========================================================================================
+# ========================================================================================
+# ========================================================================================
+# ========================================================================================
+# ========================================================================================
+# ========================================================================================
+# ========================================================================================
+# ========================================================================================
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+def _____________next_image_file() :
+
+	print "DEBUG: Earliest unprocessed image file is " + file_list[iii]
+
+	# snapshot-2018-05-23-16-57-04.jpg
+	tok = re.split('-', re.sub('\.jpg', '', file_list[iii]) )
+
+	digits = tok[1]
+	print "DEBUG: digits = " + digits
+	for iii in range(2, 7) :
+		digits = digits + tok[iii]
+		print "DEBUG: " + str(iii) + " digits = " + digits
+
+	print "DEBUG: digits = " + digits
+
+
+#	print "get_stored_ts = " + get_stored_ts()
+
+	store_file_data ( digits )
+
+	print "get_stored_ts = " + get_stored_ts()
+
+	return file_list[iii]
+
 
 
 
@@ -550,15 +583,11 @@ def main_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 		# Capture the data by calling functions.  Ignore return values.
 		server_stalled()
 		ws_data_stopped()
-		rf_dropped()
 		last_realtime()
 		proc_load()
 		proc_pct()
-		camera_down()
-		cmx_svc_runtime()
 		mono_threads()
 		mem_usage()
-		webcamwatch_down()
 
 		CSV_rec = datetime.datetime.utcnow().strftime(strftime_FMT) + ","
 		Prob_Flag = " ,"
@@ -571,35 +600,6 @@ def main_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 					Prob_Flag = " <<<<<,"
 
 		print CSV_rec + Prob_Flag
-
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		# NOTE: Would be great to output data and use highcharts
-		#
-		#  https://pythonspot.com/en/ftp-client-in-python/
-		#  https://docs.python.org/2/library/ftplib.html
-		#  http://api.highcharts.com/highstock/Highcharts.stockChart
-		#  https://www.highcharts.com/products/highcharts/
-		#  https://www.highcharts.com/products/highcharts/
-		#  https://www.highcharts.com/docs/working-with-data/data-module
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		if 0 == iii % summary_stride :
-			summarize()
-
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		#		swap_pct 0
-		#		swap_used 500
-		#		cpu_temp 38.089
-		#		mem_pct 34
-		#		rf_dropped 0
-		#		effective_used 323012
-		#		watcher_pid 16978
-		#		cpu_temp_f 100.5602
-		#		last_realtime -2
-		#		proc_load 0.24
-		#		server_stalled 0
-		#		ws_data_stopped 0
-		#		camera_down 0
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
 		iii += 1
 		sleep(sleep_for)
@@ -702,127 +702,6 @@ def mono_threads():
 
 
 # ----------------------------------------------------------------------------------------
-# Appends an event table line (HTML) to the event list.
-# Has to be maintained manually.
-#
-# ----------------------------------------------------------------------------------------
-def log_event(ID, description, code):
-	bgcolor = "TD"
-	# Supply timestamp if no ID was given
-	if len(ID) < 1 :
-		ID = datetime.datetime.now().strftime(strftime_FMT + " (local)")
-
-	# http://htmlcolorcodes.com/
-	if code == 101 :
-		bgcolor = "TD BGCOLOR=blue"
-	if code == 103 :
-		bgcolor = "TD BGCOLOR=#BA37C7"    # Violet-Pink
-	if code == 104 :
-		bgcolor = "TD BGCOLOR=#6137C7"    # Blue-Purple
-	if code == 105 :
-		bgcolor = "TD BGCOLOR=#0E7135"    # Dark Green
-	if code == 111 :
-		bgcolor = "TD BGCOLOR=#1F838A"    # Dark Turquoise
-	if code == 112 :
-		bgcolor = "TD BGCOLOR=#0E7135"    # Dark Green
-	if code == 115 :
-		bgcolor = "TD BGCOLOR=red"
-	if code == 116 :
-		bgcolor = "TD BGCOLOR=green"
-	if code == 118 :
-		bgcolor = "TD BGCOLOR=#CC04BD"    # Dark Hot Pink-purple
-
-	format_str = "<TR><TD> {} </TD>\n<TD> {} </TD>\n<{}> {} </TD></TR>\n"
-
-	FH = open(events_page , "a")
-	FH.write( format_str.format( ID, description, bgcolor, code) )
-
-	FH.close
-
-# ----------------------------------------------------------------------------------------
-# This generates a Raspberry Pi Status page, which Cumulus MX ftp's to the server.
-# It is mostly an HTML table.
-#
-# ----------------------------------------------------------------------------------------
-def summarize():
-	timestamp = datetime.datetime.utcnow().strftime(strftime_FMT)
-	cmx_svc_runtime()
-
-	FH = open(status_page , "w")
-
-	FH.write( "<HEAD><TITLE>\n" )
-	FH.write( "Raspberry Pi / Cumulus MX Health\n" )
-	FH.write( "</TITLE></HEAD><BODY BGCOLOR=\"#555555\" TEXT=\"#FFFFFF\" LINK=\"#FFFF00\" VLINK=\"#FFBB00\" ALINK=\"#FFAAFF\"><H1 ALIGN=center>\n" )
-	FH.write( "Raspberry Pi / Cumulus MX Health\n" )
-	FH.write( "</H1>\n\n" )
-	# FH.write( "<P> &nbsp;\n\n" )
-	
-	FH.write( "<CENTER>\n")
-	FH.write( "<TABLE CELLPADDING=7><TR><TD VALIGN=\"TOP\">\n\n")
-
-	FH.write( "<CENTER>\n")
-	FH.write( "<TABLE BORDER=1>\n" )
-	FH.write( "<TR><TH> Parameter </TH><TH> Current Value </TH><TH> Threshold </TH</TR>\n" )
-	# NOTE: We may not choose to print everything in data[]
-	for iii in range(0, len(data_keys)):
-		bgcolor = ""
-		if thresholds[iii] > -1 :
-			# print "   data {}  threshold {}".format( data[data_keys[iii]], thresholds[iii] )
-			if data[data_keys[iii]] > thresholds[iii] :
-				bgcolor = " BGCOLOR=\"red\""
-		
-		# format_str = "<TR><TD> {} </TD><TD ALIGN=right> " + data_format[iii]  + " </TD></TR>\n"
-		# FH.write( format_str.format( data_keys[iii], data[ data_keys[iii] ] ) )
-		# thresholds
-		format_str = "<TR><TD{}> {} </TD><TD ALIGN=right{}> " + data_format[iii]  + " </TD><TD ALIGN=right{}> {} </TD></TR>\n"
-		FH.write( format_str.format( bgcolor, data_keys[iii], bgcolor, data[data_keys[iii]], bgcolor, thresholds[iii] ) )
-
-	FH.write( "<TR><TD COLSPAN=3 ALIGN=center><FONT SIZE=-1>\n" )
-	FH.write( datetime.datetime.utcnow().strftime(strftime_FMT) + " GMT" )
-	FH.write( "<BR> " + datetime.datetime.now().strftime(strftime_FMT) + " Local" )
-	FH.write( "</FONT></TD></TR>\n" )
-
-	FH.write( "</TABLE>\n" )
-
-	# This is how often the page updates locally, but only to the web server every 5 minutes.
-	# FH.write( "<P ALIGN=center><FONT SIZE=-3> Updated every {} secs </FONT>".format( sleep_for * summary_stride ) )
-
-	FH.write( "<P> &nbsp;\n" )
-	FH.write( "<A HREF=\"Dilly_WX_Indoor.jpg\"><IMG SRC=\"Dilly_WX_Indoor_050.jpg\"></A>\n")
-	FH.write( "<BR><FONT SIZE=-3>CLICK TO ENLARGE</FONT>\n")
-	FH.write( "</CENTER>\n\n")
-	FH.write( "</TD></TR></TABLE>\n")
-	FH.write( "</CENTER>\n\n")
-
-	FH.write( "<P> &nbsp;\n" )
-	FH.write( "<center><table style=\"width:100%;border-collapse: collapse; border-spacing: 0;\" >\n" )
-  	FH.write( "  <tr>\n" )
-
-	FH.write( "    <td align=\"center\" class=\"td_navigation_bar\">:<a href=\"index.htm\">now</a>::<a href=\"gauges.htm\">gauges</a>:" + \
-		":<a href=\"today.htm\">today</a>::<a href=\"yesterday.htm\">yesterday</a>::<a href=\"thismonth.htm\">this&nbsp;month</a>:" + \
-		":<a href=\"thisyear.htm\">this&nbsp;year</a>:\n" )
-	FH.write( "    <br>:<a href=\"record.htm\">records</a>::<a href=\"monthlyrecord.htm\">monthly&nbsp;records</a>:" + \
-		":<a href=\"trends.htm\">trends</a>::<a TARGET=\"_blank\" HREF=\"http://sandaysoft.com/forum/\">forum</a>:" + \
-		":<a href=\"http://dillys.org/WX/NW_View.html\">webcam</a>:\n" )
-	FH.write( "    <br>:<a TARGET=\"_blank\" HREF=\"https://app.weathercloud.net/d0208473809#current\">Weathercloud</a>:" + \
-		":<a TARGET=\"_blank\" HREF=\"https://www.pwsweather.com/obs/RADILLY.html\">PWS&nbsp;Weather</a>:" + \
-		":<a TARGET=\"_blank\" HREF=\"https://wx.aerisweather.com/local/us/pa/mcmurray\">AerisWeather</a>:" + \
-		":<a TARGET=\"_blank\" HREF=\"https://radar.weather.gov/Conus/full_loop.php\">NWS&nbsp;Composite&nbsp;US&nbsp;Radar</a>:\n" + \
-		":<a TARGET=\"_blank\" HREF=\"https://www.windy.com/40.279/-80.089?39.317,-80.089,7,m:eMiadVG\">Windy</a>:\n" )
-	FH.write( "    <br>:<a href=\"status.html\">Pi status</a>:" + \
-		":<a href=\"events.html\">Event&nbsp;Log</a>:\n" + \
-		":<a TARGET=\"_blank\" HREF=\"https://www.wunderground.com/personal-weather-station/dashboard?ID=KPAMCMUR4\">KPAMCMUR4</a>:</td>\n" )
-
-  	FH.write( "  </tr>\n" )
-	FH.write( " </table></center>\n" )
-
-	FH.write( "<P> &nbsp;\n" )
-	FH.write( "<P ALIGN=CENTER> Last updated: " + timestamp + " UTC\n" )
-
-	FH.close
-
-
-# ----------------------------------------------------------------------------------------
 #
 #   https://www.cyberciti.biz/faq/linux-find-out-raspberry-pi-gpu-and-arm-cpu-temperature-command/
 #   https://www.raspberrypi.org/forums/viewtopic.php?t=47469
@@ -838,53 +717,6 @@ def read_cpu_temp():
 	FH.close
 	return CPU_Temp / 1000.0
 
-
-# ----------------------------------------------------------------------------------------
-# Copied from the SunFounder example to configure the GPIO ports.
-#
-# ----------------------------------------------------------------------------------------
-def GPIO_setup():
-	GPIO.setmode(GPIO.BCM)
-	GPIO.setup(17, GPIO.OUT, initial=GPIO.HIGH)
-	GPIO.setup(18, GPIO.OUT, initial=GPIO.HIGH)
-	'''
-	print "|=====================================================|"
-	print "|         2-Channel High trigger Relay Sample         |"
-	print "|-----------------------------------------------------|"
-	print "|                                                     |"
-	print "|          Turn 2 channels on off in orders           |"
-	print "|                                                     |"
-	print "|                    17 ===> IN2                      |"
-	print "|                    18 ===> IN1                      |"
-	print "|                                                     |"
-	print "|                                           SunFounder|"
-	print "|=====================================================|"
-	'''
-
-# ----------------------------------------------------------------------------------------
-# This power-cycles the web cam by triggering the rely for a period.
-#
-# ----------------------------------------------------------------------------------------
-def power_cycle():
-	##DEBUG## ___print '...Relay channel %d on' % 1
-	##DEBUG## ___print '...open leftmost pair of connectors.'
-	logger( '...open leftmost pair of connectors.')
-	GPIO.output(17, GPIO.LOW)
-	sleep(5)
-	##DEBUG## ___print '...Relay channel %d off' % 1
-	##DEBUG## ___print '...close leftmost pair of connectors.'
-	logger('...close leftmost pair of connectors.')
-	GPIO.output(17, GPIO.HIGH)
-
-# ----------------------------------------------------------------------------------------
-# Clean up the GPIO configure on exit
-#
-# ----------------------------------------------------------------------------------------
-def destroy():
-	##DEBUG## ___print "\nShutting down..."
-	logger("Shutting down...\n")
-	GPIO.output(17, GPIO.HIGH)
-	GPIO.cleanup()
 
 # ----------------------------------------------------------------------------------------
 # Write message to the log file with a leading timestamp.
@@ -954,7 +786,6 @@ def ws_data_stopped():
 			ws_data_last_secs = int( datetime.datetime.utcnow().strftime("%s") )
 			# Long message the first time we see this...
 			messager( "WARNING:  CumulusMX reports data_stopped (<#DataStopped> == 1).   (code 101)" )
-			log_event("", "CumulusMX reports data_stopped (<#DataStopped> == 1).", 101 )
 		else:
 			elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  ws_data_last_secs 
 			# Short message while this status continues
@@ -1299,571 +1130,11 @@ def WX_RF_Restored(cur_line, lineList):
 			if countOKs > 1 :
 				restored = 1
 				messager( "DEBUG:  Sensor contact appears to have been restored after " + str(elapsed) + " sec  (code 116)")
-				log_event("", "DEBUG:  Sensor contact <B>appears</B> to have been restored. Out for " + str(elapsed) + " sec", 116 )
 				break
 		else :
 			messager( "DEBUG:  Sensor RF status indeterminate.")
 
 	return restored
-
-
-# ----------------------------------------------------------------------------------------
-# Check the Cumulus MX Diags log for anything strange going on.
-#
-# If "WU Response: OK: success" is the last line we should be OK.
-# Cumulus will throw an exception once in a while, one of which looks like an
-# unexpected/unhandled response from Weather Underground, plus others.
-# The most challenging one is when the base station loses (RF) contact
-# with the remote sensor unit (as in example below). There's a "down"
-# on the base console that will sometimes re-acquire the RF connection.
-#   I've not yet figured out out to make the Pi press the button -
-#   perform the equivalent reset....
-#
-# The logs are dated, but the filenames should sort numerically....
-# "MXdiags/20170912-202909.txt"
-#
-# ----------------------------------------------------------------------------------------
-# Looking for this in the Diags log....
-#   2017-09-15 20:26:45.616 Sensor contact lost; ignoring outdoor data
-#   2017-09-15 20:26:55.616 Sensor contact lost; ignoring outdoor data
-#   2017-09-15 20:27:00.666 WU Response: OK: success
-#   
-# ----------------------------------------------------------------------------------------
-def rf_dropped() :
-	global saved_exception_tstamp
-	global saved_contact_lost
-	global data
-	check_lines = 12
-	return_value = 0
-	logger_code =111
-	file_list = listdir( mxdiags_dir )
-
-	file_list.sort()
-
-	#for iii in range(0, len(file_list)):
-	#	___print str(iii) + "  " + file_list[iii]
-
-	for iii in range(-1, -5, -1):
-		### messager( "DEBUG:  Checking in diags file, " + file_list[iii])
-		if re.search('^20', file_list[iii]) :
-			log_file = file_list[iii]
-			break
-
-
-
-	### messager( "DEBUG:  log_file = " + log_file )
-	# ___print log_file
-
-	# --------------------------------------------------------------------------------
-	# Work backwards from the end of the most recent file looking for
-	# one of the lines above.
-	# --------------------------------------------------------------------------------
-
-	fileHandle = open ( mxdiags_dir + "/" + log_file,"r" )
-	lineList = fileHandle.readlines()
-	fileHandle.close()
-
-	for iii in range(-1, (-1 * check_lines), -1):
-		lineList[iii] = re.sub('\n', ' ', lineList[iii])        # Remove any newline which might be left
-		### messager( "DEBUG:  lineList[" + str(iii) + "] = \"" + lineList[iii] + "\"" )
-		# ___print str(iii) + " \t" + lineList[iii]
-		# ------------------------------------------------------------------------
-		# We may print the same exception multiple times.  It could be identified
-		# by the timestamp...
-		# 
-		#     2017-09-22 22:24:00.485
-		#     -----------------------
-		# ------------------------------------------------------------------------
-		# 2017/09/23 02:23:38 GMT,  0,  0,  0,  24,   0.15,  0,  150444,  15%,  0,  0%,  48.3,  48.312,
-		# free|945512|764200|181312|6828|445312|168444|150444|795068|102396|0|102396
-		# WARNING:  Cumulus MX Exception thrown
-		# 
-		# 1       2017-09-22 22:24:00.485 WU update:    at System.Net.WebConnection.HandleError(WebExceptionStatus st, System.Exception e, System.String where)
-		# 2017/09/23 02:24:02 GMT,  0,  0,  0,  24,   0.10,  0,  150672,  15%,  0,  0%,  49.4,  49.388,
-		# free|945512|764432|181080|6828|445316|168444|150672|794840|102396|0|102396
-		# WARNING:  Cumulus MX Exception thrown
-		# 
-		# 1       2017-09-22 22:24:00.485 WU update:    at System.Net.WebConnection.HandleError(WebExceptionStatus st, System.Exception e, System.String where)
-		# 2017/09/23 02:24:27 GMT,  0,  0,  0,  24,   0.06,  0,  150808,  15%,  0,  0%,  49.4,  49.388,
-		# free|945512|764580|180932|6828|445328|168444|150808|794704|102396|0|102396
-		# ------------------------------------------------------------------------
-		#      WARNING:  exception_tstamp = 2017-10-0210:57:00.626:.....
-
-
-		#   2017/11/09 18:28:07 GMT WARNING:  Cumulus MX Exception thrown:    exception_tstamp =
-		#   2017-11-0913:28:00.388:.....
-		#   2017-11-09 13:28:00.388 WU update:    at System.Net.WebConnection.HandleError(WebExceptionStatus st, System.Exception e, System.String where)
-
-		if "Exception" in lineList[iii] :
-			exception_tstamp = re.sub(r'([-0-9]+ [\.:0-9]+).*', r'\1', lineList[iii] )
-			if saved_exception_tstamp != exception_tstamp :
-				# This is the signature of the most common exception we seem to see.
-				if "at System.Net.WebConnection.HandleError(WebExceptionStatus" in lineList[iii] :
-					logger_code =110
-					saved_exception_tstamp = exception_tstamp 
-				else :
-					logger_code =111
-
-				print ""
-				messager( "WARNING:  Cumulus MX Exception thrown:    exception_tstamp = " + \
-					exception_tstamp + "  (" + str(logger_code) + ")" )
-
-				# --------------------------------------------------------
-				# --------------------------------------------------------
-				#  NOTE: This should be moved to a function.
-				# --------------------------------------------------------
-				# --------------------------------------------------------
-				log_fragment = "<BR><FONT SIZE=-1><PRE>\n"
-				for jjj in range(iii-3, 0, 1) :
-					# Number the lines in the file we read
-					print str(len(lineList)+jjj+1) + "\t" + lineList[jjj].rstrip()
-					log_fragment = log_fragment + \
-						"{:06d}  {}\n".format( (len(lineList)+jjj+1), lineList[jjj].rstrip())
-
-				log_fragment = log_fragment + "</PRE></FONT>\n"
-				messager( "WARNING:    from  " + mxdiags_dir + "/" + log_file )
-				print ""
-
-				log_event(exception_tstamp, "Cumulus MX Exception thrown:" + log_fragment, logger_code )
-###			else:
-###				messager( "WARNING:  Cumulus MX Exception thrown (see above) @ " + \
-###				check_lines = 12
-###					exception_tstamp )
-			break
-
-		# ------------------------------------------------------------------------
-		#   2017-09-15 20:26:45.616 Sensor contact lost; ignoring outdoor data
-		#   2017-09-15 20:26:55.616 Sensor contact lost; ignoring outdoor data
-		#   2017-09-15 20:27:00.666 WU Response: OK: success
-		#   
-		#   2017-09-15 20:28:00.677 WU Response: OK: success
-		#   
-		# See example block below. It is possible to see the good message in 
-		# the middle of a period of disconnect because CumulusMX continues to
-		# report to Weather Underground. (Only the indoor data is valid.)
-		# ------------------------------------------------------------------------
-		########### if "Sensor contact lost; ignoring outdoor data" in lineList[iii] :
-		### 2017-11-05 07:36:59.373 Sensor contact lost; ignoring outdoor data
-		elif "Sensor contact lost" in lineList[iii] :
-			### messager( "DEBUG:  Sensor contact lost; " + lineList[iii])
-			if saved_contact_lost < 1 :
-				# 20180226 - Just testing at this point....
-				WX_RF_Restored(iii, lineList)
-				saved_contact_lost = int( datetime.datetime.utcnow().strftime("%s") )
-				# Long message the first time we see this...
-				messager( "WARNING:  Sensor contact lost; ignoring outdoor data.  " + \
-					"Press \"V\" button on WS console   (code 115)" )
-				log_event("", "Sensor contact lost; ignoring outdoor data.", 115 )
-			else:
-				elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  saved_contact_lost 
-				# Shorter message while this status continues
-				messager( "WARNING:  Sensor contact lost; ... " + str(elapsed) + " sec" )
-
-			return_value = 1
-			break
-
-
-
-		# ------------------------------------------------------------------------
-		# 01/22/18 - This type of message caused a problem for Weather Underground
-		#            which required a restart/reboot to clear.
-		#
-		# NOTE: Find unexpected messages really needs some analysis and thought.
-		#
-		# This is a grep of the diags logs for "WU" when CMX got stuck...
-		#   2018-01-22 05:54:01.173 WU Response: OK: success
-		#   2018-01-22 05:55:01.213 WU Response: OK: success
-		#   2018-01-22 05:57:40.987 WU update: The Task was canceled
-		#   2018-01-22 05:59:40.996 WU update: The Task was canceled
-		#   2018-01-22 06:01:41.021 WU update: The Task was canceled
-		#   2018-01-22 06:03:41.006 WU update: The Task was canceled
-		#
-		# I also looked for unique WeatherCloud messages
-		#   WeatherCloud Response: InternalServerError: <h1>CException</h1>
-		#   WeatherCloud Response: OK: 200
-		#   WeatherCloud Response: OK: 429
-		#   WeatherCloud update: The Task was canceled
-		#
-		# ------------------------------------------------------------------------
-		elif "The Task was canceled" in lineList[iii] :
-			# ----------------------------------------------------------------
-			# ----------------------------------------------------------------
-			#  NOTE: This should be moved to a function.
-			# ----------------------------------------------------------------
-			# ----------------------------------------------------------------
-			log_fragment = "<BR><FONT SIZE=-1><PRE>\n"
-			for jjj in range(iii-3, 0, 1) :
-				# Number the lines in the file we read
-				# Here we do NOT use the messager() function.
-				print str(len(lineList)+jjj+1) + "\t" + lineList[jjj].rstrip()
-				log_fragment = log_fragment + \
-					"{:06d}  {}\n".format( (len(lineList)+jjj+1), lineList[jjj].rstrip())
-
-			log_fragment = log_fragment + "</PRE></FONT>\n"
-			messager( "WARNING:   \"The Task was canceled\"  from  " + mxdiags_dir + "/" + log_file )
-			print ""
-
-			log_event("", "Cumulus MX: \"The Task was canceled\"" + log_fragment, 118 )
-
-			break  #####  <<<<<<  NOTE: Not sure this is right.  Check when it fires...
-			# ----------------------------------------------------------------
-			# NOTE: I think the breaks need to be looked at carefully...
-			# Example of resulting log output ... looks reasonable I think.
-			#
-			#   705	
-			#   706	2018-01-22 13:21:00.429 WU Response: OK: success
-			#   707	
-			#   708	2018-01-22 13:21:40.234 WeatherCloud update: The Task was canceled
-			#   2018/01/22 18:21:43 WARNING:   "The Task was canceled"  from  /mnt/root/home/pi/Cumulus_MX/MXdiags/20180122-095424.txt
-			#
-			# ----------------------------------------------------------------
-
-
-
-
-		# ------------------------------------------------------------------------
-		# This message, "Data input appears to have stopped" occurs when
-		# the USB link is lost.  It doesn seem like CumulusMX ever recovers,
-		# but hase to be restarted.
-		#
-		#
-		# ------------------------------------------------------------------------
-		elif "Data input appears to have stopped" in lineList[iii] :
-			# ----------------------------------------------------------------
-			log_event("", "Data input appears to have stopped, USB likely disconnected.", 120 )
-			messager( "INFO: \"Data input appears to have stopped\", USB likely disconnected.   (code 120)" )
-			return_value = 1
-			break
-
-
-
-
-
-
-
-		# ------------------------------------------------------------------------
-		# See the block below for a "Sensor contact lost" example.
-		# It is possible to get some "good" messages in the midst of a string
-		# of these "bad" messages.
-		# 11/05/17 - Added an if to skip the break until at least a few lines
-		#            have been checked.
-		# 01/08/18 - Changed that check from -3 to -2
-		# ------------------------------------------------------------------------
-		elif "WU Response: OK: success" in lineList[iii] :
-		# 	___print "Data OK"
-			if iii < 0 :    #################################################  HACKED -----   ALWAYS TRUE
-				# --------------------------------------------------------
-				# This is not quite right. CMX sends stuck data to WU.
-				# See the block below with starts:
-				#    Pulling these Latest reading records out, I notice a ...
-				# See the block below with starts:
-				# --------------------------------------------------------
-				if saved_contact_lost > 2 :
-					elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  saved_contact_lost 
-					log_event("", "Sensor contact RESTORED; receiving telemetry again. " + str(elapsed) + " sec", 116 )
-					messager( "INFO:  Sensor contact RESTORED; ... lost for " + str(elapsed) + " sec   (code 116)" )
-				saved_contact_lost = -1
-				if len( saved_exception_tstamp ) > 3 :
-					messager( "INFO: \"WU Response: OK: success\"; clearing pending exception flag.   (code 112)" )
-					log_event("","\"WU Response: OK: success\"; clearing pending exception flag.", 112 )
-				saved_exception_tstamp = "X"    # Set this flag back to the sentinal value
-				break
-
-		else :
-			if iii < (-1 * check_lines) + 1 :
-				messager( "WARNING:  Unknown status from  " + mxdiags_dir + "/" + log_file + "   (code 199)" )
-				for jjj in range(iii-3, 0, 1) :
-					# Number the lines in the file we read
-					print str(len(lineList)+jjj+1) + "\t" + lineList[jjj].rstrip()
-				log_event("", "Unknown status from  " + mxdiags_dir + "/" + log_file, 199 )
-
-
-	# --------------------------------------------------------------------------------
-	#   Not sure what to do with "None", or where exactly this comes from.
-	#   Added return_value to make sure there is a value returned.
-	#   Increased the number of records checked too.
-	#   
-	#  2017/09/20 12:50:21 GMT,  0,  0,  None,  24,  0.16,  0,  122740,  12%,  0,  0%,
-	#  free|945512|664316|281196|6764|392848|148728|122740|822772|102396|0|102396
-	#  2017/09/20 12:50:46 GMT,  0,  0,  None,  24,  0.1,  0,  122608,  12%,  0,  0%,
-	#  free|945512|664200|281312|6764|392860|148732|122608|822904|102396|0|102396
-	#  2017/09/20 12:51:11 GMT,  0,  0,  0,  24,  0.07,  0,  122696,  12%,  0,  0%,
-	# --------------------------------------------------------------------------------
-	data['rf_dropped'] = return_value
-	return return_value
-
-
-	# --------------------------------------------------------------------------------
-	# Pulling these Latest reading records out, I notice a pattern when the RF seems
-	# to be down of "FF FF FF" as shown, but it isn't quite right because we didn't
-	# have around 20 minutes of changing data from looking at the graphs.
-	# 
-	#  2018-02-26 05:25:00.424 Latest reading: 75A0: 18 35 B1 00 FF FF FF 6A 26 FF FF FF 80 45 0E C0
-	#  2018-02-26 05:30:00.439 Latest reading: 75A0: 1D 35 B2 00 FF FF FF 6C 26 FF FF FF 80 45 0E C0
-	#  2018-02-26 05:35:00.453 Latest reading: 75B0: 04 35 B2 00 47 28 00 6C 26 00 00 00 00 45 0E 80
-	#  2018-02-26 05:40:00.469 Latest reading: 75B0: 09 35 B2 00 47 28 00 6B 26 00 00 00 00 45 0E 80
-	#  2018-02-26 05:45:00.483 Latest reading: 75B0: 0E 35 B3 00 47 28 00 6B 26 00 00 00 00 45 0E 80
-	#  2018-02-26 05:50:00.498 Latest reading: 75B0: 11 36 B5 00 47 28 00 6F 26 00 00 00 00 45 0E 80
-	#  2018-02-26 05:55:00.513 Latest reading: 75B0: 18 36 B6 00 FF FF FF 6D 26 FF FF FF 80 45 0E C0
-	#  2018-02-26 06:00:00.539 Latest reading: 75B0: 1D 36 B7 00 FF FF FF 6D 26 FF FF FF 80 45 0E C0
-	#                                                            ^^^^^^^^
-	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-	# Looking at the charts, there appears to be a single jump in values between
-	# 5:32 and 5:33.   In the data log the shift shows up this way, with a string
-	# before and after 5:33 of the same values.
-	#
-	#  26/02/18,05:30,40.6,72,32.3,3.1,5.4,360,0.00,0.00,30.42,43.15,64.0,53,5.4,38.9,40.6,0.0,0,0.000,0.000,35.4,0,0.0,360,0.00,0.00
-	#  26/02/18,05:35,39.2,71,30.6,0.0,0.0,0,0.00,0.00,30.42,43.15,64.0,53,0.0,39.2,39.2,0.0,0,0.000,0.000,35.4,0,0.0,360,0.00,0.00
-	#
-	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-	# Looking at the details of the Diags log around this time, the "Sensor contact lost"
-	# one might think the data is updating for something like 18 minutes, but that's not
-	# what the temperature chart shows, which is just a single jag in the plot at 5:33.
-	# CMX is still sending data, even though it is stuck.
-	#
-	#  2018-02-26 05:31:49.202 Sensor contact lost; ignoring outdoor data
-	#  2018-02-26 05:31:59.150 Sensor contact lost; ignoring outdoor data
-	#  2018-02-26 05:32:00.666 WU Response: OK: success
-	#
-	#  2018-02-26 05:32:09.150 Sensor contact lost; ignoring outdoor data
-	#  2018-02-26 05:33:00.681 WU Response: OK: success
-	#
-	#  2018-02-26 05:34:00.667 WU Response: OK: success
-	#
-	#  2018-02-26 05:35:00.448 Writing log entry for 2/26/2018 5:35:00 AM
-	#  2018-02-26 05:35:00.449 Written log entry for 2/26/2018 5:35:00 AM
-	#  2018-02-26 05:35:00.453 Writing today.ini, LastUpdateTime = 2/26/2018 5:35:00 AM raindaystart = 43.14566924733 rain counter = 43.14566924733
-	#  2018-02-26 05:35:00.453 Latest reading: 75B0: 04 35 B2 00 47 28 00 6C 26 00 00 00 00 45 0E 80
-	#  2018-02-26 05:35:00.682 WU Response: OK: success
-	#
-	#      ..... Gap here .....
-	#
-	#  2018-02-26 05:48:00.694 WU Response: OK: success
-	#
-	#  2018-02-26 05:49:00.674 WU Response: OK: success
-	#
-	#  2018-02-26 05:50:00.492 Writing log entry for 2/26/2018 5:50:00 AM
-	#  2018-02-26 05:50:00.494 Written log entry for 2/26/2018 5:50:00 AM
-	#  2018-02-26 05:50:00.497 Writing today.ini, LastUpdateTime = 2/26/2018 5:50:00 AM raindaystart = 43.14566924733 rain counter = 43.14566924733
-	#  2018-02-26 05:50:00.498 Latest reading: 75B0: 11 36 B5 00 47 28 00 6F 26 00 00 00 00 45 0E 80
-	#  2018-02-26 05:50:00.707 WU Response: OK: success
-	#
-	#  2018-02-26 05:50:01.010 WeatherCloud Response: OK: 200
-	#  2018-02-26 05:50:49.156 Sensor contact lost; ignoring outdoor data
-	#  2018-02-26 05:50:59.578 Sensor contact lost; ignoring outdoor data
-	#  2018-02-26 05:51:00.979 WU Response: OK: success
-	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-	# 
-	# Maybe we can't conclude the RF has restarted unless we see a minimum
-	# of two "WU Response: OK: success" records in a row.  Or, if we do see
-	# such a record, the one before cannot be "Sensor contact lost." But there
-	# is an exception to that as well, when proceeded by a "Latest reading"
-	# record, we still might have dropped RF.  Its also possible a
-	# "WeatherCloud Response" record could be in there depending on the
-	# response time from the server.
-	# 
-	# --------------------------------------------------------------------------------
-	# Appears that CumulusMX retries to read the sensor approximately every 10 seconds
-	#     2017-11-05 07:33:49.373 Sensor contact lost; ignoring outdoor data
-	#     2017-11-05 07:33:59.373 Sensor contact lost; ignoring outdoor data
-	#     2017-11-05 07:34:00.946 WU Response: OK: success
-	#     
-	#     2017-11-05 07:34:09.372 Sensor contact lost; ignoring outdoor data
-	#     2017-11-05 07:34:19.472 Sensor contact lost; ignoring outdoor data
-	#     2017-11-05 07:34:29.472 Sensor contact lost; ignoring outdoor data
-	#     2017-11-05 07:34:39.373 Sensor contact lost; ignoring outdoor data
-	#     2017-11-05 07:34:49.373 Sensor contact lost; ignoring outdoor data
-	#     2017-11-05 07:34:59.373 Sensor contact lost; ignoring outdoor data
-	#     2017-11-05 07:35:00.348 Writing log entry for 11/5/2017 7:35:00 AM
-	#     2017-11-05 07:35:00.350 Written log entry for 11/5/2017 7:35:00 AM
-	#     2017-11-05 07:35:00.353 Writing today.ini, LastUpdateTime = 11/5/2017 7:35:00 AM raindaystart = 32.811...
-	#     2017-11-05 07:35:00.353 Latest reading: 21F0: 09 3D CA 00 FF FF FF 33 26 FF FF FF 84 EF 0A C0
-	#     2017-11-05 07:35:00.946 WU Response: OK: success
-	#     
-	#     2017-11-05 07:35:09.373 Sensor contact lost; ignoring outdoor data
-	#     2017-11-05 07:35:19.373 Sensor contact lost; ignoring outdoor data
-	#     2017-11-05 07:35:29.373 Sensor contact lost; ignoring outdoor data
-	# --------------------------------------------------------------------------------
-
-
-
-
-# ----------------------------------------------------------------------------------------
-#  Check web cam status.
-#
-#  After power-cycling the web cam, it could take up to 5 minutes for the next
-#  image update.  But more importantly, the dillys.org webserver cron job only
-#  runs every 5 minutes... but empirically, up to 10 minutes - accounting for
-#  each 5 minutes....?
-#
-# NOTE: I have similar code running as a service as of this writing, which
-#       drives a relay which interrupts the power to the web cam -
-#       a power-cycle.  Eventually, that functionality will go here...
-#
-# ----------------------------------------------------------------------------------------
-def camera_down():
-	global data
-	global pcyc_holdoff_time
-
-	#___# # <<<<<<<<<<<<<<<<<<<< COMMENTED OUT THE RELAY STUFF
-
-	try:
-		response = urllib.urlopen('http://dillys.org/wx/N_Since_Updated.txt')
-		content = response.read()
-		# ------------------------------------------------------------------
-		# The file contains at least a trailing newline ... I've not looked
-		#   "545   1504095902   12:25:02_UTC "
-		#
-		# systemd seems to complain about urlopen failing in restart...
-		#     Maybe content = "0 0 00:00:00_UTC" if urlopen fails??
-		# ------------------------------------------------------------------
-	except:
-		print "Unexpected ERROR in camera_down:", sys.exc_info()[0]
-		content = "0 0 00:00:00_UTC "
-		messager( "DEBUG: content = \"" + content + "\" in camera_down()" )
-
-	words = re.split(' +', content)
-	##DEBUG## ___print words[0], words[2]
-
-	# --------------------------------------------------------------------------------
-	#										##
-	#										##
-	#     Traceback (most recent call last):					##
-	#       File "/mnt/root/home/pi/watchdog.py", line 672, in <module>		##
-	#         write_pid_file()							##
-	#       File "/mnt/root/home/pi/watchdog.py", line 125, in main			##
-	#         rf_dropped(), last_realtime(), proc_load(), camera_down() ) + \	##
-	#       File "/mnt/root/home/pi/watchdog.py", line 643, in camera_down		##
-	#     										##
-	#     ValueError: invalid literal for int() with base 10: ''			##
-	#										##
-	#										##
-	# --------------------------------------------------------------------------------
-
-	##### interval = int(result.group(1))
-	try:
-		interval = int(words[0])
-	except:
-		interval = -99999
-		messager( "DEBUG: camera_down(): interval looked invalid, \"" + words[0] + "\"" )
-
-
-	if interval > 3000:
-		#___# power_cycle()
-
-		# ------------------------------------------------------------------------
-		#
-		#   2017/10/04 13:05:12 GMT 3166 13:05:02_UTC power cycled
-		#   2017/10/04 13:05:12 GMT,  0,  0,  0,  24,   0.00,  1,  93332,  9%,  0,  0%,  43.5,  43.470,   110.2,
-		#   free|945512|296608|648904|6768|77532|125744|93332|852180|102396|0|102396
-		#
-		#   2017/10/04 13:15:25 GMT 3465 13:10:01_UTC power cycled
-		#   2017/10/04 13:15:25 GMT,  0,  0,  0,  24,   0.17,  1,  92956,  9%,  0,  0%,  42.9,  42.932,   109.3,
-		#   free|945512|296760|648752|6768|78044|125760|92956|852556|102396|0|102396
-		# ------------------------------------------------------------------------
-
-		if pcyc_holdoff_time > 0 :
-			if int(time.strftime("%s")) > pcyc_holdoff_time :
-				# holdoff has expired
-				logger(words[0] + " " + words[2] + " waiting on webcam image update.")
-				###### if data['camera_down'] == 0 :
-				######	log_event("", " waiting on webcam image update.", 104 )
-		else:
-			pcyc_holdoff_time = int(time.strftime("%s")) + 600
-			logger(words[0] + " " + words[2] + " power cycled")
-			log_event("", " Webcam image update stalled.", 103 )
-
-		# ------------------------------------------------------------------------
-		# Give the cam time to reset, and the webserver crontab to fire.
-		# The camera comes up pretty quickly, but it seems to resynch to
-		# the 5-minute interval, and the server crontab only fires every
-		# 5 minutes (unsyncronized as a practical matter).  So 10 min max.
-		# ------------------------------------------------------------------------
-
-		#___# sleep(sleep_on_recycle)
-		data['camera_down'] = 1
-		return 1
-	else:
-		if data['camera_down'] == 1 :
-			log_event("", " Webcam image updating!.", 105 )
-		pcyc_holdoff_time = 0
-		data['camera_down'] = 0
-		return 0
-
-
-# ----------------------------------------------------------------------------------------
-# Return run-time of cumulusmx service as fractional days - Excel-style date.
-#
-# 2017-12-22 def last_restarted() was rolled into this routine.
-# ----------------------------------------------------------------------------------------
-#      $ systemctl status cumulusmx | grep since
-#        Active: active (running) since Thu 2017-10-19 17:34:34 EDT; 2 weeks 3 days ago
-# ----------------------------------------------------------------------------------------
-def cmx_svc_runtime():
-	global data
-	output = subprocess.check_output(["/bin/systemctl", "status", "cumulusmx"])
-	lines = re.split('\n', output)
-
-
-
-	for iii in range(0, len(lines)):
-		if re.search('Main PID:', lines[iii]) :
-			mono_pid = re.sub('.*Main PID:.', '', lines[iii])
-			mono_pid = re.sub(' \(.*', '', mono_pid)
-			break
-
-		if re.search('since', lines[iii]) :
-
-			start_time = re.sub('.* since ... ', '', lines[iii])
-			start_time = re.sub(';.*', '', start_time)
-			duration = re.sub('.*; ', '', lines[iii])
-			duration = re.sub(' ago', '', duration)
-
-
-
-
-	timestamp = datetime.datetime.now().strptime(start_time, "%Y-%m-%d %H:%M:%S %Z")
-	start_secs = int(timestamp.strftime("%s"))
-	now_secs = int(datetime.datetime.now().strftime("%s"))
-	secs_running = now_secs - start_secs
-	in_days = float(secs_running) / float( 60*60*24 )
-
-	data['cmx_svc_runtime'] = in_days
-	data['mono_pid'] = mono_pid
-	data['last_restarted'] = duration
-	return in_days
-
-
-
-
-# ----------------------------------------------------------------------------------------
-# Return status of wxwatchdog service 
-#
-# ----------------------------------------------------------------------------------------
-#   $ systemctl status wxwatchdog 
-#     Active: active (running) since Thu 2017-10-19 17:34:34 EDT; 2 weeks 3 days ago
-#     Active: inactive (dead) (Result: exit-code) since Tue 2018-01-16 12:54:10 EST; 8h ago
-# ----------------------------------------------------------------------------------------
-def webcamwatch_down():
-	global data
-	ret_val = 1
-	output = subprocess.check_output(["/bin/systemctl", "status", "wxwatchdog"])
-	lines = re.split('\n', output)
-
-	for iii in range(0, len(lines)):
-		if re.search('Active:', lines[iii]) :
-			### print lines[iii]
-			status = re.sub('.*Active:', '', lines[iii])
-			### print status
-			status = re.sub(' *since.*', '', status)
-			### print status
-			if re.search(' active .running.', status) :
-				ret_val = 0
-
-	data['webcamwatch_down'] = ret_val
-	return ret_val
-
-
 
 # ----------------------------------------------------------------------------------------
 # Read the ambient temperature from "/web/ambient_tempT.txttmp"
@@ -1897,7 +1168,6 @@ def amb_temp():
 # This handles the startup and shutdown of the script.
 # ----------------------------------------------------------------------------------------
 if __name__ == '__main__':
-###	GPIO_setup()
 	#### if sys.argv[1] = "stop"
 	messager("  Starting " + this_script + "  PID=" + str(getpid()))
 
@@ -1910,61 +1180,9 @@ if __name__ == '__main__':
 #		destroy()
 
 # ----------------------------------------------------------------------------------------
-#   2.7.9 (default, Sep 17 2016, 20:26:04)
-#   [GCC 4.9.2]
-# ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # NOTE: Examples from /mnt/root/home/pi/Cumulus_MX/MXdiags logs
-# ----------------------------------------------------------------------------------------
-# NOTE: Bad (out-of-range) data detected.  Probably result of RF issues.
-#   2018-03-03 19:36:00.941 WU Response: OK: success
-#
-#   2018-03-03 19:36:12.777 Ignoring bad data: pressure = 6381.9
-#   2018-03-03 19:36:12.778                    offset = 0
-#   2018-03-03 19:36:12.778 Sensor contact lost; ignoring outdoor data
-#   2018-03-03 19:37:01.194 WU Response: OK: success
-#
-# ----------------------------------------------------------------------------------------
-# NOTE: Very short period of "Sensor contact lost; ignoring outdoor data"
-#   2018-03-03 15:16:03.595 WU Response: OK: success
-#
-#   2018-03-03 15:16:12.714 Sensor contact lost; ignoring outdoor data
-#   2018-03-03 15:17:01.291 WU Response: OK: success
-#
-#   2018-03-03 15:18:01.087 WU Response: OK: success
-# ----------------------------------------------------------------------------------------
-# NOTE: At startup, communicating with various sites...
-#   2018-02-04 15:01:17.360 Creating WU URL #1
-#   2018-02-04 15:01:17.360 http://weatherstation.wunderground.com/weatherstation/updateweatherstation.php?ID=KPAMCMUR4&PASSWORD=**********&dateutc=2018-02-04+20%3A00%3A16&winddir=180&windspeedmph=1.6&windgustmph=3.8&windspdmph_avg2m=0.7&winddir_avg2m=195&humidity=82&tempf=37.0&rainin=0.00&dailyrainin=0.06&baromin=29.988&dewptf=32.1&indoortempf=68.5&indoorhumidity=36&softwaretype=Cumulus%20v3.0.0&action=updateraw
-#   2018-02-04 15:01:17.363 Creating PWS URL #1
-#   2018-02-04 15:01:17.363 http://www.pwsweather.com/pwsupdate/pwsupdate.php?ID=RADILLY&PASSWORD=**********&dateutc=2018-02-04+20%3A00%3A16&winddir=195&windspeedmph=0.7&windgustmph=3.8&humidity=82&tempf=37.0&rainin=0.00&dailyrainin=0.06&baromin=29.988&dewptf=32.1&softwaretype=Cumulus%20v3.0.0&action=updateraw
-#   2018-02-04 15:01:17.364 End processing history data
-#   2018-02-04 15:01:17.373 Start Timers
-#   2018-02-04 15:01:17.373 Starting 1-minute timer
-#   2018-02-04 15:01:17.376 Attempting realtime FTP connect
-#   2018-02-04 15:01:18.436 Starting Realtime timer, interval = 24 seconds
-#   2018-02-04 15:01:18.441 Uploading WU archive #1
-#   2018-02-04 15:01:18.626 Uploading PWS archive #1
-#   2018-02-04 15:01:18.988 PWS Response: OK: 
-#   <html>
-#   <head>
-#      <title>PWS Weather Station Update</title>
-#   </head>
-#   <body>
-#   Data Logged and posted in METAR mirror.
-#
-#   </body>
-#   </html>
-#   2018-02-04 15:01:18.989 End of PWS archive upload
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
