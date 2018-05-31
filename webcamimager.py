@@ -1,7 +1,8 @@
 #!/usr/bin/python
+#@@@
 #
 # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-#
+#    * Is there a way to detect that we are in "catchup" mode and reduce the sleep?
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
 #     printf "20180523214508\nsnapshot-2018-05-23-21-45-08.jpg\n" > webcamimager__.dat
@@ -86,18 +87,21 @@ from ftplib import FTP
 import shutil
 import re
 
+server_img_dir = "South"
+image_dir = "/home/pi/images"
+image_dir = "South"
+last_image_dir_mtime = 0.0
 
 ftp_credentials_file = "/home/pi/.ftp.credentials"
 ftp_login = ""
 ftp_password = ""
 
 this_script = sys.argv[0]
-image_dir = "/home/pi/images"
 last_image_name = ""
 image_data_file = re.sub('\.py', '__.dat', this_script)
 last_timestamp = 0
 last_filename = ""
-sleep_for = 5
+sleep_for = 30
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
@@ -196,20 +200,26 @@ Prob_Track = [
 #
 # ----------------------------------------------------------------------------------------
 def main():
-	global data
-	global Prob_Track
+	global ftp_login
+	global ftp_password
+	fetch_FTP_credentials()
 
 	python_version = "v " + str(sys.version)
 	print "Python version = " + python_version
 
-	push_to_server('__WORK/arc_2015/2015_missing.txt', 'North')
+	while True:
+		next_image_file()
+		messager( "DEBUG: Sleep seconds = " + str(sleep_for) )
+		sleep(sleep_for)
+		print "."
 
 	exit()
 
-	push_to_server('images/NW_thumb.jpg', 'North')
 
-	next_image_file()
-	push_image()
+####	push_to_server('__WORK/arc_2015/2015_missing.txt', server_img_dir )
+####	push_to_server(image_dir + '/NW_thumb.jpg', server_img_dir )
+####	next_image_file()
+####	DEFUNCT_push_image()
 
 #####	sleep(sleep_for)
 
@@ -225,23 +235,26 @@ def midnight_process(date_string) :
 	# Example: 20180523 - - - (looks like a number, but a string here.)
 	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
 
-	print "DEBUG: Creating tar file"
+	tar_cmd = "tar czf " + image_dir + "/arc-" + date_string + ".tgz " + image_dir + "/snapshot-" + date_string + "*.jpg"
+	print "DEBUG: Creating tar file with: " + tar_cmd 
 	try:
-		subprocess.check_call("tar czf images/arc-" + date_string + ".tgz images/snapshot-" + date_string + "*.jpg", shell=True)
+		subprocess.check_call(tar_cmd, shell=True)
 	except :
 		print "Unexpected ERROR in tar:", sys.exc_info()[0]
 
-	tar_size = os.stat("images/arc-" + date_string + ".tgz").st_size
+	tar_size = os.stat(image_dir + "/arc-" + date_string + ".tgz").st_size
 	print "DEBUG: taf file size = " + str(tar_size)
 
 	# https://stackoverflow.com/questions/82831/how-to-check-whether-a-file-exists?rq=1
-	if os.path.isfile("images/" + date_stamp + ".mp4") :
-		print "WARNING: images/" + date_stamp + ".mp4 already exists"
-		os.unlink("images/" + date_stamp + ".mp4")
+	if os.path.isfile(image_dir + "/" + date_stamp + ".mp4") :
+		print "WARNING: " + image_dir + "/" + date_stamp + ".mp4 already exists"
+		os.unlink(image_dir + "/" + date_stamp + ".mp4")
 
-	print "DEBUG: Creating mp4 file images/" + date_stamp + ".mp4"
+	print "DEBUG: Creating mp4 file image_dir" + "/" + date_stamp + ".mp4"
+	ffmpeg_cmd = "cat " + image_dir + "/snapshot-" + date_string + "*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 " + image_dir + "/" + date_stamp + ".mp4"
+	print "DEBUG: Creating mp4 using cmd: " + ffmpeg_cmd 
 	try:
-		subprocess.check_output("cat images/snapshot-" + date_string + "*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 images/" + date_stamp + ".mp4", shell=True)
+		subprocess.check_output("cat " + image_dir + "/snapshot-" + date_string + "*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 " + image_dir + "/" + date_stamp + ".mp4", shell=True)
 	except :
 ###	except CalledProcessError, EHandle:
 		print "Unexpected ERROR in ffmpeg:", sys.exc_info()[0]
@@ -259,48 +272,89 @@ def midnight_process(date_string) :
 		print "INFO: Tar is large enough to delete jpg files."
 
 		try:
-			subprocess.check_output("rm images/snapshot-" + date_string + "*.jpg", shell=True)
+			subprocess.check_output("rm " + image_dir + "/snapshot-" + date_string + "*.jpg", shell=True)
 		except :
 			print "Unexpected ERROR in rm:", sys.exc_info()[0]
 	else :
 		print "WARNING: Tar is too small to justify deleting jpg files."
 
-	print "DEBUG: Exiting"
-	exit()
+#DEBUG#	print "DEBUG: Exiting ... so Midnight process can be checked"
+#DEBUG#	exit()
 
 
 
 # ----------------------------------------------------------------------------------------
 #  Find the next "unprocessed" image file ... if any
 #
+#  Note: Would do well to break this up a little.
+#
 # ----------------------------------------------------------------------------------------
 def next_image_file() :
-
 	global last_timestamp
+	global last_filename
+	global last_image_dir_mtime
 
 	# Should only ever happen at startup...
 	if last_timestamp == 0 :
+		print "DEBUG: read " + image_data_file
+		print "DEBUG: read " + image_data_file
+		print "DEBUG: read " + image_data_file
+		print "DEBUG: read " + image_data_file
 		last_timestamp = get_stored_ts()
 		last_filename = get_stored_filename()
 
+
+#@@@
+#@@@
+#@@@ Note: this comparision is just not working correctly
+#@@@ Note: This may thwart the desire to all this script to "catch up" when we have a list of unprocessed snapshots.
+#@@@       Though maybe, since we always make one pass through the files at start up, if we write a thumbnail,
+#@@@       that will change the directory mtime, and that will trigger one more. ..... might be OK.
+#@@@
+#@@@ The intent here, is to detect when the directory has change, i.e. mtime of the folder is updated.
+#@@@
+#@@@
+#@@@
+	image_dir_mtime = os.stat( server_img_dir ).st_mtime
+	print "DEBUG: os.stat(\"" +  server_img_dir + "\").st_mtime = " + str(image_dir_mtime) + "   Saved = " + str(last_image_dir_mtime)
+#DEBUG#	print image_dir_mtime - last_image_dir_mtime
+#	if image_dir_mtime <> last_image_dir_mtime :
+#		print "DEBUG: bypass reading the directory... #1"
+#		last_image_dir_mtime = image_dir_mtime
+#		return
+
+	if image_dir_mtime - last_image_dir_mtime == 0.0 :
+		print "DEBUG: bypass reading the directory... #2 directory mtime is unchanged."
+		last_image_dir_mtime = image_dir_mtime
+		return
+
+	last_image_dir_mtime = image_dir_mtime
+
 	print "DEBUG: last processed last_timestamp = " + last_timestamp
-	print "DEBUG: last processed filename = " + last_filename
-	print "DEBUG: date_string = " + re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename)
+###	print "DEBUG: last processed filename = " + last_filename
 	date_string = re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename)
+###	print "DEBUG: date_string = " + date_string
 	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
-	print "DEBUG: date_stamp = " + date_stamp
+###	print "DEBUG: date_stamp = " + date_stamp
 
 	last_day_code = re.sub(r'^......(..)....*', r'\1', last_timestamp)
-	print "DEBUG: last processed day code = " + last_day_code
+###	print "DEBUG: last processed day code = " + last_day_code
 
-	line = 0
+	# --------------------------------------------------------------------------------
+	#  Look for the most recent *unprocessed* snapshot image file.
+	# --------------------------------------------------------------------------------
 	file_list = listdir( image_dir )
+	file_list_len = len( file_list )
 	file_list.sort()
 
 	digits = 0
+	line = 0
 	while int(digits) <= int(last_timestamp) :
 		line += 1
-		print "DEBUG: Checking file # " + str(line) + "  " + file_list[line]
+###		print "DEBUG: Checking file # " + str(line) + "  " + file_list[line]
+		if line >= file_list_len :
+			messager( "DEBUG: line # = " + str(line) + "   file_list_len = " + str(file_list_len) + "  (End of list.)" )
+			break
 
 		if "snapshot" in file_list[line] :
 			# snapshot-2018-05-23-16-57-04.jpg
@@ -313,38 +367,59 @@ def next_image_file() :
 				##### print "DEBUG: " + str(iii) + " digits = " + digits
 
 			day_code = tok[3]
-			print "DEBUG: day = " + tok[3]
-			if last_day_code != day_code :
-				print "DEBUG: MIDNIGHT ROLLOVER!"
-				print "DEBUG: MIDNIGHT ROLLOVER!"
-				print "DEBUG: MIDNIGHT ROLLOVER!"
-				print "DEBUG: MIDNIGHT ROLLOVER!"
-				# snapshot-2018-05-23-16-57-04.jpg
-				midnight_process(re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename))
 
-			print "DEBUG: digits = " + digits
+
+###			print "DEBUG: digits = " + digits
 			if int(digits) > int(last_timestamp) :
-				print "DEBUG: found new image file = " + digits
+###				print "DEBUG: found new image file = " + digits
 				break
 
-###			print "DEBUG: Compare..."
-###			print "DEBUG:       -  " + last_timestamp
-###			print "DEBUG:       -  " + digits
-			sleep(0.5)
-
-
 	if int(digits) > int(last_timestamp) :
-		print "DEBUG: Earliest unprocessed image file is " + file_list[line]
+#DEBUG#		print "DEBUG: Earliest unprocessed image file is " + file_list[line]
 		store_file_data ( digits, file_list[line] )
 
-	shutil.copy2( image_dir + '/' + file_list[line], image_dir + '/NW.jpg' )
 
-###	convert = subprocess.check_output( ['/usr/bin/convert', 'images/NW.jpg', '-resize', '30%', 'images/NW_thumb.jpg'] )
-###	convert = subprocess.check_output( ['/usr/bin/convert', 'images/NW.jpg', '-verbose', '-resize', '30%', 'images/NW_thumb.jpg', '2>&1'] )
-	convert = subprocess.check_output( ['/usr/bin/convert', 'images/NW.jpg', '-verbose', '-resize', '30%', 'images/NW_thumb.jpg'] )
-###	convert = re.sub('.*average: *', '', convert)
-###	convert = convert.rstrip()
-	messager( "DEBUG: convert data: \"" + convert + "\"" )
+		messager( "DEBUG: Make copy of image file " + image_dir + '/' + file_list[line] + ' as NW.jpg' )
+		shutil.copy2( image_dir + '/' + file_list[line], image_dir + '/NW.jpg' )
+		messager( "DEBUG: Upload to server directory  " + server_img_dir )
+		push_to_server(image_dir + '/NW.jpg', server_img_dir )
+
+
+		# ------------------------------------------------------------------------
+		#  Note: This is needed for an apparent quirk of Linux.  It seems that
+		#        the directory mtime is not changed by convert if is *overwrites*
+		#        rather than writing a new file.
+		# ------------------------------------------------------------------------
+		try :
+			os.unlink(image_dir + '/NW_thumb.jpg' )
+		except:
+			print "Unexpected ERROR in unlink:", sys.exc_info()[0]
+
+
+
+
+		messager( "DEBUG: Create thumbnail " + image_dir + '/NW_thumb.jpg' )
+###		convert = subprocess.check_output( ['/usr/bin/convert', image_dir + '/NW.jpg', '-verbose', '-resize', '30%', image_dir + '/NW_thumb.jpg', '2>&1'] )
+		convert = subprocess.check_output( ['/usr/bin/convert', image_dir + '/NW.jpg', '-verbose', '-resize', '30%', image_dir + '/NW_thumb.jpg'] )
+		if len(convert) > 0 :
+			messager( "DEBUG: convert returned data: \"" + convert + "\"" )
+
+		messager( "DEBUG: Upload thumbnail " + image_dir + '/NW_thumb.jpg'  + "  to server directory  " + server_img_dir )
+		push_to_server(image_dir + '/NW_thumb.jpg', server_img_dir )
+
+
+		print "DEBUG: day = " + tok[3]
+		if last_day_code != day_code :
+			print "INFO: MIDNIGHT ROLLOVER!"
+			print "INFO: MIDNIGHT ROLLOVER!"
+			print "INFO: MIDNIGHT ROLLOVER!"
+			print "INFO: MIDNIGHT ROLLOVER!"
+			# snapshot-2018-05-23-16-57-04.jpg
+			midnight_process(re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename))
+
+		last_timestamp = digits
+
+
 
 
 
@@ -414,36 +489,59 @@ def push_to_server(local_file, remote_path) :
 	if re.search('/', local_file) :
 		local_file_bare = re.sub(r'.*/', r'', local_file)
 
-	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-	#  This should go into a separate routine, and only executed at startup
-	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-	FH = open(ftp_credentials_file, "r")
-	data = FH.readlines()
-	FH.close
 
-	ftp_login = data[0].strip("\n")
-	ftp_password = data[1].strip("\n")
+	# --------------------------------------------------------------------------------
+	#  Ran into a case where the first FTP command failed...
+	#
+	#
+	#       File "./webcamimager.py", line 492, in push_to_server
+	#         ftp = FTP('dillys.org')
+	#       File "/usr/lib/python2.7/ftplib.py", line 120, in __init__
+	#         self.connect(host)
+	#       File "/usr/lib/python2.7/ftplib.py", line 135, in connect
+	#         self.sock = socket.create_connection((self.host, self.port), self.timeout)
+	#       File "/usr/lib/python2.7/socket.py", line 575, in create_connection
+	#         raise err
+	#     socket.error: [Errno 110] Connection timed out
+	#
+	# See https://stackoverflow.com/questions/567622/is-there-a-pythonic-way-to-try-something-up-to-a-maximum-number-of-times
+	# --------------------------------------------------------------------------------
+	for iii in range(5) :
+		try :
+			ftp = FTP('dillys.org')
+			ftp.login( ftp_login, ftp_password )
+			ftp.cwd( remote_path )
+			ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
+			ftp.quit()
+			return
+### >>>>>>>>>>>>>>>	break
+		except socket.error, e :
+			iii += 1
+			print "FTP Socket Error %d: %s" % (e.args[0], e.args[1])
+			# Increase the sleep time with each iteration
+			sleep(iii)
+	return
 
-	###print "DEBUG: ftp_login = " + ftp_login + "    ftp_password = " + ftp_password
-	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-
-	ftp = FTP('dillys.org')
+	#  DELETE WHEN ABOVE IS PROVEN
+	#  DELETE WHEN ABOVE IS PROVEN
+	#  DELETE WHEN ABOVE IS PROVEN
+	#  DELETE WHEN ABOVE IS PROVEN
+	# --------------------------------------------------------------------------------
 	ftp.login( ftp_login, ftp_password )
 
 	ftp.cwd( remote_path )
-	print "DEBUG: FTP PWD = " + ftp.pwd()
+
+#DEBUG#	print "DEBUG: FTP PWD = " + ftp.pwd()
 
 	ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
 
-	data = []
-	ftp.dir(data.append)
+#DEBUG#	data = []
+#DEBUG#	ftp.dir(data.append)
 
 	ftp.quit()
  
-	for line in data:
-		print "-", line
+#DEBUG#	for line in data:
+#DEBUG#		print "DEBUG: " + line
 
  
 #  images/NW_thumb.jpg bobdilly@dillys.org:/home/content/b/o/b/bobdilly/html/WX
@@ -458,7 +556,7 @@ def push_to_server(local_file, remote_path) :
 #  FTP User: camdilly
 #  FTP PWD: /home/content/b/o/b/bobdilly/html/WX
 # ----------------------------------------------------------------------------------------
-def push_image() :
+def DEFUNCT_push_image() :
 	global image_data_file
 
 	###print "DEBUG: read " + image_data_file
@@ -484,7 +582,7 @@ def push_image() :
 
 
 
-	filename = 'images/NW_thumb.jpg'
+	filename = image_dir + '/NW_thumb.jpg'
 	ftp.storbinary('STOR NW_thumb.jpg', open(filename, 'rb'))
 
 
@@ -499,6 +597,24 @@ def push_image() :
 
 
 
+# ----------------------------------------------------------------------------------------
+#  Read the ftp_credentials_file and store the credentials for later usage.
+#
+#  FTP User: camdilly
+#  FTP PWD: /home/content/b/o/b/bobdilly/html/WX
+# ----------------------------------------------------------------------------------------
+def fetch_FTP_credentials() :
+	global ftp_login
+	global ftp_password
+
+	FH = open(ftp_credentials_file, "r")
+	data = FH.readlines()
+	FH.close
+
+	ftp_login = data[0].strip("\n")
+	ftp_password = data[1].strip("\n")
+
+	###print "DEBUG: ftp_login = " + ftp_login + "    ftp_password = " + ftp_password
 
 
 
