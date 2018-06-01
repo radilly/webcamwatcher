@@ -45,14 +45,14 @@
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
 #
-#
 # ========================================================================================
-#              NOTE: Don't necessarily need "Cumulus MX Exception thrown (see above)"
-#                    messages.  Added end message 01/08/2018.
-# 20180224 RAD Had a case when the readline() in ws_data_stopped() returned ''
-#              which could not be converted to an integer. Somewhat kludgy fix.
-# 20170712 RAD Want this to run silently (eventually), but log periodically soas
-#              not to hammer the SD card.
+# ========================================================================================
+# ========================================================================================
+# 20180531 RAD Added gloabl catching_up, which detects when the list of files to
+#              process exceeds a certain threshold (3 at this point), and reduces
+#              the sleep duration during that condition.
+# ========================================================================================
+# ========================================================================================
 # ========================================================================================
 #
 #  EXTERNALIZING LOCAL SETTINGS:
@@ -87,9 +87,15 @@ from ftplib import FTP
 import shutil
 import re
 
+# These might be externalized...  There are many hard-coded 'NW_thumb.jpg' and 'NW.jpg' strings still
+main_image = "NW.jpg"
+thumbnail_image = "S_thumb.jpg"
 server_img_dir = "South"
 image_dir = "/home/pi/images"
 image_dir = "South"
+
+
+# Real mtime will always be larger
 last_image_dir_mtime = 0.0
 
 ftp_credentials_file = "/home/pi/.ftp.credentials"
@@ -101,6 +107,7 @@ last_image_name = ""
 image_data_file = re.sub('\.py', '__.dat', this_script)
 last_timestamp = 0
 last_filename = ""
+catching_up = False
 sleep_for = 30
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -209,19 +216,16 @@ def main():
 
 	while True:
 		next_image_file()
-		messager( "DEBUG: Sleep seconds = " + str(sleep_for) )
-		sleep(sleep_for)
+
+		if catching_up :
+			duration = 2
+		else :
+			duration = sleep_for
+		messager( "DEBUG: Sleep seconds = {}".format(duration) )
+		sleep(duration)
 		print "."
 
 	exit()
-
-
-####	push_to_server('__WORK/arc_2015/2015_missing.txt', server_img_dir )
-####	push_to_server(image_dir + '/NW_thumb.jpg', server_img_dir )
-####	next_image_file()
-####	DEFUNCT_push_image()
-
-#####	sleep(sleep_for)
 
 
 # ----------------------------------------------------------------------------------------
@@ -293,6 +297,7 @@ def next_image_file() :
 	global last_timestamp
 	global last_filename
 	global last_image_dir_mtime
+	global catching_up
 
 	# Should only ever happen at startup...
 	if last_timestamp == 0 :
@@ -316,7 +321,7 @@ def next_image_file() :
 #@@@
 #@@@
 	image_dir_mtime = os.stat( server_img_dir ).st_mtime
-	print "DEBUG: os.stat(\"" +  server_img_dir + "\").st_mtime = " + str(image_dir_mtime) + "   Saved = " + str(last_image_dir_mtime)
+	print "DEBUG: os.stat(\"{}\").st_mtime = {}   Saved = {}".format(server_img_dir, image_dir_mtime, last_image_dir_mtime)
 #DEBUG#	print image_dir_mtime - last_image_dir_mtime
 #	if image_dir_mtime <> last_image_dir_mtime :
 #		print "DEBUG: bypass reading the directory... #1"
@@ -354,6 +359,7 @@ def next_image_file() :
 ###		print "DEBUG: Checking file # " + str(line) + "  " + file_list[line]
 		if line >= file_list_len :
 			messager( "DEBUG: line # = " + str(line) + "   file_list_len = " + str(file_list_len) + "  (End of list.)" )
+			catching_up = False
 			break
 
 		if "snapshot" in file_list[line] :
@@ -419,6 +425,9 @@ def next_image_file() :
 
 		last_timestamp = digits
 
+		if (file_list_len - line) > 3 :
+			messager( "DEBUG: line # = " + str(line) + "   file_list_len = " + str(file_list_len) + "  (Catching up.)" )
+			catching_up = True
 
 
 
@@ -871,214 +880,6 @@ def write_pid_file():
 	FH.write(PID)
 	FH.close
 
-# ----------------------------------------------------------------------------------------
-# See if CumulusMX detected that the data from the Weather Station has
-# stopped.
-#
-# Monitor web/DataStoppedT.txt which contains only "<#DataStopped>",
-# really the temp file generated with every update.  I'm not exactly sure
-# what trips this flag.
-#
-#   1 ==> data has stopped
-#   0 ==> OK
-# ----------------------------------------------------------------------------------------
-def ws_data_stopped():
-	global data
-	global ws_data_last_secs
-	# Had a case where this file was empty so the string returned was "", which caused
-	# a "ValueError: invalid literal for int() with base 10: ''" from readline().
-	# NOTE: Here I added logic to use a -1 value, but the better answer might be
-	# to try to reread the file several times, with some timeout of course.
-	FH = open(data_stop_file, "r")
-	text = FH.readline()
-	if re.search('^[01]', text) :
-		data_status = int( text )
-	else:
-		data_status = -1
-
-	FH.close
-	if data_status > 0 :
-		if ws_data_last_secs < 1 :
-			ws_data_last_secs = int( datetime.datetime.utcnow().strftime("%s") )
-			# Long message the first time we see this...
-			messager( "WARNING:  CumulusMX reports data_stopped (<#DataStopped> == 1).   (code 101)" )
-		else:
-			elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  ws_data_last_secs 
-			# Short message while this status continues
-			messager( "WARNING:  data_stopped ... " + str(elapsed) + " sec" )
-	else:
-		ws_data_last_secs = 0
-	data['ws_data_stopped'] = data_status
-	return data_status
-
-# ----------------------------------------------------------------------------------------
-# Code on the server records checksum of the past 12 values of realtime.txt (after
-# stripping off the timestamp). WS_Updates.txt is a count of the unique checksums
-# in this mini log, across the past 12 updates to realtime.txt (12 minutes).
-#
-# Returms:
-#   1 ==> data has stopped
-#   0 ==> OK
-# ----------------------------------------------------------------------------------------
-def server_stalled():
-	global data
-	# --------------------------------------------------------------------------------
-	#   2017/10/11 13:01:56 GMT,  0,  0,  0,  24,   0.01,  0,  89248,  9%,  0,  0%,  46.2,  46.160,   115.1,
-	#   free|945512|271656|673856|6796|55352|127056|89248|856264|102396|0|102396
-	# --------------------------------------------------------------------------------
-	try:
-		response = urllib.urlopen('http://dillys.org/wx/WS_Updates.txt')
-		content = response.read()
-	except:
-		print "Unexpected ERROR in server_stalled:", sys.exc_info()[0]
-		content = "12"      # Assume a good answer...
-	# .................................................................
-	# Strip off the trailing newline which is helpf when catting on the other
-	# side. This should have a value be 1 and 10 - when 10 is realy expected.
-	# .................................................................
-	content = content.rstrip()
-	if len(content) < 1:
-		messager( "DEBUG: WS_Updates.txt looks short = \"" + content.rstrip() + "\"" )
-
-	# ...... REMOVE ...................................................
-	####### result = re.search('(\d*)', content)
-	####### The file contains at least a trailing newline ... I've not looked
-	####### words = re.split(' +', content)
-	# .................................................................
-	try:
-		unique_count = int(content)
-		# ...... REMOVE ...........................................
-		####### unique_count = int(result.group(1))
-		# .........................................................
-	except:
-		# .........................................................
-		# Big value - obvious if debugging...
-		# .........................................................
-		unique_count = 99
-	##_DEBUG_## ___print "wx/WS_Updates.txt = " + str( unique_count )
-	if unique_count < 3 :
-		data['server_stalled'] = 1
-		return 1
-		messager( "WARNING:  unique_count =" + str(unique_count) + "; expected 12." + \
-			"  realtime.txt data was not updated recently (last 45 mins)." )
-	else:
-		data['server_stalled'] = 0
-		return 0
-
-
-# ----------------------------------------------------------------------------------------
-#
-#     NO RETURN VALUE - Well, none that is used consistently.
-#
-#              Return value should be like status, 0 or 1, FALSE or TRUE
-#
-# ----------------------------------------------------------------------------------------
-##########################################        def realtime_stalled():
-def last_realtime():
-	global data
-	global last_secs
-	global last_date
-	#  ---------------------------------------------------------------------
-	#  09/10/17 12:02:47 73.0 92 70.6 3.1 4.5 270 ...
-	#  09/10/17 12:03:11 73.0 92 70.6 3.1 4.5 270 ...
-	#  ---------------------------------------------------------------------
-	try :
-		response = urllib.urlopen('http://dillys.org/wx/realtime.txt')
-		content = response.read()
-	except:
-		print "Unexpected ERROR in last_realtime:", sys.exc_info()[0]
-		# --------------------------------------------------------------
-		#  https://docs.python.org/2/tutorial/errors.html
-		#  https://docs.python.org/2/library/sys.html
-		#  https://docs.python.org/3/library/traceback.html
-		#  https://docs.python.org/2/library/traceback.html
-		#  
-		#
-		#
-		#  https://stackoverflow.com/questions/8238360/how-to-save-traceback-sys-exc-info-values-in-a-variable
-		# --------------------------------------------------------------
-		content = "00/00/00 00:00:00 45.5 80 39.7 0.0 0.7 360 0.00 0.05 30.14 N 0 mph ..."
-		messager( "DEBUG: content = \"" + content + "\" in last_realtime()" )
-
-	words = re.split(' +', content)
-
-	#  ---------------------------------------------------------------------
-	#  20170815 14:38:55 Zulu
-	#  server_stalled() = 0
-	#  ws_data_stopped = 0
-	#  Traceback (most recent call last):
-  	#  File "./watchdog.py", line 166, in <module>
-    	#  main()
-  	#  File "./watchdog.py", line 156, in main
-    	#  last_realtime()
-  	#  File "./watchdog.py", line 124, in last_realtime
-    	#  timestamp = words[1]
-	#  IndexError: list index out of range
-	#       *** File may not have been completely written
-	#  ---------------------------------------------------------------------
-	if (len(words)) < 2 :
-		date_str = "00/00/00"
-		timestamp = "00:00:00"
-		seconds = last_secs
-		diff_secs = -1
-	else:
-		date_str = words[0]
-		ddd = re.split('/', date_str)
-		timestamp = words[1]
-		########## ___print timestamp
-		words = re.split(':', timestamp)
-		seconds = int(words[2]) + 60 * ( int(words[1]) + ( 60 * int(words[0]) ) )
-		diff_secs = seconds - last_secs
-
-	#  ---------------------------------------------------------------------
-	#  date-time, server_stalled, ws_data_stopped, rf_dropped, last_realtime, proc_load, 
-	#  2017/09/17 22:11:59 GMT,  0,  0,  0,  -65471,  0.0,  101244,  10%,  0,  0%,
-	#  free|945512|560184|385328|6768|317368|141572|101244|844268|102396|0|102396
-	#  WARNING: 65543 elapsed since realtime.txt was updated.
-	#  2017/09/17 22:12:24 GMT,  0,  0,  0,  65543,  0.0,  101148,  10%,  0,  0%,
-	#  free|945512|560088|385424|6768|317368|141572|101148|844364|102396|0|102396
-	#  
-    	#  Because above, when we get an incomplete file, lacking a timestamp
-    	#  we set the time to "00:00:00" and we get a weird number for
-	#  last_realtime.  The nominal value we expect is 24, or perhaps
-	#  48 - 48 being the transmit interval for the remote sensors.
-	#  
-	#  ---------------------------------------------------------------------
-	if last_secs == 999999 :
-		stat_text = "ok"
-		status = 0
-		diff_secs = -2
-	elif diff_secs > 200 :
-		stat_text = "NOT UPDATED"
-		status = 1
-		messager( "WARNING: " + str(diff_secs) + " elapsed since realtime.txt was updated." )
-	elif diff_secs < -2000 :
-		stat_text = "NOT UPDATED"
-		status = -1
-		messager( "DEBUG: Got large negative value from record:\n\t" + content )
-#		for item in content :
-#			___print "    " + item
-		if last_date != date_str :
-			#  -----------------------------------------------------
-			#  Timestamp in realtime.txt is in "local" time.
-			#  -----------------------------------------------------
-			messager( "DEBUG: Likely the day rolled over as save date does not match..." )
-			if seconds < 300 :
-				messager( "DEBUG:    ... and seconds = " + str(seconds) )
-			if diff_secs == -86376 :
-				messager( "DEBUG:    ... yep, the date on the Pi rolled over" )
-			last_date = date_str
-	else:
-		stat_text = "ok"
-		status = 0
-
-
-	#########################  ___print "  {}    {}    {}   {}".format(timestamp,seconds,diff_secs,status)
-	last_secs = seconds
-	data['last_realtime'] = diff_secs
-	return diff_secs       # For now we track this number. Later should return status.
-
-
 
 
 # ----------------------------------------------------------------------------------------
@@ -1288,12 +1089,10 @@ if __name__ == '__main__':
 	messager("  Starting " + this_script + "  PID=" + str(getpid()))
 
 	write_pid_file()
-	### cmx_svc_runtime()	# This reads the PID for the main mono process
 	try:
 		main()
 	except KeyboardInterrupt:
 		messager("  Good bye from " + this_script)
-#		destroy()
 
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
