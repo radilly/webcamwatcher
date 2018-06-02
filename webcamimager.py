@@ -42,8 +42,9 @@
 #
 #   NOTE: This should be able to be run as a service. (systemctl)
 #
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#   NOTE: We should move the tar file to an archive directory.
 #
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
 # ========================================================================================
 # ========================================================================================
@@ -75,6 +76,14 @@ import datetime
 import time
 from time import sleep
 import sys
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#  https://docs.python.org/2/library/subprocess.html
+#  https://pypi.org/project/subprocess32/
+#  http://www.pythonforbeginners.com/os/subprocess-for-system-administrators
+#  https://pythonspot.com/python-subprocess/
+#  http://stackabuse.com/pythons-os-and-subprocess-popen-commands/
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 import subprocess
 
 
@@ -221,9 +230,9 @@ def main():
 			duration = 2
 		else :
 			duration = sleep_for
-		messager( "DEBUG: Sleep seconds = {}".format(duration) )
+		messager( "DEBUG: Sleep {} sec.".format(duration) )
 		sleep(duration)
-		print "."
+		#DEBUG# print "."
 
 	exit()
 
@@ -239,52 +248,80 @@ def midnight_process(date_string) :
 	# Example: 20180523 - - - (looks like a number, but a string here.)
 	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
 
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	#  -C, --directory=DIR
+	#      Change  to  DIR  before performing any operations.  This option is order-sensitive, i.e. it affects
+	#      all options that follow.
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	#  Tinkered with a few ideas for tar.
+	#  Could not get --directory to work as I expected from the man page.
+	#  I am also a little concerned about using a wildcard with the tar command.
+	#  Seems like it might be safer to build a table of files, and the -T option
+	#   (as I have been doing on the hosted server).
+	#
+	#   tar -c --directory=South -zf arc_2018/arc-2018-06-01.tgz South/snapshot-2018-06-01*.jpg
+	#   tar -c --directory=South -zf arc_2018/arc-2018-06-01.tgz snapshot-2018-06-01*.jpg
+	#   tar -c --directory=/home/pi/South -zf arc_2018/arc-2018-06-01_0002.tgz snapshot-2018-06-01*.jpg
+	#   ls -al South/arc_2018
+	#   tar -c --directory=South -zf South/arc_2018/arc-2018-06-01.tgz snapshot-2018-06-01*.jpg
+	#   tar -c -zf South/arc_2018/arc-2018-06-01.tgz South/snapshot-2018-06-01*.jpg
+	#   ls -al South/arc_2018
+	#   tar tzvf South/arc_2018/arc-2018-06-01.tgz | less
+	#   ls South/snapshot-2018-06-01 | less
+	#   ls South/snapshot-2018-06-01-*.jpg | less
+	#   ls South/snapshot-2018-06-01-*.jpg > South/arc_2018/index-2018-06-01.txt
+	#   less South/arc_2018/index-2018-06-01.txt
+	#   tar -c -zf South/arc_2018/arc-2018-06-01.tgz -T South/arc_2018/index-2018-06-01.txt
+	#   tar tzvf South/arc_2018/arc-2018-06-01.tgz | less
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
 	tar_cmd = "tar czf " + image_dir + "/arc-" + date_string + ".tgz " + image_dir + "/snapshot-" + date_string + "*.jpg"
-	print "DEBUG: Creating tar file with: " + tar_cmd 
+	messager( "DEBUG: Creating tar file with: " + tar_cmd )
 	try:
 		subprocess.check_call(tar_cmd, shell=True)
 	except :
 		print "Unexpected ERROR in tar:", sys.exc_info()[0]
 
 	tar_size = os.stat(image_dir + "/arc-" + date_string + ".tgz").st_size
-	print "DEBUG: taf file size = " + str(tar_size)
+	messager( "DEBUG: taf file size = " + str(tar_size) )
 
 	# https://stackoverflow.com/questions/82831/how-to-check-whether-a-file-exists?rq=1
 	if os.path.isfile(image_dir + "/" + date_stamp + ".mp4") :
 		print "WARNING: " + image_dir + "/" + date_stamp + ".mp4 already exists"
 		os.unlink(image_dir + "/" + date_stamp + ".mp4")
 
-	print "DEBUG: Creating mp4 file image_dir" + "/" + date_stamp + ".mp4"
+	messager( "DEBUG: Creating mp4 file image_dir" + "/" + date_stamp + ".mp4" )
 	ffmpeg_cmd = "cat " + image_dir + "/snapshot-" + date_string + "*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 " + image_dir + "/" + date_stamp + ".mp4"
-	print "DEBUG: Creating mp4 using cmd: " + ffmpeg_cmd 
+	messager( "DEBUG: Creating mp4 using cmd: " + ffmpeg_cmd )
 	try:
 		subprocess.check_output("cat " + image_dir + "/snapshot-" + date_string + "*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 " + image_dir + "/" + date_stamp + ".mp4", shell=True)
 	except :
 ###	except CalledProcessError, EHandle:
-		print "Unexpected ERROR in ffmpeg:", sys.exc_info()[0]
-###		print "Unexpected ERROR in ffmpeg:", EHandle.returncode
+		messager( "ERROR: Unexpected ERROR in ffmpeg:" + sys.exc_info()[0] )
 		ffmpeg_failed = True
 
 	if ffmpeg_failed :
-		print "WARNING: ffmpeg failed."
+		messager( "WARNING: ffmpeg failed." )
 
 	if tar_size <= 5000000 :
-		print "WARNING: Tar is too small to justify deleting jpg files."
+		messager( "WARNING: Tar is too small to justify deleting jpg files." )
 
 	# Could also check if ffmpeg worked ... but if we have a good tar file ...
 	if tar_size > 5000000 :
-		print "INFO: Tar is large enough to delete jpg files."
+		messager( "INFO: Tar is large enough to delete jpg files." )
 
 		try:
 			subprocess.check_output("rm " + image_dir + "/snapshot-" + date_string + "*.jpg", shell=True)
 		except :
-			print "Unexpected ERROR in rm:", sys.exc_info()[0]
+			messager( "ERROR: Unexpected ERROR in rm:" + sys.exc_info()[0] )
 	else :
-		print "WARNING: Tar is too small to justify deleting jpg files."
-
-#DEBUG#	print "DEBUG: Exiting ... so Midnight process can be checked"
-#DEBUG#	exit()
-
+		messager( "WARNING: Tar is too small to justify deleting jpg files." )
 
 
 # ----------------------------------------------------------------------------------------
@@ -292,6 +329,61 @@ def midnight_process(date_string) :
 #
 #  Note: Would do well to break this up a little.
 #
+# ----------------------------------------------------------------------------------------
+#  This is a section of the nohup.out file with some DEBUG statements still in place
+#  06/01/2018 after the script has been running about 24 hours. There are 4 iterations
+#  through the main loop below. The first and the last are the same, #1 and #4.
+#
+#  #1 & #4 - This case should be the least expensive type of interation. We cheat a
+#       little to keep the code simple.  We're still polling, but the mtime of a
+#       Unix directory (modification time) changes when a new file is written.  So we
+#       only need to stat() the directory and see if the mtime changed since the last
+#       check.  If the mtime is the same we just return and go back to sleep.
+#       Note: There are several Python ways to wait for a directory change, e.q.
+#       a file added to trigger some action.  It is interesting and effecient I
+#       expect, but involves a callback and is a little complicated.
+#
+#  #2 - This is the periodic image processing. At present the web cam ftps a jpg
+#       to the Pi every 5 minutes.  We basically upload 2 files to the hosted web
+#       server, a copy of the latest image with a generic name, and a thumbnail
+#       version created with "convert," which is part of imagemagick.  With the
+#       sleep time at 30 seconds this fires about every 10 iterations when the
+#       processing is "caught up."
+#
+#  #3 - This is a non-image-processing iteration. It's an artifact of the capability
+#       to go into "catchup mode."  In this mode we process the backlog of files
+#       which can build up while this script is *not* running.  Note that the
+#       folder mtime has changed so we ran through the list of files in the folder
+#       and got to the last one without find a new file.  The mtime changed because
+#       of thumbnail generation which keeps is in a #2 type cycle until we hit
+#       the end of the list of files.
+#       Note: Consider the midnight case - when, if the tar goes well, all the
+#       files in it are deleted, i.e. the number of files drops.
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+#  1 .     .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+#    DEBUG: os.stat("South").st_mtime = 1527888257.13   Saved = 1527888257.13
+#    DEBUG: bypass reading the directory... #2 directory mtime is unchanged.
+#    2018/06/01 21:28:48 DEBUG: Sleep seconds = 30
+#  2 .     .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+#    DEBUG: os.stat("South").st_mtime = 1527888554.81   Saved = 1527888257.13
+#    DEBUG: last processed last_timestamp = 20180601172410
+#    DEBUG: write ./webcamimager__.dat
+#    2018/06/01 21:29:18 DEBUG: Make copy of image file South/snapshot-2018-06-01-17-29-10.jpg as NW.jpg
+#    2018/06/01 21:29:18 DEBUG: Upload to server directory  South
+#    2018/06/01 21:29:20 DEBUG: Create thumbnail South/NW_thumb.jpg
+#    2018/06/01 21:29:20 DEBUG: Upload thumbnail South/NW_thumb.jpg  to server directory  South
+#    DEBUG: day = 01
+#    2018/06/01 21:29:21 DEBUG: Sleep seconds = 30
+#  3 .     .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+#    DEBUG: os.stat("South").st_mtime = 1527888560.51   Saved = 1527888554.81
+#    DEBUG: last processed last_timestamp = 20180601172910
+#    2018/06/01 21:29:51 DEBUG: line # = 222   file_list_len = 222  (End of list.)
+#    2018/06/01 21:29:51 DEBUG: Sleep seconds = 30
+#  4 .     .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+#    DEBUG: os.stat("South").st_mtime = 1527888560.51   Saved = 1527888560.51
+#    DEBUG: bypass reading the directory... #2 directory mtime is unchanged.
+#    2018/06/01 21:30:21 DEBUG: Sleep seconds = 30
+#    .
 # ----------------------------------------------------------------------------------------
 def next_image_file() :
 	global last_timestamp
@@ -301,13 +393,11 @@ def next_image_file() :
 
 	# Should only ever happen at startup...
 	if last_timestamp == 0 :
-		print "DEBUG: read " + image_data_file
-		print "DEBUG: read " + image_data_file
-		print "DEBUG: read " + image_data_file
-		print "DEBUG: read " + image_data_file
 		last_timestamp = get_stored_ts()
 		last_filename = get_stored_filename()
 
+
+	image_dir_mtime = os.stat( image_dir ).st_mtime
 
 #@@@
 #@@@
@@ -319,23 +409,20 @@ def next_image_file() :
 #@@@ The intent here, is to detect when the directory has change, i.e. mtime of the folder is updated.
 #@@@
 #@@@
-#@@@
-	image_dir_mtime = os.stat( server_img_dir ).st_mtime
-	print "DEBUG: os.stat(\"{}\").st_mtime = {}   Saved = {}".format(server_img_dir, image_dir_mtime, last_image_dir_mtime)
-#DEBUG#	print image_dir_mtime - last_image_dir_mtime
-#	if image_dir_mtime <> last_image_dir_mtime :
-#		print "DEBUG: bypass reading the directory... #1"
-#		last_image_dir_mtime = image_dir_mtime
-#		return
+#@@@	print "DEBUG: os.stat(\"{}\").st_mtime = {}   Saved = {}".format(image_dir, image_dir_mtime, last_image_dir_mtime)
+#@@@	if image_dir_mtime <> last_image_dir_mtime :
+#@@@		print "DEBUG: bypass reading the directory... #1"
+#@@@		last_image_dir_mtime = image_dir_mtime
+#@@@		return
 
 	if image_dir_mtime - last_image_dir_mtime == 0.0 :
-		print "DEBUG: bypass reading the directory... #2 directory mtime is unchanged."
+		messager( "DEBUG: directory {} mtime unchanged.".format(image_dir) )
 		last_image_dir_mtime = image_dir_mtime
 		return
 
 	last_image_dir_mtime = image_dir_mtime
 
-	print "DEBUG: last processed last_timestamp = " + last_timestamp
+###	print "DEBUG: last processed last_timestamp = " + last_timestamp
 ###	print "DEBUG: last processed filename = " + last_filename
 	date_string = re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename)
 ###	print "DEBUG: date_string = " + date_string
@@ -382,13 +469,39 @@ def next_image_file() :
 
 	if int(digits) > int(last_timestamp) :
 #DEBUG#		print "DEBUG: Earliest unprocessed image file is " + file_list[line]
-		store_file_data ( digits, file_list[line] )
 
 
-		messager( "DEBUG: Make copy of image file " + image_dir + '/' + file_list[line] + ' as NW.jpg' )
-		shutil.copy2( image_dir + '/' + file_list[line], image_dir + '/NW.jpg' )
-		messager( "DEBUG: Upload to server directory  " + server_img_dir )
-		push_to_server(image_dir + '/NW.jpg', server_img_dir )
+
+		# ------------------------------------------------------------------------
+		#  This is a strange failure mode of the web cam...    06/02/2018
+		#   -rw-r--r--  1 pi pi    11592 Jun  2 01:34 snapshot-2018-06-02-01-34-13.jpg
+		#   -rw-r--r--  1 pi pi    11579 Jun  2 01:39 snapshot-2018-06-02-01-39-13.jpg
+		#   -rw-r--r--  1 pi pi    11576 Jun  2 01:44 snapshot-2018-06-02-01-44-13.jpg
+		#   -rw-r--r--  1 pi pi    11555 Jun  2 01:49 snapshot-2018-06-02-01-49-13.jpg
+		#   -rw-r--r--  1 pi pi        0 Jun  2 01:54 snapshot-2018-06-02-01-54-13.jpg
+		#   -rw-r--r--  1 pi pi        0 Jun  2 01:59 snapshot-2018-06-02-01-59-13.jpg
+		#   -rw-r--r--  1 pi pi        0 Jun  2 02:04 snapshot-2018-06-02-02-04-13.jpg
+		#   -rw-r--r--  1 pi pi        0 Jun  2 02:09 snapshot-2018-06-02-02-09-13.jpg
+		# ------------------------------------------------------------------------
+		jpg_size = os.stat( image_dir + '/' + file_list[line] ).st_size
+		if jpg_size < 500 :
+			store_file_data ( digits, file_list[line] )
+			last_timestamp = digits
+			messager( "WARNING: Skipping image file {}/{} size = {}".format( image_dir, file_list[line], jpg_size ) )
+			# ----------------------------------------------------------------
+			#  As above, there were a stack of 0-length images.  We want to get
+			#  through them quickly.  The folder is "touched" so that mtime
+			#  changes or we'd have to wait for the next image to be FTP'ed.
+			# ----------------------------------------------------------------
+			catching_up = True
+			subprocess.check_output( ['/usr/bin/touch', image_dir] )
+			return
+
+
+		messager( "DEBUG: Copy image file " + image_dir + '/' + file_list[line] + ' as ' + main_image +
+			" and upload to " + server_img_dir )
+		shutil.copy2( image_dir + '/' + file_list[line], image_dir + '/' + main_image )
+		push_to_server(image_dir + '/' + main_image, server_img_dir )
 
 
 		# ------------------------------------------------------------------------
@@ -402,19 +515,29 @@ def next_image_file() :
 			print "Unexpected ERROR in unlink:", sys.exc_info()[0]
 
 
+		convert = ""
+		messager( "DEBUG: Create and upload thumbnail " + image_dir + '/NW_thumb.jpg'  + "  to server directory  " + server_img_dir )
+		convert_cmd = ['/usr/bin/convert',
+				image_dir + '/' + main_image,
+				'-verbose',
+				'-resize', '30%',
+				image_dir + '/NW_thumb.jpg']
+		try :
+###			convert = subprocess.check_output( ['/usr/bin/convert', image_dir + '/' + main_image, '-verbose', '-resize', '30%', image_dir + '/NW_thumb.jpg', '2>&1'] )
+			convert = subprocess.check_output( convert_cmd )
+		except:
+			print "Unexpected ERROR in convert:", sys.exc_info()[0]
 
 
-		messager( "DEBUG: Create thumbnail " + image_dir + '/NW_thumb.jpg' )
-###		convert = subprocess.check_output( ['/usr/bin/convert', image_dir + '/NW.jpg', '-verbose', '-resize', '30%', image_dir + '/NW_thumb.jpg', '2>&1'] )
-		convert = subprocess.check_output( ['/usr/bin/convert', image_dir + '/NW.jpg', '-verbose', '-resize', '30%', image_dir + '/NW_thumb.jpg'] )
 		if len(convert) > 0 :
 			messager( "DEBUG: convert returned data: \"" + convert + "\"" )
 
-		messager( "DEBUG: Upload thumbnail " + image_dir + '/NW_thumb.jpg'  + "  to server directory  " + server_img_dir )
 		push_to_server(image_dir + '/NW_thumb.jpg', server_img_dir )
 
+		store_file_data ( digits, file_list[line] )
+		last_timestamp = digits
 
-		print "DEBUG: day = " + tok[3]
+#DEBUG#		print "DEBUG: day = " + tok[3]
 		if last_day_code != day_code :
 			print "INFO: MIDNIGHT ROLLOVER!"
 			print "INFO: MIDNIGHT ROLLOVER!"
@@ -423,7 +546,6 @@ def next_image_file() :
 			# snapshot-2018-05-23-16-57-04.jpg
 			midnight_process(re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename))
 
-		last_timestamp = digits
 
 		if (file_list_len - line) > 3 :
 			messager( "DEBUG: line # = " + str(line) + "   file_list_len = " + str(file_list_len) + "  (Catching up.)" )
@@ -443,7 +565,7 @@ def next_image_file() :
 # ----------------------------------------------------------------------------------------
 def store_file_data(ts, filename) :
 	global image_data_file
-	print "DEBUG: write " + image_data_file
+#DEBUG#	messager( "DEBUG: write " + image_data_file )
 	FH = open(image_data_file, "w")
 	FH.write( ts + "\n" )
 	FH.write( filename + "\n" )
@@ -455,15 +577,16 @@ def store_file_data(ts, filename) :
 # ----------------------------------------------------------------------------------------
 def get_stored_ts() :
 	global image_data_file
-	print "DEBUG: read " + image_data_file
+#DEBUG#	messager( "DEBUG: read " + image_data_file )
 	FH = open(image_data_file, "r")
 	content = FH.readlines()
 	FH.close
 
 	ts = str(content[0].strip("\n"))
+	messager( "DEBUG: Stored ts = " + ts )
 
-	day_code = re.sub(r'^......(..)....*', r'\1', ts)
-	print "DEBUG: read day code = " + day_code
+#DELETE#	day_code = re.sub(r'^......(..)....*', r'\1', ts)
+#DELETE#	messager( "DEBUG: day_code = " + day_code )
 
 	return ts
 
@@ -472,12 +595,13 @@ def get_stored_ts() :
 # ----------------------------------------------------------------------------------------
 def get_stored_filename() :
 	global image_data_file
-	print "DEBUG: read " + image_data_file
+#DEBUG#	messager( "DEBUG: read " + image_data_file )
 	FH = open(image_data_file, "r")
 	content = FH.readlines()
 	FH.close
 
 	filename = str(content[1].strip("\n"))
+	messager( "DEBUG: Stored filename = " + filename )
 
 	return filename
 
@@ -517,9 +641,12 @@ def push_to_server(local_file, remote_path) :
 	# --------------------------------------------------------------------------------
 	for iii in range(5) :
 		try :
+			messager( "DEBUG: FTP connect to {}".format( "dillys.org" ) )
 			ftp = FTP('dillys.org')
 			ftp.login( ftp_login, ftp_password )
+			messager( "DEBUG: FTP remote cd to {}".format( remote_path ) )
 			ftp.cwd( remote_path )
+			messager( "DEBUG: FTP STOR {} to  {}".format( local_file_bare, local_file) )
 			ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
 			ftp.quit()
 			return
