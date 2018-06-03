@@ -96,11 +96,9 @@ from ftplib import FTP
 import shutil
 import re
 
-# These might be externalized...  There are many hard-coded 'NW_thumb.jpg' and 'NW.jpg' strings still
-main_image = "NW.jpg"
+main_image = "S.jpg"
 thumbnail_image = "S_thumb.jpg"
 server_img_dir = "South"
-image_dir = "/home/pi/images"
 image_dir = "South"
 
 
@@ -281,14 +279,28 @@ def midnight_process(date_string) :
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
+
+	#  Creats a list like South/arc_2018/index-2018-06-01.txt for use with -T
+	daily_image_list(date_string, image_dir )
+
+	yyyy = re.sub(r'(....).*', r'\1', date_string)
+	arc_dir = image_dir + '/arc_' + yyyy
+	image_index = arc_dir + '/index-' + date_string + ".txt"
+
+
+
 	tar_cmd = "tar czf " + image_dir + "/arc-" + date_string + ".tgz " + image_dir + "/snapshot-" + date_string + "*.jpg"
+	#   tar -c -zf South/arc_2018/arc-2018-06-01.tgz -T South/arc_2018/index-2018-06-01.txt
+	tar_cmd = "tar -c -T " + image_index + " -zf " + arc_dir + "/arc-" + date_string + ".tgz "
+
+
 	messager( "DEBUG: Creating tar file with: " + tar_cmd )
 	try:
 		subprocess.check_call(tar_cmd, shell=True)
 	except :
 		print "Unexpected ERROR in tar:", sys.exc_info()[0]
 
-	tar_size = os.stat(image_dir + "/arc-" + date_string + ".tgz").st_size
+	tar_size = os.stat(arc_dir + "/arc-" + date_string + ".tgz").st_size
 	messager( "DEBUG: taf file size = " + str(tar_size) )
 
 	# https://stackoverflow.com/questions/82831/how-to-check-whether-a-file-exists?rq=1
@@ -510,18 +522,18 @@ def next_image_file() :
 		#        rather than writing a new file.
 		# ------------------------------------------------------------------------
 		try :
-			os.unlink(image_dir + '/NW_thumb.jpg' )
+			os.unlink(image_dir + '/' + thumbnail_image)
 		except:
 			print "Unexpected ERROR in unlink:", sys.exc_info()[0]
 
 
 		convert = ""
-		messager( "DEBUG: Create and upload thumbnail " + image_dir + '/NW_thumb.jpg'  + "  to server directory  " + server_img_dir )
+		messager( "DEBUG: Create and upload thumbnail " + image_dir + '/' + thumbnail_image + "  to server directory  " + server_img_dir )
 		convert_cmd = ['/usr/bin/convert',
 				image_dir + '/' + main_image,
 				'-verbose',
 				'-resize', '30%',
-				image_dir + '/NW_thumb.jpg']
+				image_dir + '/' + thumbnail_image ]
 		try :
 ###			convert = subprocess.check_output( ['/usr/bin/convert', image_dir + '/' + main_image, '-verbose', '-resize', '30%', image_dir + '/NW_thumb.jpg', '2>&1'] )
 			convert = subprocess.check_output( convert_cmd )
@@ -532,7 +544,7 @@ def next_image_file() :
 		if len(convert) > 0 :
 			messager( "DEBUG: convert returned data: \"" + convert + "\"" )
 
-		push_to_server(image_dir + '/NW_thumb.jpg', server_img_dir )
+		push_to_server(image_dir + '/' + thumbnail_image, server_img_dir )
 
 		store_file_data ( digits, file_list[line] )
 		last_timestamp = digits
@@ -550,6 +562,41 @@ def next_image_file() :
 		if (file_list_len - line) > 3 :
 			messager( "DEBUG: line # = " + str(line) + "   file_list_len = " + str(file_list_len) + "  (Catching up.)" )
 			catching_up = True
+
+
+
+
+
+
+
+
+
+
+
+# ----------------------------------------------------------------------------------------
+#  Build a list of the days files (used as input to tar).
+#@@@
+# ----------------------------------------------------------------------------------------
+def daily_image_list( date_string, image_dir ) :
+
+	yyyy = re.sub(r'(....).*', r'\1', date_string)
+	arc_dir = image_dir + '/arc_' + yyyy
+
+	file_list = listdir( image_dir )
+	file_list_len = len( file_list )
+
+	image_index = arc_dir + '/index-' + date_string + ".txt"
+	FH = open(image_index, "w")
+
+	look_for = "snapshot-" + date_string
+
+	line = 0
+	while line < file_list_len :
+		if look_for in file_list[line] :
+			FH.write( image_dir + "/" + file_list[line] + "\n" )
+		line += 1
+
+	FH.close
 
 
 
@@ -573,7 +620,6 @@ def store_file_data(ts, filename) :
 
 # ----------------------------------------------------------------------------------------
 #
-#@@@
 # ----------------------------------------------------------------------------------------
 def get_stored_ts() :
 	global image_data_file
@@ -718,8 +764,8 @@ def DEFUNCT_push_image() :
 
 
 
-	filename = image_dir + '/NW_thumb.jpg'
-	ftp.storbinary('STOR NW_thumb.jpg', open(filename, 'rb'))
+	filename = image_dir + '/' + thumbnail_image
+	ftp.storbinary('STOR ' + thumbnail_image, open(filename, 'rb'))
 
 
  
