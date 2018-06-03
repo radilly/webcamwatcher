@@ -228,7 +228,7 @@ def main():
 			duration = 2
 		else :
 			duration = sleep_for
-		messager( "DEBUG: Sleep {} sec.".format(duration) )
+#DEBUG#		messager( "DEBUG: Sleep {} sec.".format(duration) )
 		sleep(duration)
 		#DEBUG# print "."
 
@@ -241,7 +241,8 @@ def main():
 #  Example argument:   2018-05-23
 # ----------------------------------------------------------------------------------------
 def midnight_process(date_string) :
-	ffmpeg_failed = False
+	ffmpeg_failed = True
+	tar_failed = True
 
 	# Example: 20180523 - - - (looks like a number, but a string here.)
 	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
@@ -297,25 +298,112 @@ def midnight_process(date_string) :
 	messager( "DEBUG: Creating tar file with: " + tar_cmd )
 	try:
 		subprocess.check_call(tar_cmd, shell=True)
+		tar_failed = False
 	except :
-		print "Unexpected ERROR in tar:", sys.exc_info()[0]
+		messager( "ERROR: Unexpected ERROR in tar: {}".format( sys.exc_info()[0] ) )
 
 	tar_size = os.stat(arc_dir + "/arc-" + date_string + ".tgz").st_size
 	messager( "DEBUG: taf file size = " + str(tar_size) )
 
+	mp4_file = image_dir + "/" + date_stamp + ".mp4"
 	# https://stackoverflow.com/questions/82831/how-to-check-whether-a-file-exists?rq=1
-	if os.path.isfile(image_dir + "/" + date_stamp + ".mp4") :
-		print "WARNING: " + image_dir + "/" + date_stamp + ".mp4 already exists"
-		os.unlink(image_dir + "/" + date_stamp + ".mp4")
+	if os.path.isfile( mp4_file ) :
+		messager( "WARNING: " + mp4_file + " already exists" )
+		os.unlink( mp4_file )
 
-	messager( "DEBUG: Creating mp4 file image_dir" + "/" + date_stamp + ".mp4" )
-	ffmpeg_cmd = "cat " + image_dir + "/snapshot-" + date_string + "*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 " + image_dir + "/" + date_stamp + ".mp4"
+	messager( "DEBUG: Creating mp4 file" + mp4_file )
+
+	cat_cmd = r"cat {}/snapshot-{}*.jpg".format( image_dir, date_string )
+	messager( "DEBUG: cat_cmd = \"{}\"".format( cat_cmd ) )
+
+	ffmpeg_opts = "-f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 "
+	messager( "DEBUG: ffmpeg_opts = \"{}\"".format( ffmpeg_opts ) )
+
+	ffmpeg_cmd = cat_cmd + r" | ffmpeg " + ffmpeg_opts + mp4_file 
+	messager( "DEBUG: ffmpeg_cmd = \"{}\"".format( ffmpeg_cmd ) )
+
+
+
+
+
+#INFO: MIDNIGHT ROLLOVER!
+#INFO: MIDNIGHT ROLLOVER!
+#INFO: MIDNIGHT ROLLOVER!
+#INFO: MIDNIGHT ROLLOVER!
+#2018/06/03 12:11:37 DEBUG: Creating tar file with: tar -c -T South/arc_2018/index-2018-06-02.txt -zf South/arc_2018/arc-2018-06-02.tgz
+#2018/06/03 12:11:40 DEBUG: taf file size = 12913880
+#2018/06/03 12:11:40 WARNING: South/20180602.mp4 already exists
+#2018/06/03 12:11:40 DEBUG: Creating mp4 fileSouth/20180602.mp4
+#2018/06/03 12:11:40 DEBUG: Creating mp4 using cmd: cat South/snapshot-2018-06-02*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 South/20180602.mp4
+#2018/06/03 12:11:40 ERROR: Unexpected ERROR in ffmpeg: <type 'exceptions.NameError'>
+#2018/06/03 12:11:40 WARNING: ffmpeg failed.
+#2018/06/03 12:11:40 INFO: Tar is large enough to delete jpg files.
+#2018/06/03 12:11:40 DEBUG: line # = 203   file_list_len = 301  (Catching up.)
+#
+#
+#INFO: MIDNIGHT ROLLOVER!
+#INFO: MIDNIGHT ROLLOVER!
+#INFO: MIDNIGHT ROLLOVER!
+#INFO: MIDNIGHT ROLLOVER!
+#2018/06/03 12:07:46 DEBUG: Creating tar file with: tar -c -T South/arc_2018/index-2018-06-02.txt -zf South/arc_2018/arc-2018-06-02.tgz
+#2018/06/03 12:07:49 DEBUG: taf file size = 12913880
+#2018/06/03 12:07:49 DEBUG: Creating mp4 fileSouth/20180602.mp4
+#2018/06/03 12:07:49 DEBUG: Creating mp4 using cmd: cat South/snapshot-2018-06-02*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 South/20180602.mp4
+#2018/06/03 12:07:49 ERROR: Unexpected ERROR in ffmpeg: <type 'exceptions.NameError'>
+#2018/06/03 12:07:49 WARNING: ffmpeg failed.
+#2018/06/03 12:07:49 INFO: Tar is large enough to delete jpg files.
+#2018/06/03 12:07:49 DEBUG: line # = 202   file_list_len = 299  (Catching up.)
+#
+#
+#
+#INFO: MIDNIGHT ROLLOVER!
+#INFO: MIDNIGHT ROLLOVER!
+#INFO: MIDNIGHT ROLLOVER!
+#INFO: MIDNIGHT ROLLOVER!
+#2018/06/03 12:04:06 DEBUG: Creating tar file with: tar -c -T South/arc_2018/index-2018-06-02.txt -zf South/arc_2018/arc-2018-06-02.tgz
+#2018/06/03 12:04:09 DEBUG: taf file size = 12913880
+#2018/06/03 12:04:09 DEBUG: Creating mp4 fileSouth/20180602.mp4
+#2018/06/03 12:04:09 DEBUG: Creating mp4 using cmd: cat South/snapshot-2018-06-02*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 South/20180602.mp4
+#2018/06/03 12:04:09 ERROR: Unexpected ERROR in ffmpeg: <type 'exceptions.NameError'>
+#2018/06/03 12:04:09 WARNING: ffmpeg failed.
+#2018/06/03 12:04:09 INFO: Tar is large enough to delete jpg files.
+#2018/06/03 12:04:09 DEBUG: line # = 202   file_list_len = 299  (Catching up.)
+#
+#
+#INFO: MIDNIGHT ROLLOVER!
+#INFO: MIDNIGHT ROLLOVER!
+#INFO: MIDNIGHT ROLLOVER!
+#INFO: MIDNIGHT ROLLOVER!
+#2018/06/03 04:03:44 DEBUG: Creating tar file with: tar -c -T South/arc_2018/index-2018-06-02.txt -zf South/arc_2018/arc-2018-06-02.tgz
+#2018/06/03 04:03:47 DEBUG: taf file size = 12913880
+#2018/06/03 04:03:47 DEBUG: Creating mp4 fileSouth/20180602.mp4
+#2018/06/03 04:03:47 DEBUG: Creating mp4 using cmd: cat South/snapshot-2018-06-02*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 South/20180602.mp4
+#Traceback (most recent call last):
+#  File "./webcamimager.py", line 1277, in <module>
+#    main()
+#  File "./webcamimager.py", line 225, in main
+#    next_image_file()
+#  File "./webcamimager.py", line 570, in next_image_file
+#    midnight_process(re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename))
+#  File "./webcamimager.py", line 322, in midnight_process
+#    messager( "ERROR: Unexpected ERROR in ffmpeg:" + sys.exc_info()[0] )
+#TypeError: cannot concatenate 'str' and 'type' objects
+#
+
+
+
+
 	messager( "DEBUG: Creating mp4 using cmd: " + ffmpeg_cmd )
 	try:
-		subprocess.check_output("cat " + image_dir + "/snapshot-" + date_string + "*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 " + image_dir + "/" + date_stamp + ".mp4", shell=True)
+		subprocess.check_output(ffmpeg_cmd , shell=True)
+#####################################				subprocess.check_output("cat " + image_dir + "/snapshot-" + date_string + "*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 " + mp4_file, shell=True)
+		ffmpeg_failed = False
+
+
+
 	except :
 ###	except CalledProcessError, EHandle:
-		messager( "ERROR: Unexpected ERROR in ffmpeg:" + sys.exc_info()[0] )
+		messager( "ERROR: Unexpected ERROR in ffmpeg: {}".format( sys.exc_info()[0] ) )
 		ffmpeg_failed = True
 
 	if ffmpeg_failed :
@@ -325,15 +413,15 @@ def midnight_process(date_string) :
 		messager( "WARNING: Tar is too small to justify deleting jpg files." )
 
 	# Could also check if ffmpeg worked ... but if we have a good tar file ...
-	if tar_size > 5000000 :
+	if tar_size > 5000000 and not ffmpeg_failed and not tar_failed :
 		messager( "INFO: Tar is large enough to delete jpg files." )
 
 		try:
 			subprocess.check_output("rm " + image_dir + "/snapshot-" + date_string + "*.jpg", shell=True)
 		except :
-			messager( "ERROR: Unexpected ERROR in rm:" + sys.exc_info()[0] )
+			messager( "ERROR: Unexpected ERROR in rm: {}".format( sys.exc_info()[0] ) )
 	else :
-		messager( "WARNING: Tar is too small to justify deleting jpg files." )
+		messager( "WARNING: Tar is too small (or ffmpeg failed) to justify deleting jpg files." )
 
 
 # ----------------------------------------------------------------------------------------
@@ -457,7 +545,8 @@ def next_image_file() :
 		line += 1
 ###		print "DEBUG: Checking file # " + str(line) + "  " + file_list[line]
 		if line >= file_list_len :
-			messager( "DEBUG: line # = " + str(line) + "   file_list_len = " + str(file_list_len) + "  (End of list.)" )
+#REMOVE#		messager( "DEBUG: line # = " + str(line) + "   file_list_len = " + str(file_list_len) + "  (End of list.)" )
+			messager( "DEBUG: line # = {}   file_list_len = {}  (End of list.)".format( line, file_list_len ) )
 			catching_up = False
 			break
 
@@ -509,42 +598,48 @@ def next_image_file() :
 			subprocess.check_output( ['/usr/bin/touch', image_dir] )
 			return
 
+		source_file = image_dir + '/' + file_list[line]
+		target_file = image_dir + '/' + main_image
 
-		messager( "DEBUG: Copy image file " + image_dir + '/' + file_list[line] + ' as ' + main_image +
-			" and upload to " + server_img_dir )
+		messager( "DEBUG: Copy image file {} as {} and upload to {}".format( source_file, main_image, server_img_dir ) )
+#REMOVE#		messager( "DEBUG: Copy image file " + image_dir + '/' + file_list[line] + ' as ' + main_image +
+#REMOVE#			" and upload to " + server_img_dir )
+
 		shutil.copy2( image_dir + '/' + file_list[line], image_dir + '/' + main_image )
-		push_to_server(image_dir + '/' + main_image, server_img_dir )
+		shutil.copy2( source_file, target_file )
+		push_to_server( target_file, server_img_dir )
 
 
+		thumbnail_file = image_dir + '/' + thumbnail_image
 		# ------------------------------------------------------------------------
 		#  Note: This is needed for an apparent quirk of Linux.  It seems that
 		#        the directory mtime is not changed by convert if is *overwrites*
 		#        rather than writing a new file.
 		# ------------------------------------------------------------------------
 		try :
-			os.unlink(image_dir + '/' + thumbnail_image)
+			os.unlink( thumbnail_file )
 		except:
-			print "Unexpected ERROR in unlink:", sys.exc_info()[0]
+			messager( "ERROR: Unexpected ERROR in unlink: {}".format( sys.exc_info()[0] ) )
 
 
 		convert = ""
-		messager( "DEBUG: Create and upload thumbnail " + image_dir + '/' + thumbnail_image + "  to server directory  " + server_img_dir )
+		messager( "DEBUG: Create and upload thumbnail {} to server directory {}".format(thumbnail_file, server_img_dir ) )
 		convert_cmd = ['/usr/bin/convert',
 				image_dir + '/' + main_image,
 				'-verbose',
 				'-resize', '30%',
-				image_dir + '/' + thumbnail_image ]
+				thumbnail_file ]
 		try :
 ###			convert = subprocess.check_output( ['/usr/bin/convert', image_dir + '/' + main_image, '-verbose', '-resize', '30%', image_dir + '/NW_thumb.jpg', '2>&1'] )
 			convert = subprocess.check_output( convert_cmd )
 		except:
-			print "Unexpected ERROR in convert:", sys.exc_info()[0]
+			messager( "ERROR: Unexpected ERROR in convert: {}".format( sys.exc_info()[0] ) )
 
 
 		if len(convert) > 0 :
 			messager( "DEBUG: convert returned data: \"" + convert + "\"" )
 
-		push_to_server(image_dir + '/' + thumbnail_image, server_img_dir )
+		push_to_server( thumbnail_file, server_img_dir )
 
 		store_file_data ( digits, file_list[line] )
 		last_timestamp = digits
@@ -687,12 +782,12 @@ def push_to_server(local_file, remote_path) :
 	# --------------------------------------------------------------------------------
 	for iii in range(5) :
 		try :
-			messager( "DEBUG: FTP connect to {}".format( "dillys.org" ) )
+#DEBUG#			messager( "DEBUG: FTP connect to {}".format( "dillys.org" ) )
 			ftp = FTP('dillys.org')
 			ftp.login( ftp_login, ftp_password )
-			messager( "DEBUG: FTP remote cd to {}".format( remote_path ) )
+#DEBUG#			messager( "DEBUG: FTP remote cd to {}".format( remote_path ) )
 			ftp.cwd( remote_path )
-			messager( "DEBUG: FTP STOR {} to  {}".format( local_file_bare, local_file) )
+#DEBUG#			messager( "DEBUG: FTP STOR {} to  {}".format( local_file_bare, local_file) )
 			ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
 			ftp.quit()
 			return
