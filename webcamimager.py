@@ -49,6 +49,8 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20180603 RAD Cleaned up a bunch of stuff.
+#              process exceeds a certain threshold (3 at this point), and reduces
 # 20180531 RAD Added gloabl catching_up, which detects when the list of files to
 #              process exceeds a certain threshold (3 at this point), and reduces
 #              the sleep duration during that condition.
@@ -83,6 +85,15 @@ import sys
 #  http://www.pythonforbeginners.com/os/subprocess-for-system-administrators
 #  https://pythonspot.com/python-subprocess/
 #  http://stackabuse.com/pythons-os-and-subprocess-popen-commands/
+#  https://stackoverflow.com/questions/40222793/python-subprocess-check-output-stderr-usage
+#
+#  Both of these are used, but probabably not very well
+#      subprocess.check_call()
+#      subprocess.check_output()
+#
+#  This seemed to do what I usually want.  The shell=True clause is not used, but ...?
+#      convert = subprocess.check_output( convert_cmd, stderr=subprocess.STDOUT )
+#
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 import subprocess
 
@@ -288,12 +299,7 @@ def midnight_process(date_string) :
 	arc_dir = image_dir + '/arc_' + yyyy
 	image_index = arc_dir + '/index-' + date_string + ".txt"
 
-
-
-	tar_cmd = "tar czf " + image_dir + "/arc-" + date_string + ".tgz " + image_dir + "/snapshot-" + date_string + "*.jpg"
-	#   tar -c -zf South/arc_2018/arc-2018-06-01.tgz -T South/arc_2018/index-2018-06-01.txt
 	tar_cmd = "tar -c -T " + image_index + " -zf " + arc_dir + "/arc-" + date_string + ".tgz "
-
 
 	messager( "DEBUG: Creating tar file with: " + tar_cmd )
 	try:
@@ -322,85 +328,10 @@ def midnight_process(date_string) :
 	ffmpeg_cmd = cat_cmd + r" | ffmpeg " + ffmpeg_opts + mp4_file 
 	messager( "DEBUG: ffmpeg_cmd = \"{}\"".format( ffmpeg_cmd ) )
 
-
-
-
-
-#INFO: MIDNIGHT ROLLOVER!
-#INFO: MIDNIGHT ROLLOVER!
-#INFO: MIDNIGHT ROLLOVER!
-#INFO: MIDNIGHT ROLLOVER!
-#2018/06/03 12:11:37 DEBUG: Creating tar file with: tar -c -T South/arc_2018/index-2018-06-02.txt -zf South/arc_2018/arc-2018-06-02.tgz
-#2018/06/03 12:11:40 DEBUG: taf file size = 12913880
-#2018/06/03 12:11:40 WARNING: South/20180602.mp4 already exists
-#2018/06/03 12:11:40 DEBUG: Creating mp4 fileSouth/20180602.mp4
-#2018/06/03 12:11:40 DEBUG: Creating mp4 using cmd: cat South/snapshot-2018-06-02*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 South/20180602.mp4
-#2018/06/03 12:11:40 ERROR: Unexpected ERROR in ffmpeg: <type 'exceptions.NameError'>
-#2018/06/03 12:11:40 WARNING: ffmpeg failed.
-#2018/06/03 12:11:40 INFO: Tar is large enough to delete jpg files.
-#2018/06/03 12:11:40 DEBUG: line # = 203   file_list_len = 301  (Catching up.)
-#
-#
-#INFO: MIDNIGHT ROLLOVER!
-#INFO: MIDNIGHT ROLLOVER!
-#INFO: MIDNIGHT ROLLOVER!
-#INFO: MIDNIGHT ROLLOVER!
-#2018/06/03 12:07:46 DEBUG: Creating tar file with: tar -c -T South/arc_2018/index-2018-06-02.txt -zf South/arc_2018/arc-2018-06-02.tgz
-#2018/06/03 12:07:49 DEBUG: taf file size = 12913880
-#2018/06/03 12:07:49 DEBUG: Creating mp4 fileSouth/20180602.mp4
-#2018/06/03 12:07:49 DEBUG: Creating mp4 using cmd: cat South/snapshot-2018-06-02*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 South/20180602.mp4
-#2018/06/03 12:07:49 ERROR: Unexpected ERROR in ffmpeg: <type 'exceptions.NameError'>
-#2018/06/03 12:07:49 WARNING: ffmpeg failed.
-#2018/06/03 12:07:49 INFO: Tar is large enough to delete jpg files.
-#2018/06/03 12:07:49 DEBUG: line # = 202   file_list_len = 299  (Catching up.)
-#
-#
-#
-#INFO: MIDNIGHT ROLLOVER!
-#INFO: MIDNIGHT ROLLOVER!
-#INFO: MIDNIGHT ROLLOVER!
-#INFO: MIDNIGHT ROLLOVER!
-#2018/06/03 12:04:06 DEBUG: Creating tar file with: tar -c -T South/arc_2018/index-2018-06-02.txt -zf South/arc_2018/arc-2018-06-02.tgz
-#2018/06/03 12:04:09 DEBUG: taf file size = 12913880
-#2018/06/03 12:04:09 DEBUG: Creating mp4 fileSouth/20180602.mp4
-#2018/06/03 12:04:09 DEBUG: Creating mp4 using cmd: cat South/snapshot-2018-06-02*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 South/20180602.mp4
-#2018/06/03 12:04:09 ERROR: Unexpected ERROR in ffmpeg: <type 'exceptions.NameError'>
-#2018/06/03 12:04:09 WARNING: ffmpeg failed.
-#2018/06/03 12:04:09 INFO: Tar is large enough to delete jpg files.
-#2018/06/03 12:04:09 DEBUG: line # = 202   file_list_len = 299  (Catching up.)
-#
-#
-#INFO: MIDNIGHT ROLLOVER!
-#INFO: MIDNIGHT ROLLOVER!
-#INFO: MIDNIGHT ROLLOVER!
-#INFO: MIDNIGHT ROLLOVER!
-#2018/06/03 04:03:44 DEBUG: Creating tar file with: tar -c -T South/arc_2018/index-2018-06-02.txt -zf South/arc_2018/arc-2018-06-02.tgz
-#2018/06/03 04:03:47 DEBUG: taf file size = 12913880
-#2018/06/03 04:03:47 DEBUG: Creating mp4 fileSouth/20180602.mp4
-#2018/06/03 04:03:47 DEBUG: Creating mp4 using cmd: cat South/snapshot-2018-06-02*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 South/20180602.mp4
-#Traceback (most recent call last):
-#  File "./webcamimager.py", line 1277, in <module>
-#    main()
-#  File "./webcamimager.py", line 225, in main
-#    next_image_file()
-#  File "./webcamimager.py", line 570, in next_image_file
-#    midnight_process(re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename))
-#  File "./webcamimager.py", line 322, in midnight_process
-#    messager( "ERROR: Unexpected ERROR in ffmpeg:" + sys.exc_info()[0] )
-#TypeError: cannot concatenate 'str' and 'type' objects
-#
-
-
-
-
 	messager( "DEBUG: Creating mp4 using cmd: " + ffmpeg_cmd )
 	try:
 		subprocess.check_output(ffmpeg_cmd , shell=True)
-#####################################				subprocess.check_output("cat " + image_dir + "/snapshot-" + date_string + "*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 " + mp4_file, shell=True)
 		ffmpeg_failed = False
-
-
-
 	except :
 ###	except CalledProcessError, EHandle:
 		messager( "ERROR: Unexpected ERROR in ffmpeg: {}".format( sys.exc_info()[0] ) )
@@ -516,7 +447,8 @@ def next_image_file() :
 #@@@		return
 
 	if image_dir_mtime - last_image_dir_mtime == 0.0 :
-		messager( "DEBUG: directory {} mtime unchanged.".format(image_dir) )
+###		messager( "DEBUG: directory {} mtime unchanged.".format(image_dir) )
+		print "{} unchanged".format(image_dir)
 		last_image_dir_mtime = image_dir_mtime
 		return
 
@@ -543,10 +475,18 @@ def next_image_file() :
 	line = 0
 	while int(digits) <= int(last_timestamp) :
 		line += 1
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
 ###		print "DEBUG: Checking file # " + str(line) + "  " + file_list[line]
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
 		if line >= file_list_len :
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
 #REMOVE#		messager( "DEBUG: line # = " + str(line) + "   file_list_len = " + str(file_list_len) + "  (End of list.)" )
-			messager( "DEBUG: line # = {}   file_list_len = {}  (End of list.)".format( line, file_list_len ) )
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+			messager( "DEBUG: line # {} of {} (last)".format( line, file_list_len ) )
 			catching_up = False
 			break
 
@@ -602,24 +542,37 @@ def next_image_file() :
 		target_file = image_dir + '/' + main_image
 
 		messager( "DEBUG: Copy image file {} as {} and upload to {}".format( source_file, main_image, server_img_dir ) )
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
 #REMOVE#		messager( "DEBUG: Copy image file " + image_dir + '/' + file_list[line] + ' as ' + main_image +
 #REMOVE#			" and upload to " + server_img_dir )
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
 
 		shutil.copy2( image_dir + '/' + file_list[line], image_dir + '/' + main_image )
 		shutil.copy2( source_file, target_file )
 		push_to_server( target_file, server_img_dir )
 
-
 		thumbnail_file = image_dir + '/' + thumbnail_image
-		# ------------------------------------------------------------------------
-		#  Note: This is needed for an apparent quirk of Linux.  It seems that
-		#        the directory mtime is not changed by convert if is *overwrites*
-		#        rather than writing a new file.
-		# ------------------------------------------------------------------------
-		try :
-			os.unlink( thumbnail_file )
-		except:
-			messager( "ERROR: Unexpected ERROR in unlink: {}".format( sys.exc_info()[0] ) )
+
+
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+#REMOVE#		# ------------------------------------------------------------------------
+#REMOVE#		#  Note: This is needed for an apparent quirk of Linux.  It seems that
+#REMOVE#		#        the directory mtime is not changed by convert if is *overwrites*
+#REMOVE#		#        rather than writing a new file.
+#REMOVE#		# ------------------------------------------------------------------------
+#REMOVE#		try :
+#REMOVE#			os.unlink( thumbnail_file )
+#REMOVE#		except:
+#REMOVE#			messager( "ERROR: Unexpected ERROR in unlink: {}".format( sys.exc_info()[0] ) )
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
 
 
 		convert = ""
@@ -629,12 +582,23 @@ def next_image_file() :
 				'-verbose',
 				'-resize', '30%',
 				thumbnail_file ]
+		convert_cmd = ['/usr/bin/convert',
+				image_dir + '/' + main_image,
+				'-resize', '30%',
+				thumbnail_file ]
 		try :
-###			convert = subprocess.check_output( ['/usr/bin/convert', image_dir + '/' + main_image, '-verbose', '-resize', '30%', image_dir + '/NW_thumb.jpg', '2>&1'] )
-			convert = subprocess.check_output( convert_cmd )
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+#REMOVE###			convert = subprocess.check_output( ['/usr/bin/convert', image_dir + '/' + main_image, '-verbose', '-resize', '30%', image_dir + '/NW_thumb.jpg', '2>&1'] )
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+			convert = subprocess.check_output( convert_cmd, stderr=subprocess.STDOUT )
+#REMOVE#			subprocess.check_output( ['/usr/bin/touch', thumbnail_file] )
+			subprocess.check_output( ['/usr/bin/touch', image_dir] )
 		except:
 			messager( "ERROR: Unexpected ERROR in convert: {}".format( sys.exc_info()[0] ) )
-
 
 		if len(convert) > 0 :
 			messager( "DEBUG: convert returned data: \"" + convert + "\"" )
@@ -654,17 +618,13 @@ def next_image_file() :
 			midnight_process(re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename))
 
 
+		# ------------------------------------------------------------------------
+		# If we have a backlog of at least 3 files (might no be snapshots),
+		# shorten the sleep time
+		# ------------------------------------------------------------------------
 		if (file_list_len - line) > 3 :
-			messager( "DEBUG: line # = " + str(line) + "   file_list_len = " + str(file_list_len) + "  (Catching up.)" )
+			messager( "DEBUG: line # {} of {} (Catching up)".format( line, file_list_len ) )
 			catching_up = True
-
-
-
-
-
-
-
-
 
 
 
