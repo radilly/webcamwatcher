@@ -2,7 +2,7 @@
 #@@@
 #
 # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-#    * Is there a way to detect that we are in "catchup" mode and reduce the sleep?
+#    * NOTE: Should look more carefully of the use of subprocess
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
 #     printf "20180523214508\nsnapshot-2018-05-23-21-45-08.jpg\n" > webcamimager__.dat
@@ -37,14 +37,16 @@
 #   When a day rollover is detected, the script will:
 #      * Use ffmpeg to generate mp4
 #      * tar up the days jpg files
-#      * Create a web page to access video
-#      * Upload the mp4 file and web page to the server
+#      * Create a web page to access video   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< To be done
+#      * Upload the mp4 file and web page to the server   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< To be done
 #
 #   NOTE: This should be able to be run as a service. (systemctl)
 #
-#   NOTE: We poll for directory changes once we have caught up and have hit our stride.
-#         A better approach would be an interrupt-driven one where we wait for the
-#         directory changes (new file written) and then wake up.  Some reverences:
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#
+#   Considered using something to watch for directory changes.  Not sure it's
+#   worth the complexity.  I think stating the direcory is inexpensive while
+#   polling.  Nevertheless, here are some references:
 #
 #   https://blog.philippklaus.de/2011/08/watching-directories-for-changes-using-python_-_an-overview
 #   https://stackoverflow.com/questions/4708511/how-to-watch-a-directory-for-changes
@@ -58,7 +60,6 @@
 #
 #   https://github.com/johnwesonga/directory-watcher/blob/master/dirwatcher.py
 #
-#
 #   http://www.docmoto.com/support/advanced-topics/creating-a-folder-monitor-using-python/
 #
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -66,8 +67,9 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20180604 RAD More cleanup.  Seems to be running well in my testing.  Removed a lot
+#              of dead code left from watchdog.py.
 # 20180603 RAD Cleaned up a bunch of stuff.
-#              process exceeds a certain threshold (3 at this point), and reduces
 # 20180531 RAD Added gloabl catching_up, which detects when the list of files to
 #              process exceeds a certain threshold (3 at this point), and reduces
 #              the sleep duration during that condition.
@@ -90,9 +92,7 @@
 #
 # ========================================================================================
 
-import urllib
 import datetime
-import time
 from time import sleep
 import sys
 
@@ -143,104 +143,24 @@ image_data_file = re.sub('\.py', '__.dat', this_script)
 last_timestamp = 0
 last_filename = ""
 catching_up = False
-sleep_for = 15
+sleep_for = 5
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-
-
-
-sleep_on_recycle = 600
-# ----------------------------
-#    stride    secs    minutes
-#  	1	24	0.4
-#       2	48	0.8
-#       3	72	1.2
-#       4	96	1.6
-#       5	120	2
-# ----------------------------
-log_header_stride = 15
-summary_stride = 3
-
-last_secs = 999999          # This is a sentinel value for startup.
-last_date = ""
-proc_load_lim = 4.0         # See https://www.booleanworld.com/guide-linux-top-command/
-mem_usage_lim = 85
-ws_data_last_secs = 0       # Number of epoch secs at outage start
-saved_contact_lost = -1     # Number of epoch secs when RF contact lost
-
-BASE_DIR =              "/mnt/root/home/pi/Cumulus_MX"
-data_stop_file =        BASE_DIR + "/web/DataStoppedT.txttmp"
-ambient_temp_file =     BASE_DIR + "/web/ambient_tempT.txttmp"
-status_page =           BASE_DIR + "/web/status.html"
-events_page =           BASE_DIR + "/web/events.html"
-mxdiags_dir =           BASE_DIR + "/MXdiags"
 
 logger_file = sys.argv[0]
 logger_file = re.sub('\.py', '.log', logger_file)
 
-proc_stat_busy = -1		# Sentinal value
-proc_stat_idle = -1
-proc_stat_hist = []		# Holds last proc_stat_hist_n samples
-proc_stat_hist_n = 10		# Control length of history array to keep
-
 # strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
 strftime_FMT = "%Y/%m/%d %H:%M:%S"
-saved_exception_tstamp = "9999-99-9999:00:00.999:....."
-saved_exception_tstamp = "X"
-
-pcyc_holdoff_time = 0
-
-# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-# This is the global data value dictionary.   This is written into by many of
-# the routines which follow.
-# Most of the keys map to a function name...
-#
-# https://www.python-course.eu/dictionaries.php
-# https://docs.python.org/2/tutorial/datastructures.html#dictionaries
-# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-data = []
-data = { 'watcher_pid' : getpid() }
-data['camera_down'] = 0
-
-data_keys = [
-	"python_version",
-	"webcamwatch_down"
-	]
-	# amb_temp   {}
-
-# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-# For HTML Table-style output lines
-# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-# https://pyformat.info/
 
 
-# ----------------------------------------------------------------------------------------
-# For CSV-style output line
-# ----------------------------------------------------------------------------------------
-#       "date-time",
-CSV_keys = [
-	"cmx_svc_runtime",
-	"webcamwatch_down"
-	]
 
-# https://pyformat.info/
-CSV_format = [
-	"{:16.10f}",
-	"{}",
-	]
-
-# This is used to determine which fields should trip the problem flag.
-Prob_Track = [
-	0,
-	1,
-	]
-
-
+# ========================================================================================
 # ----------------------------------------------------------------------------------------
 #
 # Main loop
 #
 # ----------------------------------------------------------------------------------------
+# ========================================================================================
 def main():
 	global ftp_login
 	global ftp_password
@@ -277,34 +197,14 @@ def midnight_process(date_string) :
 
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	#  -C, --directory=DIR
-	#      Change  to  DIR  before performing any operations.  This option is order-sensitive, i.e. it affects
-	#      all options that follow.
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	#  Tinkered with a few ideas for tar.
 	#  Could not get --directory to work as I expected from the man page.
 	#  I am also a little concerned about using a wildcard with the tar command.
 	#  Seems like it might be safer to build a table of files, and the -T option
-	#   (as I have been doing on the hosted server).
+	#   (as I have been doing on the hosted server).  daily_image_list() builds it.
 	#
-	#   tar -c --directory=South -zf arc_2018/arc-2018-06-01.tgz South/snapshot-2018-06-01*.jpg
-	#   tar -c --directory=South -zf arc_2018/arc-2018-06-01.tgz snapshot-2018-06-01*.jpg
-	#   tar -c --directory=/home/pi/South -zf arc_2018/arc-2018-06-01_0002.tgz snapshot-2018-06-01*.jpg
-	#   ls -al South/arc_2018
-	#   tar -c --directory=South -zf South/arc_2018/arc-2018-06-01.tgz snapshot-2018-06-01*.jpg
-	#   tar -c -zf South/arc_2018/arc-2018-06-01.tgz South/snapshot-2018-06-01*.jpg
-	#   ls -al South/arc_2018
-	#   tar tzvf South/arc_2018/arc-2018-06-01.tgz | less
-	#   ls South/snapshot-2018-06-01 | less
-	#   ls South/snapshot-2018-06-01-*.jpg | less
-	#   ls South/snapshot-2018-06-01-*.jpg > South/arc_2018/index-2018-06-01.txt
-	#   less South/arc_2018/index-2018-06-01.txt
 	#   tar -c -zf South/arc_2018/arc-2018-06-01.tgz -T South/arc_2018/index-2018-06-01.txt
 	#   tar tzvf South/arc_2018/arc-2018-06-01.tgz | less
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
@@ -328,7 +228,7 @@ def midnight_process(date_string) :
 	tar_size = os.stat(arc_dir + "/arc-" + date_string + ".tgz").st_size
 	messager( "DEBUG: taf file size = " + str(tar_size) )
 
-	mp4_file = image_dir + "/" + date_stamp + ".mp4"
+	mp4_file = arc_dir + "/" + date_stamp + ".mp4"
 	# https://stackoverflow.com/questions/82831/how-to-check-whether-a-file-exists?rq=1
 	if os.path.isfile( mp4_file ) :
 		messager( "WARNING: " + mp4_file + " already exists" )
@@ -365,7 +265,7 @@ def midnight_process(date_string) :
 		messager( "INFO: Tar is large enough to delete jpg files." )
 
 		try:
-			subprocess.check_output("rm " + image_dir + "/snapshot-" + date_string + "*.jpg", shell=True)
+			subprocess.check_output("rm " + image_dir + "/snapshot-" + date_string + r"*.jpg", shell=True)
 		except :
 			messager( "ERROR: Unexpected ERROR in rm: {}".format( sys.exc_info()[0] ) )
 	else :
@@ -450,26 +350,26 @@ def next_image_file() :
 	# --------------------------------------------------------------------------------
 	image_dir_mtime = os.stat( image_dir ).st_mtime
 
-#@@@
-#@@@
-#@@@ Note: this comparision is just not working correctly
-#@@@ Note: This may thwart the desire to all this script to "catch up" when we have a list of unprocessed snapshots.
-#@@@       Though maybe, since we always make one pass through the files at start up, if we write a thumbnail,
-#@@@       that will change the directory mtime, and that will trigger one more. ..... might be OK.
-#@@@
-#@@@ The intent here, is to detect when the directory has change, i.e. mtime of the folder is updated.
-#@@@
-#@@@
-#@@@	print "DEBUG: os.stat(\"{}\").st_mtime = {}   Saved = {}".format(image_dir, image_dir_mtime, last_image_dir_mtime)
-#@@@	if image_dir_mtime <> last_image_dir_mtime :
-#@@@		print "DEBUG: bypass reading the directory... #1"
-#@@@		last_image_dir_mtime = image_dir_mtime
-#@@@		return
+#|||
+#|||
+#||| Note: this comparision is just not working correctly
+#||| Note: This may thwart the desire to all this script to "catch up" when we have a list of unprocessed snapshots.
+#|||       Though maybe, since we always make one pass through the files at start up, if we write a thumbnail,
+#|||       that will change the directory mtime, and that will trigger one more. ..... might be OK.
+#|||
+#||| The intent here, is to detect when the directory has change, i.e. mtime of the folder is updated.
+#|||
+#|||	print "DEBUG: os.stat(\"{}\").st_mtime = {}   Saved = {}".format(image_dir, image_dir_mtime, last_image_dir_mtime)
+#|||	if image_dir_mtime <> last_image_dir_mtime :
+#|||		print "DEBUG: bypass reading the directory... #1"
+#|||		last_image_dir_mtime = image_dir_mtime
+#|||		return
 
 	if image_dir_mtime - last_image_dir_mtime == 0.0 :
-###		messager( "DEBUG: directory {} mtime unchanged.".format(image_dir) )
-###		print "{} unchanged".format(image_dir)
-		sys.stdout.write('->')
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# Progress indicator
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		sys.stdout.write('.')
 		sys.stdout.flush()
 		last_image_dir_mtime = image_dir_mtime
 		return
@@ -478,8 +378,10 @@ def next_image_file() :
 
 ###	print "DEBUG: last processed last_timestamp = " + last_timestamp
 ###	print "DEBUG: last processed filename = " + last_filename
+
 	date_string = re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename)
 ###	print "DEBUG: date_string = " + date_string
+
 	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
 ###	print "DEBUG: date_stamp = " + date_stamp
 
@@ -509,10 +411,8 @@ def next_image_file() :
 			tok = re.split('-', re.sub('\.jpg', '', file_list[line]) )
 
 			digits = tok[1]
-			##### print "DEBUG: digits = " + digits
 			for iii in range(2, 7) :
 				digits = digits + tok[iii]
-				##### print "DEBUG: " + str(iii) + " digits = " + digits
 
 			day_code = tok[3]
 
@@ -524,7 +424,6 @@ def next_image_file() :
 
 	if int(digits) > int(last_timestamp) :
 #DEBUG#		print "DEBUG: Earliest unprocessed image file is " + file_list[line]
-
 
 
 		# ------------------------------------------------------------------------
@@ -555,7 +454,10 @@ def next_image_file() :
 		source_file = image_dir + '/' + file_list[line]
 		target_file = image_dir + '/' + main_image
 
-		print " <<"
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# Progress indicator Ending
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		print ""
 		messager( "DEBUG: Copy image file {} as {} and upload to {}".format( source_file, main_image, server_img_dir ) )
 
 		shutil.copy2( image_dir + '/' + file_list[line], image_dir + '/' + main_image )
@@ -568,11 +470,6 @@ def next_image_file() :
 		messager( "DEBUG: Create and upload thumbnail {} to server directory {}".format(thumbnail_file, server_img_dir ) )
 		convert_cmd = ['/usr/bin/convert',
 				image_dir + '/' + main_image,
-				'-verbose',
-				'-resize', '30%',
-				thumbnail_file ]
-		convert_cmd = ['/usr/bin/convert',
-				image_dir + '/' + main_image,
 				'-resize', '30%',
 				thumbnail_file ]
 		try :
@@ -581,6 +478,9 @@ def next_image_file() :
 		except:
 			messager( "ERROR: Unexpected ERROR in convert: {}".format( sys.exc_info()[0] ) )
 
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# Generally nothing, unless -verbose is used...
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		if len(convert) > 0 :
 			messager( "DEBUG: convert returned data: \"" + convert + "\"" )
 
@@ -595,7 +495,9 @@ def next_image_file() :
 			print "INFO: MIDNIGHT ROLLOVER!"
 			print "INFO: MIDNIGHT ROLLOVER!"
 			print "INFO: MIDNIGHT ROLLOVER!"
+			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 			# snapshot-2018-05-23-16-57-04.jpg
+			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 			midnight_process(re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename))
 
 
@@ -728,63 +630,16 @@ def push_to_server(local_file, remote_path) :
 #DEBUG#			messager( "DEBUG: FTP STOR {} to  {}".format( local_file_bare, local_file) )
 			ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
 			ftp.quit()
+			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+			# Yes, that's a return that's not at the funtion end
+			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 			return
-### >>>>>>>>>>>>>>>	break
 		except socket.error, e :
 			iii += 1
 			print "FTP Socket Error %d: %s" % (e.args[0], e.args[1])
 			# Increase the sleep time with each iteration
 			sleep(iii)
 	return
-
-# ----------------------------------------------------------------------------------------
-#
-#
-#  https://pythonspot.com/en/ftp-client-in-python/
-#  https://docs.python.org/2/library/ftplib.html
-#
-#  FTP User: camdilly
-#  FTP PWD: /home/content/b/o/b/bobdilly/html/WX
-# ----------------------------------------------------------------------------------------
-def DEFUNCT_push_image() :
-	global image_data_file
-
-	###print "DEBUG: read " + image_data_file
-	FH = open(ftp_credentials_file, "r")
-	data = FH.readlines()
-	FH.close
-
-	ftp_login = data[0].strip("\n")
-	ftp_password = data[1].strip("\n")
-
-	###print "DEBUG: ftp_login = " + ftp_login + "    ftp_password = " + ftp_password
-
-	ftp = FTP('dillys.org')
-	ftp.login( ftp_login, ftp_password )
-	print "DEBUG: FTP PWD = " + ftp.pwd()
-
-	ftp.retrlines('LIST')
-
-	data = []
-
-###	ftp.cwd('/NorthFacing/')
-###	ftp.dir(data.append)
-
-
-
-	filename = image_dir + '/' + thumbnail_image
-	ftp.storbinary('STOR ' + thumbnail_image, open(filename, 'rb'))
-
-
- 
-	ftp.quit()
- 
-	for line in data:
-		print "-", line
-
-
-#  images/NW_thumb.jpg bobdilly@dillys.org:/home/content/b/o/b/bobdilly/html/WX
-
 
 
 # ----------------------------------------------------------------------------------------
@@ -806,222 +661,6 @@ def fetch_FTP_credentials() :
 
 	###print "DEBUG: ftp_login = " + ftp_login + "    ftp_password = " + ftp_password
 
-
-
-# ========================================================================================
-# ========================================================================================
-# ========================================================================================
-# ========================================================================================
-# ========================================================================================
-# ========================================================================================
-# ========================================================================================
-# ========================================================================================
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-def _____________next_image_file() :
-
-	print "DEBUG: Earliest unprocessed image file is " + file_list[iii]
-
-	# snapshot-2018-05-23-16-57-04.jpg
-	tok = re.split('-', re.sub('\.jpg', '', file_list[iii]) )
-
-	digits = tok[1]
-	print "DEBUG: digits = " + digits
-	for iii in range(2, 7) :
-		digits = digits + tok[iii]
-		print "DEBUG: " + str(iii) + " digits = " + digits
-
-	print "DEBUG: digits = " + digits
-
-
-#	print "get_stored_ts = " + get_stored_ts()
-
-	store_file_data ( digits )
-
-	print "get_stored_ts = " + get_stored_ts()
-
-	return file_list[iii]
-
-
-
-
-
-
-
-
-
-
-
-# ----------------------------------------------------------------------------------------
-#
-# Main loop
-#
-# ----------------------------------------------------------------------------------------
-#
-#
-#  To Do:
-#		last_realtime() return value should be leveraged <<<  OBSOLETE???????????????
-# ----------------------------------------------------------------------------------------
-def main_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX():
-	global data
-	global Prob_Track
-
-	python_version = "v " + str(sys.version)
-	python_version = re.sub(' *\n *', '<BR>', python_version )
-	python_version = re.sub(' *\(', '<BR>(', python_version )
-
-	messager("Python version: " + str(sys.version))
-	data['python_version'] = python_version
-
-	iii = 0
-	while True:
-		if 0 == iii % log_header_stride:
-			amb_temp()        # This won't / shouldn't change rapidly so sample periodically
-
-			hdr = "date-time,"
-			for jjj in range(0, len(CSV_keys)):
-				hdr = hdr + " {},".format( CSV_keys[jjj] )
-
-			print hdr
-
-		# Capture the data by calling functions.  Ignore return values.
-		server_stalled()
-		ws_data_stopped()
-		last_realtime()
-		proc_load()
-		proc_pct()
-		mono_threads()
-		mem_usage()
-
-		CSV_rec = datetime.datetime.utcnow().strftime(strftime_FMT) + ","
-		Prob_Flag = " ,"
-
-		for jjj in range(0, len(CSV_keys)):
-			format_str = " " + CSV_format[jjj] + ","
-			CSV_rec = CSV_rec + format_str.format( data[CSV_keys[jjj]] )
-			if Prob_Track[jjj] > 0 :
-				if data[CSV_keys[jjj]] > 0 :
-					Prob_Flag = " <<<<<,"
-
-		print CSV_rec + Prob_Flag
-
-		iii += 1
-		sleep(sleep_for)
-
-
-
-
-
-
-# ----------------------------------------------------------------------------------------
-#  Read and parse the first line of "/proc/stat", the cpu line, and calulate the
-#  average cpu utilization as a percentage.
-#
-#  First call is the initialization - usage since boot-up.
-#  Subsequent calls find the avergae utilization since the previous call.
-#
-# ----------------------------------------------------------------------------------------
-def proc_pct() :
-	global proc_stat_busy
-	global proc_stat_idle
-	global proc_stat_hist
-	global data
-
-	# --------------------------------------------------------------------------------
-	# Work backwards from the end of the most recent file looking for
-	# one of the lines above.
-	# --------------------------------------------------------------------------------
-
-	fileHandle = open ( "/proc/stat","r" )
-	lineList = fileHandle.readlines()
-	fileHandle.close()
-
-	lineList[0] = re.sub('\n', '', lineList[0])        # Remove any newline which might be left
-
-	tok = re.split(' *', lineList[0])
-
-	idle = int(tok[4]) + int(tok[5])
-	busy = int(tok[1]) + int(tok[2]) + int(tok[3]) + int(tok[6]) + int(tok[7]) + int(tok[8])
-
-	if proc_stat_busy < 0 :
-		### print "Since last boot:  {} * 100 / {}".format( busy, idle+busy )
-		### print "{:6.3f}%".format( float(busy * 100) / float(idle + busy) )
-		### print "========"
-		pct_util = float(busy * 100) / float(idle + busy)
-
-	else :
-		delta_busy = busy - proc_stat_busy 
-		delta_idle = idle - proc_stat_idle
-		timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-		pct_util = float(delta_busy * 100) / float(delta_idle + delta_busy)
-		### print "{} {:6.3f}%".format( timestamp, pct_util )
-		# ------------------------------------------------------------------------
-		# Unused for now.  Here in case we want to look at a rolling average...
-		# ------------------------------------------------------------------------
-		if len(proc_stat_hist) > (proc_stat_hist_n -1) :
-			proc_stat_hist = proc_stat_hist[1:]
-		proc_stat_hist.append( pct_util )
-
-	proc_stat_busy = busy
-	proc_stat_idle = idle
-	data['proc_pct'] = pct_util
-	return pct_util
-
-
-# ----------------------------------------------------------------------------------------
-# Count the mono threads running
-# 
-#  NOTE: 15 is s good number, but this seems to grow after a few weeks...
-# ----------------------------------------------------------------------------------------
-def mono_threads():
-	global data
-
-	PID = str( data['mono_pid'] )
-
-	# --------------------------------------------------------------------------------
-	#  This failed 01/08/18 when I restarted the "cumulusmx" service.  I reordered
-	#  the calls in the do forever loop which should avoid this...
-	#        Traceback (most recent call last):
-	#          File "/mnt/root/home/pi/watchdog.py", line 1362, in <module>
-	#            main()
-	#          File "/mnt/root/home/pi/watchdog.py", line 296, in main
-	#            mono_threads()
-	#          File "/mnt/root/home/pi/watchdog.py", line 413, in mono_threads
-	#            fileHandle = open ( "/proc/" + str(PID) + "/stat","r" )
-	#        IOError: [Errno 2] No such file or directory: '/proc/540/stat'
-	#
-	#  We could check that we have the right process via cmdline...
-	#    $ cat /proc/13899/cmdline
-	#    /usr/bin/mono/mnt/root/home/pi/Cumulus_MX/CumulusMX.exe
-	# --------------------------------------------------------------------------------
-	fileHandle = open ( "/proc/" + str(PID) + "/stat","r" )
-	lineList = fileHandle.readlines()
-	fileHandle.close()
-
-	lineList[0] = re.sub('\n', '', lineList[0])        # Remove any newline which might be left
-	tok = re.split(' *', lineList[0])
-
-	data['mono_threads'] = int(tok[19])
-	return int(tok[19])
-
-
-# ----------------------------------------------------------------------------------------
-#
-#   https://www.cyberciti.biz/faq/linux-find-out-raspberry-pi-gpu-and-arm-cpu-temperature-command/
-#   https://www.raspberrypi.org/forums/viewtopic.php?t=47469
-#   https://www.raspberrypi.org/forums/viewtopic.php?t=190489 - Temp and Freq !!
-#   https://www.raspberrypi.org/forums/viewtopic.php?t=39953
-#   https://raspberrypi.stackexchange.com/questions/56611/is-this-idle-temperature-normal-for-the-rpi-3
-#
-#  We could definately round this.   It appears to be quantized .... and maybe close to Farherheit
-# ----------------------------------------------------------------------------------------
-def read_cpu_temp():
-	FH = open("/sys/class/thermal/thermal_zone0/temp", "r")
-	CPU_Temp = float( FH.readline() )
-	FH.close
-	return CPU_Temp / 1000.0
 
 
 # ----------------------------------------------------------------------------------------
@@ -1062,204 +701,6 @@ def write_pid_file():
 	FH.close
 
 
-
-# ----------------------------------------------------------------------------------------
-# uptime  gives  a one line display of the following information.  The current time,
-# how long the system has been running, how many users are currently logged on,  and
-# the system load averages for the past 1, 5, and 15 minutes.
-#   [' 08:39:19 up 3 days, 8 min,  2 users,  load average: 0.00, 0.00, 0.00\n']
-#
-# Could also read this from /proc/loadavg
-#
-# https://docs.python.org/2/library/subprocess.html
-# https://docs.python.org/2/library/re.html#module-contents
-# ----------------------------------------------------------------------------------------
-def proc_load():
-	global data
-	load = subprocess.check_output('/usr/bin/uptime')
-	load = re.sub('.*average: *', '', load)
-	load = load.rstrip()
-	# messager( "DEBUG: uptime data: \"" + load + "\"" )
-	# load = re.sub(',', '', load)
-	words = re.split(', ', load)
-###	for iii in range(0, len(words)):
-###		print "DEBUG: words[" + str(iii) + "] = \"" +  words[iii] + "\""
-
-	cur_proc_load = float(words[0])
-	proc_load_5m = float(words[1])
-
-	if cur_proc_load > proc_load_lim :
-		messager( "WARNING: \t" + \
-			"proc_load_lim = " + str(proc_load_lim) + \
-			"\t\t 1 minute load average = " + str(cur_proc_load) )
-	data['proc_load'] = cur_proc_load
-	data['proc_load_5m'] = proc_load_5m
-	return cur_proc_load
-
-
-	if cur_proc_load > proc_load_lim :
-		messager( "WARNING: 1 minute load average = " + str(cur_proc_load) + \
-			";  proc_load_lim = " + str(proc_load_lim) )
-		return 1
-	else:
-		return 0
-
-
-
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-#               CURRENTLY RETURNS A STRING RATHER THAN A BINARY
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# NOTE: Data is stored into the data[] array, so this could be converted to returning
-#       a binary return code.
-#
-# Examine the output from the free command - particularly focusing on swap usage.
-# Could also read /proc/meminfo
-#
-# Empirically, after running about a month, it seems we start using swap a little
-# at a time.  Literally a few bytes a day or half-day are added - far less than 1%
-# after a week perhaps.
-#
-#                total       used       free     shared    buffers     cached
-#   Mem:        945512     307040     638472       6768      83880     128100
-#   -/+ buffers/cache:      95060     850452
-#   Swap:       102396          0     102396
-#
-#   0  945512
-#   1  311232
-#   2  634280
-#   3  6768
-#   4  83880
-#   5  128100
-#   6  99252
-#   7  846260
-#   8  102396
-#   9  0
-#   10  102396
-#
-# See:
-#   http://www.linuxatemyram.com/http://www.linuxatemyram.com/
-#   http://www.linuxnix.com/find-ram-size-in-linuxunix/
-#
-# ----------------------------------------------------------------------------------------
-def mem_usage():
-	global data
-	free = subprocess.check_output('/usr/bin/free')
-	#                       Remove all the text portions - we want just the numbers
-	free = re.sub('.*total *used *free *shared *buffers *cached\n.*Mem: *', '', free)
-	free = re.sub('\n.*buffers/cache: *', ' ', free)
-	free = re.sub('Swap: *', ' ', free)
-	free = re.sub('\n', ' ', free)                    # Remove any newline which might be left
-	free = re.sub(' +', ' ', free)                    # Reduce multiple spaces to 1
-	free = re.sub(' $', '', free)                     # Trim any trailing blank
-	words = re.split(' +', free)
-
-	# free|945512|908692|36820|3732|244416|226828|437448|508064|102396|3064|99332
-
-	if (len(words)) < 11 :
-		messager( "WARNING:  Expecting 11 tokens from \"free\", but got " + str(mem_pct)  )
-
-	### for iii in range(0, len(words)):
-	### 	___print str(iii) + "  " + words[iii]
-
-	mem_total = int(words[0])
-	mem_used = int(words[1])
-	mem_free = int(words[2])
-
-	shared = words[3]
-	buffers = words[4]
-	cached = words[5]
-
-	bu_ca_used = int(words[6])
-	bu_ca_free = int(words[7])
-
-	swap_total = int(words[8])
-	swap_used = int(words[9])
-	data['swap_used'] = swap_used
-	swap_free = int(words[10])
-
-	swap_pct = 100 * swap_used / swap_total
-	data['swap_pct'] = swap_pct
-	effective_used = mem_total - bu_ca_free
-	data['effective_used'] = effective_used 
-	mem_pct = 100 * effective_used / mem_total
-	data['mem_pct'] = mem_pct
-	# This was misleading...
-	# mem_pct = 100 * mem_used / mem_total
-	if mem_pct > mem_usage_lim :
-		messager( "WARNING:  " + str(mem_pct) + "% mem in use" )
-
-	# free = re.sub(' ', '|', free)                     # Replace each blank with a |
-
-	cpu_temp = read_cpu_temp()
-	data['cpu_temp_c'] = cpu_temp
-	cpu_temp_f = ( cpu_temp * 1.8 ) + 32
-	data['cpu_temp_f'] = cpu_temp_f
-
-	return " {:6d}, {:2d}%, {:6d}, {:2d}%, {:4.1f}c, {:5.1f}f,".format(effective_used, mem_pct, swap_used, swap_pct, \
-		cpu_temp, cpu_temp_f )
-
-
-# ----------------------------------------------------------------------------------------
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# ----------------------------------------------------------------------------------------
-def WX_RF_Restored(cur_line, lineList):
-	global saved_contact_lost
-	countOKs = 0
-	restored = 0
-	# If this is only called when an OK record is already seen, then
-	# cur_line will index that record; we have 1 countOKs
-	for iii in range(cur_line, (cur_line - 12), -1):
-		if "Sensor contact lost" in lineList[iii] :
-			restored = 0
-			break
-		elif "WU Response: OK: success" in lineList[iii] :
-			countOKs += 1
-			if countOKs > 1 :
-				restored = 1
-				messager( "DEBUG:  Sensor contact appears to have been restored after " + str(elapsed) + " sec  (code 116)")
-				break
-		else :
-			messager( "DEBUG:  Sensor RF status indeterminate.")
-
-	return restored
-
-# ----------------------------------------------------------------------------------------
-# Read the ambient temperature from "/web/ambient_tempT.txttmp"
-#
-# NOTE: This could just return the numeric portion, but then one would need to know
-#       the units.  The "interesting metric" could be the difference between
-#       ambient temp, and the temp of the processor.
-#
-# Returns an HTML string generated from ambient_tempT.txt which contains:
-#    <#intemp> <#tempunit>
-# or     
-#    <#intemp> <#tempunitnodeg>
-#
-# ----------------------------------------------------------------------------------------
-def amb_temp():
-	global data
-	FH = open(ambient_temp_file, "r")
-	# data_string = FH.readline()
-	# data_string = re.sub('\n', '', data_string)
-	data_string = re.sub('\n', '', FH.readline() )
-	# lines = re.split('\n', data_string)
-	FH.close
-	data['amb_temp'] = float( re.sub(r' .*', r'', data_string ) )
-	return data_string
-
-
-
 # ----------------------------------------------------------------------------------------
 # The function main contains a "do forever..." (and is called in a try block here)
 #
@@ -1273,6 +714,10 @@ if __name__ == '__main__':
 	try:
 		main()
 	except KeyboardInterrupt:
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# Progress indicator Ending
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		print ""
 		messager("  Good bye from " + this_script)
 
 # ----------------------------------------------------------------------------------------
@@ -1281,4 +726,71 @@ if __name__ == '__main__':
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
-# NOTE: Examples from /mnt/root/home/pi/Cumulus_MX/MXdiags logs
+# 06/03/2018 Midnight
+#
+#  ........................................
+#  2018/06/04 04:03:44 DEBUG: Copy image file South/snapshot-2018-06-04-00-03-46.jpg as S.jpg and upload to South
+#  2018/06/04 04:03:45 DEBUG: Create and upload thumbnail South/S_thumb.jpg to server directory South
+#  INFO: MIDNIGHT ROLLOVER!
+#  INFO: MIDNIGHT ROLLOVER!
+#  INFO: MIDNIGHT ROLLOVER!
+#  INFO: MIDNIGHT ROLLOVER!
+#  2018/06/04 04:03:46 DEBUG: Creating tar file with: tar -c -T South/arc_2018/index-2018-06-03.txt -zf South/arc_2018/arc-2018-06-03.tgz
+#  2018/06/04 04:03:50 DEBUG: taf file size = 15671428
+#  2018/06/04 04:03:50 DEBUG: Creating mp4 fileSouth/20180603.mp4
+#  2018/06/04 04:03:50 DEBUG: cat_cmd = "cat South/snapshot-2018-06-03*.jpg"
+#  2018/06/04 04:03:50 DEBUG: ffmpeg_opts = "-f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 "
+#  2018/06/04 04:03:50 DEBUG: ffmpeg_cmd = "cat South/snapshot-2018-06-03*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 South/20180603.mp4"
+#  2018/06/04 04:03:50 DEBUG: Creating mp4 using cmd: cat South/snapshot-2018-06-03*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 South/20180603.mp4
+#  ffmpeg version 3.2.10-1~deb9u1+rpt1 Copyright (c) 2000-2018 the FFmpeg developers
+#    built with gcc 6.3.0 (Raspbian 6.3.0-18+rpi1) 20170516
+#    configuration: --prefix=/usr --extra-version='1~deb9u1+rpt1' --toolchain=hardened --libdir=/usr/lib/arm-linux-gnueabihf --incdir=/usr/include/arm-linux-gnueabihf --enable-gpl --disable-stripping --enable-avresample --enable-avisynth --enable-gnutls --enable-ladspa --enable-libass --enable-libbluray --enable-libbs2b --enable-libcaca --enable-libcdio --enable-libebur128 --enable-libflite --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libgme --enable-libgsm --enable-libmp3lame --enable-libopenjpeg --enable-libopenmpt --enable-libopus --enable-libpulse --enable-librubberband --enable-libshine --enable-libsnappy --enable-libsoxr --enable-libspeex --enable-libssh --enable-libtheora --enable-libtwolame --enable-libvorbis --enable-libvpx --enable-libwavpack --enable-libwebp --enable-libx265 --enable-libxvid --enable-libzmq --enable-libzvbi --enable-omx-rpi --enable-mmal --enable-openal --enable-opengl --enable-sdl2 --enable-libdc1394 --enable-libiec61883 --enable-chromaprint --enable-frei0r --enable-libopencv --enable-libx264 --enable-shared
+#    libavutil      55. 34.101 / 55. 34.101
+#    libavcodec     57. 64.101 / 57. 64.101
+#    libavformat    57. 56.101 / 57. 56.101
+#    libavdevice    57.  1.100 / 57.  1.100
+#    libavfilter     6. 65.100 /  6. 65.100
+#    libavresample   3.  1.  0 /  3.  1.  0
+#    libswscale      4.  2.100 /  4.  2.100
+#    libswresample   2.  3.100 /  2.  3.100
+#    libpostproc    54.  1.100 / 54.  1.100
+#  Input #0, image2pipe, from 'pipe:':
+#    Duration: N/A, bitrate: N/A
+#    Stream #0:0: Video: mjpeg, yuvj420p(pc, bt470bg/unknown/unknown), 640x480, 8 fps, 8 tbr, 8 tbn, 8 tbc
+#  No pixel format specified, yuvj420p for H.264 encoding chosen.
+#  Use -pix_fmt yuv420p for compatibility with outdated media players.
+#  [libx264 @ 0x1962db0] using cpu capabilities: ARMv6 NEON
+#  [libx264 @ 0x1962db0] profile High, level 2.2
+#  [libx264 @ 0x1962db0] 264 - core 148 r2748 97eaef2 - H.264/MPEG-4 AVC codec - Copyleft 2003-2016 - http://www.videolan.org/x264.html - options: cabac=1 ref=3 deblock=1:0:0 analyse=0x3:0x113 me=hex subme=7 psy=1 psy_rd=1.00:0.00 mixed_ref=1 me_range=16 chroma_me=1 trellis=1 8x8dct=1 cqm=0 deadzone=21,11 fast_pskip=1 chroma_qp_offset=-2 threads=6 lookahead_threads=1 sliced_threads=0 nr=0 decimate=1 interlaced=0 bluray_compat=0 constrained_intra=0 bframes=3 b_pyramid=2 b_adapt=1 b_bias=0 direct=1 weightb=1 open_gop=0 weightp=2 keyint=250 keyint_min=8 scenecut=40 intra_refresh=0 rc_lookahead=40 rc=crf mbtree=1 crf=23.0 qcomp=0.60 qpmin=0 qpmax=69 qpstep=4 ip_ratio=1.40 aq=1:1.00
+#  Output #0, mp4, to 'South/20180603.mp4':
+#    Metadata:
+#      encoder         : Lavf57.56.101
+#      Stream #0:0: Video: h264 (libx264) ([33][0][0][0] / 0x0021), yuvj420p(pc), 640x480, q=-1--1, 8 fps, 16384 tbn, 8 tbc
+#      Metadata:
+#        encoder         : Lavc57.64.101 libx264
+#      Side data:
+#        cpb: bitrate max/min/avg: 0/0/0 buffer size: 0 vbv_delay: -1
+#  Stream mapping:
+#    Stream #0:0 -> #0:0 (mjpeg (native) -> h264 (libx264))
+#  frame=  288 fps=9.0 q=-1.0 Lsize=    7586kB time=00:00:35.62 bitrate=1744.4kbits/s speed=1.11x
+#  video:7582kB audio:0kB subtitle:0kB other streams:0kB global headers:0kB muxing overhead: 0.055490%
+#  [libx264 @ 0x1962db0] frame I:4     Avg QP:20.24  size: 56232
+#  [libx264 @ 0x1962db0] frame P:86    Avg QP:20.98  size: 35120
+#  [libx264 @ 0x1962db0] frame B:198   Avg QP:22.33  size: 22817
+#  [libx264 @ 0x1962db0] consecutive B-frames:  6.2%  4.9%  4.2% 84.7%
+#  [libx264 @ 0x1962db0] mb I  I16..4:  5.8% 82.0% 12.2%
+#  [libx264 @ 0x1962db0] mb P  I16..4:  3.7% 51.2%  4.8%  P16..4: 15.8% 14.1%  8.4%  0.0%  0.0%    skip: 2.1%
+#  [libx264 @ 0x1962db0] mb B  I16..4:  2.5% 21.6%  2.0%  B16..8: 24.1% 16.2%  6.2%  direct:21.8%  skip: 5.6%  L0:40.5% L1:33.0% BI:26.5%
+#  [libx264 @ 0x1962db0] 8x8 transform intra:84.3% inter:70.2%
+#  [libx264 @ 0x1962db0] coded y,uvDC,uvAC intra: 63.6% 83.5% 59.5% inter: 67.5% 78.7% 23.2%
+#  [libx264 @ 0x1962db0] i16 v,h,dc,p: 44% 29% 25%  2%
+#  [libx264 @ 0x1962db0] i8 v,h,dc,ddl,ddr,vr,hd,vl,hu: 22% 19% 41%  2%  3%  2%  4%  3%  4%
+#  [libx264 @ 0x1962db0] i4 v,h,dc,ddl,ddr,vr,hd,vl,hu: 14% 18% 12%  7% 11%  8% 12%  7% 11%
+#  [libx264 @ 0x1962db0] i8c dc,h,v,p: 54% 22% 19%  5%
+#  [libx264 @ 0x1962db0] Weighted P-Frames: Y:40.7% UV:39.5%
+#  [libx264 @ 0x1962db0] ref P L0: 38.3% 15.8% 19.5% 19.1%  7.3%
+#  [libx264 @ 0x1962db0] ref B L0: 68.4% 24.0%  7.7%
+#  [libx264 @ 0x1962db0] ref B L1: 87.4% 12.6%
+#  [libx264 @ 0x1962db0] kb/s:1725.10
+#  2018/06/04 04:04:22 INFO: Tar is large enough to delete jpg files.
+#  2018/06/04 04:04:29 DEBUG: file # 6 of 6 (last)
