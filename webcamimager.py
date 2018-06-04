@@ -42,7 +42,24 @@
 #
 #   NOTE: This should be able to be run as a service. (systemctl)
 #
-#   NOTE: We should move the tar file to an archive directory.
+#   NOTE: We poll for directory changes once we have caught up and have hit our stride.
+#         A better approach would be an interrupt-driven one where we wait for the
+#         directory changes (new file written) and then wake up.  Some reverences:
+#
+#   https://blog.philippklaus.de/2011/08/watching-directories-for-changes-using-python_-_an-overview
+#   https://stackoverflow.com/questions/4708511/how-to-watch-a-directory-for-changes
+#        https://github.com/seb-m/pyinotify
+#   https://www.michaelcho.me/article/using-pythons-watchdog-to-monitor-changes-to-a-directory
+#   http://brunorocha.org/python/watching-a-directory-for-file-changes-with-python.html
+#   https://pypi.org/project/watchdog/0.5.4/
+#   https://pypi.org/project/python-watcher/
+#   https://pypi.org/project/watcher/
+#   https://pypi.org/project/fs-watcher/
+#
+#   https://github.com/johnwesonga/directory-watcher/blob/master/dirwatcher.py
+#
+#
+#   http://www.docmoto.com/support/advanced-topics/creating-a-folder-monitor-using-python/
 #
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
@@ -126,7 +143,7 @@ image_data_file = re.sub('\.py', '__.dat', this_script)
 last_timestamp = 0
 last_filename = ""
 catching_up = False
-sleep_for = 30
+sleep_for = 15
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
@@ -428,6 +445,9 @@ def next_image_file() :
 		last_filename = get_stored_filename()
 
 
+	# --------------------------------------------------------------------------------
+	#  Check the modification time on the image directory.
+	# --------------------------------------------------------------------------------
 	image_dir_mtime = os.stat( image_dir ).st_mtime
 
 #@@@
@@ -448,7 +468,9 @@ def next_image_file() :
 
 	if image_dir_mtime - last_image_dir_mtime == 0.0 :
 ###		messager( "DEBUG: directory {} mtime unchanged.".format(image_dir) )
-		print "{} unchanged".format(image_dir)
+###		print "{} unchanged".format(image_dir)
+		sys.stdout.write('->')
+		sys.stdout.flush()
 		last_image_dir_mtime = image_dir_mtime
 		return
 
@@ -475,19 +497,11 @@ def next_image_file() :
 	line = 0
 	while int(digits) <= int(last_timestamp) :
 		line += 1
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-###		print "DEBUG: Checking file # " + str(line) + "  " + file_list[line]
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
 		if line >= file_list_len :
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-#REMOVE#		messager( "DEBUG: line # = " + str(line) + "   file_list_len = " + str(file_list_len) + "  (End of list.)" )
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-			messager( "DEBUG: line # {} of {} (last)".format( line, file_list_len ) )
-			catching_up = False
+			messager( "DEBUG: file # {} of {} (last)".format( line, file_list_len ) )
+			if catching_up :
+				catching_up = False
+				messager( "INFO: Catch-up mode off" )
 			break
 
 		if "snapshot" in file_list[line] :
@@ -541,39 +555,14 @@ def next_image_file() :
 		source_file = image_dir + '/' + file_list[line]
 		target_file = image_dir + '/' + main_image
 
+		print " <<"
 		messager( "DEBUG: Copy image file {} as {} and upload to {}".format( source_file, main_image, server_img_dir ) )
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-#REMOVE#		messager( "DEBUG: Copy image file " + image_dir + '/' + file_list[line] + ' as ' + main_image +
-#REMOVE#			" and upload to " + server_img_dir )
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
 
 		shutil.copy2( image_dir + '/' + file_list[line], image_dir + '/' + main_image )
 		shutil.copy2( source_file, target_file )
 		push_to_server( target_file, server_img_dir )
 
 		thumbnail_file = image_dir + '/' + thumbnail_image
-
-
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-#REMOVE#		# ------------------------------------------------------------------------
-#REMOVE#		#  Note: This is needed for an apparent quirk of Linux.  It seems that
-#REMOVE#		#        the directory mtime is not changed by convert if is *overwrites*
-#REMOVE#		#        rather than writing a new file.
-#REMOVE#		# ------------------------------------------------------------------------
-#REMOVE#		try :
-#REMOVE#			os.unlink( thumbnail_file )
-#REMOVE#		except:
-#REMOVE#			messager( "ERROR: Unexpected ERROR in unlink: {}".format( sys.exc_info()[0] ) )
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-
 
 		convert = ""
 		messager( "DEBUG: Create and upload thumbnail {} to server directory {}".format(thumbnail_file, server_img_dir ) )
@@ -587,15 +576,7 @@ def next_image_file() :
 				'-resize', '30%',
 				thumbnail_file ]
 		try :
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-#REMOVE###			convert = subprocess.check_output( ['/usr/bin/convert', image_dir + '/' + main_image, '-verbose', '-resize', '30%', image_dir + '/NW_thumb.jpg', '2>&1'] )
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
-#REMOVE#=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
 			convert = subprocess.check_output( convert_cmd, stderr=subprocess.STDOUT )
-#REMOVE#			subprocess.check_output( ['/usr/bin/touch', thumbnail_file] )
 			subprocess.check_output( ['/usr/bin/touch', image_dir] )
 		except:
 			messager( "ERROR: Unexpected ERROR in convert: {}".format( sys.exc_info()[0] ) )
@@ -623,7 +604,7 @@ def next_image_file() :
 		# shorten the sleep time
 		# ------------------------------------------------------------------------
 		if (file_list_len - line) > 3 :
-			messager( "DEBUG: line # {} of {} (Catching up)".format( line, file_list_len ) )
+			messager( "DEBUG: file # {} of {} (Catching up)".format( line, file_list_len ) )
 			catching_up = True
 
 
@@ -685,9 +666,6 @@ def get_stored_ts() :
 
 	ts = str(content[0].strip("\n"))
 	messager( "DEBUG: Stored ts = " + ts )
-
-#DELETE#	day_code = re.sub(r'^......(..)....*', r'\1', ts)
-#DELETE#	messager( "DEBUG: day_code = " + day_code )
 
 	return ts
 
@@ -758,31 +736,6 @@ def push_to_server(local_file, remote_path) :
 			# Increase the sleep time with each iteration
 			sleep(iii)
 	return
-
-	#  DELETE WHEN ABOVE IS PROVEN
-	#  DELETE WHEN ABOVE IS PROVEN
-	#  DELETE WHEN ABOVE IS PROVEN
-	#  DELETE WHEN ABOVE IS PROVEN
-	# --------------------------------------------------------------------------------
-	ftp.login( ftp_login, ftp_password )
-
-	ftp.cwd( remote_path )
-
-#DEBUG#	print "DEBUG: FTP PWD = " + ftp.pwd()
-
-	ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
-
-#DEBUG#	data = []
-#DEBUG#	ftp.dir(data.append)
-
-	ftp.quit()
- 
-#DEBUG#	for line in data:
-#DEBUG#		print "DEBUG: " + line
-
- 
-#  images/NW_thumb.jpg bobdilly@dillys.org:/home/content/b/o/b/bobdilly/html/WX
-
 
 # ----------------------------------------------------------------------------------------
 #
