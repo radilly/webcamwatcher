@@ -1679,15 +1679,22 @@ def amb_temp():
 	data['amb_temp'] = float( re.sub(r' .*', r'', data_string ) )
 	return data_string
 
+
 # ----------------------------------------------------------------------------------------
+#  Fetch the version of mono
 #
 # ----------------------------------------------------------------------------------------
 def mono_version():
 	global data
 
-	response = subprocess.check_output(["/usr/bin/mono", "-V"])
-	line = re.split('\n', response)
-	tok = re.split(' *', line[0])
+	try :
+		response = subprocess.check_output(["/usr/bin/mono", "-V"])
+		line = re.split('\n', response)
+		tok = re.split(' *', line[0])
+		version = tok[4]
+	except:
+		messager( "ERROR: From mono: {}".format( sys.exc_info()[0] ) )
+		version = "Not found"
 
 #DEBUG#
 #DEBUG#	for iii in range(0, len(line)):
@@ -1699,9 +1706,8 @@ def mono_version():
 #DEBUG#	print "mono version = " + tok[4]
 #DEBUG#
 
-	data['mono_version'] = tok[4]
-	return tok[4]
-
+	data['mono_version'] = version
+	return version
 
 
 
