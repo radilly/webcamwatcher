@@ -753,7 +753,9 @@ if __name__ == '__main__':
 	messager("  Starting " + this_script + "  PID=" + str(getpid()))
 
 	write_pid_file()
-	mono_version()
+
+	messager("Mono version: {}" .format( mono_version() ) )
+
 	try:
 		main()
 	except KeyboardInterrupt:

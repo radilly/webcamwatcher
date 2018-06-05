@@ -1724,7 +1724,9 @@ if __name__ == '__main__':
 
 	write_pid_file()
 	cmx_svc_runtime()	# This reads the PID for the main mono process
-	mono_version()
+
+	messager("Mono version: {}" .format( mono_version() ) )
+
 	try:
 		main()
 	except KeyboardInterrupt:
