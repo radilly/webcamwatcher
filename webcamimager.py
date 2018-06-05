@@ -8,13 +8,13 @@
 #     printf "20180523214508\nsnapshot-2018-05-23-21-45-08.jpg\n" > webcamimager__.dat
 #
 # Restart using...
-#   kill -9 `cat webcamimager.PID` ; nohup /usr/bin/python -u /mnt/root/home/pi/webcamimager.py >> /mnt/root/home/pi/webcamimager.log 2>&1 &
+#   kill -9 `cat webcamimager.PID` ; nohup /usr/bin/python -u /home/pi/webcamimager.py >> /home/pi/webcamimager.log 2>&1 &
 #
 # Stop with ... 
 #   kill -9 `cat webcamimager.PID`
 #
 # Start with ...
-#   nohup /usr/bin/python -u /mnt/root/home/pi/webcamimager.py >> /mnt/root/home/pi/webcamimager.log 2>&1 &
+#   nohup /usr/bin/python -u /home/pi/webcamimager.py >> /home/pi/webcamimager.log 2>&1 &
 #
 # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 #
@@ -92,10 +92,6 @@
 #
 # ========================================================================================
 
-import datetime
-from time import sleep
-import sys
-
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 #  https://docs.python.org/2/library/subprocess.html
 #  https://pypi.org/project/subprocess32/
@@ -114,9 +110,10 @@ import sys
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 import subprocess
 
-
-
 # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+import datetime
+from time import sleep
+import sys
 from os import listdir
 from os import getpid
 import os
@@ -124,10 +121,29 @@ from ftplib import FTP
 import shutil
 import re
 
+
+
+# ========================================================================================
+# ========================================================================================
+# ========================================================================================
+#  This needs to be parameterized if we are to support multiple web cams
+#
+#         image_dir = sys.argv[1]
+#         main_image = sys.argv[2]
+#         thumbnail_image = sys.argv[3]
+#         server_img_dir = sys.argv[4]
+#
+#  We *could* derive all of these from "South" - a single parameter.
+#  But I hesitate to give up the flexibility just in case...
+# ========================================================================================
+# ========================================================================================
+# ========================================================================================
+image_dir = "South"
 main_image = "S.jpg"
 thumbnail_image = "S_thumb.jpg"
 server_img_dir = "South"
-image_dir = "South"
+
+# ========================================================================================
 
 
 # Real mtime will always be larger
@@ -151,6 +167,10 @@ logger_file = re.sub('\.py', '.log', logger_file)
 
 # strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
 strftime_FMT = "%Y/%m/%d %H:%M:%S"
+
+data = []
+data = { 'watcher_pid' : getpid() }
+data['camera_down'] = 0
 
 
 
@@ -178,7 +198,6 @@ def main():
 			duration = sleep_for
 #DEBUG#		messager( "DEBUG: Sleep {} sec.".format(duration) )
 		sleep(duration)
-		#DEBUG# print "."
 
 	exit()
 
@@ -457,7 +476,7 @@ def next_image_file() :
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# Progress indicator Ending
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		print ""
+		print "||"
 		messager( "DEBUG: Copy image file {} as {} and upload to {}".format( source_file, main_image, server_img_dir ) )
 
 		shutil.copy2( image_dir + '/' + file_list[line], image_dir + '/' + main_image )
@@ -637,6 +656,8 @@ def push_to_server(local_file, remote_path) :
 		except socket.error, e :
 			iii += 1
 			print "FTP Socket Error %d: %s" % (e.args[0], e.args[1])
+			for jjj in range(0, len(e.args) - 1) :
+				print "    {}",format( e.args[jjj] )
 			# Increase the sleep time with each iteration
 			sleep(iii)
 	return
@@ -653,11 +674,11 @@ def fetch_FTP_credentials() :
 	global ftp_password
 
 	FH = open(ftp_credentials_file, "r")
-	data = FH.readlines()
+	response = FH.readlines()
 	FH.close
 
-	ftp_login = data[0].strip("\n")
-	ftp_password = data[1].strip("\n")
+	ftp_login = response[0].strip("\n")
+	ftp_password = response[1].strip("\n")
 
 	###print "DEBUG: ftp_login = " + ftp_login + "    ftp_password = " + ftp_password
 
@@ -702,6 +723,27 @@ def write_pid_file():
 
 
 # ----------------------------------------------------------------------------------------
+#  Fetch the version of mono
+#
+# ----------------------------------------------------------------------------------------
+def mono_version():
+	global data
+
+	try :
+		response = subprocess.check_output(["/usr/bin/mono", "-V"])
+		line = re.split('\n', response)
+		tok = re.split(' *', line[0])
+		version = tok[4]
+	except:
+		messager( "ERROR: From mono: {}".format( sys.exc_info()[0] ) )
+		version = "Not found"
+
+	data['mono_version'] = version
+	return version
+
+
+
+# ----------------------------------------------------------------------------------------
 # The function main contains a "do forever..." (and is called in a try block here)
 #
 # This handles the startup and shutdown of the script.
@@ -711,6 +753,7 @@ if __name__ == '__main__':
 	messager("  Starting " + this_script + "  PID=" + str(getpid()))
 
 	write_pid_file()
+	mono_version()
 	try:
 		main()
 	except KeyboardInterrupt:
