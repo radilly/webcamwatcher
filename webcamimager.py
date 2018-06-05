@@ -735,7 +735,7 @@ def mono_version():
 		tok = re.split(' *', line[0])
 		version = tok[4]
 	except:
-		messager( "ERROR: From mono: {}".format( sys.exc_info()[0] ) )
+		messager( "ERROR: From mono version check: {}".format( sys.exc_info()[0] ) )
 		version = "Not found"
 
 	data['mono_version'] = version
