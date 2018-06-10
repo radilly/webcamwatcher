@@ -66,6 +66,9 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20180610 RAD Ugly bug with the midnight_process(), or the call to it.  It was getting
+#              last_filename passed to it, but this was only set in the first iteration
+#              when is is read from a file.
 # 20180604 RAD More cleanup.  Seems to be running well in my testing.  Removed a lot
 #              of dead code left from watchdog.py.
 # 20180603 RAD Cleaned up a bunch of stuff.
@@ -115,8 +118,9 @@ import subprocess
 import datetime
 from time import sleep
 import sys
-from os import listdir
-from os import getpid
+from os import listdir, getpid, stat, unlink
+## https://docs.python.org/2/tutorial/modules.html#packages
+## from os.path import isfile
 import os
 from ftplib import FTP
 import shutil
@@ -214,6 +218,8 @@ def midnight_process(date_string) :
 	ffmpeg_failed = True
 	tar_failed = True
 
+	messager( "DEBUG: Called midnight_process( {} )".format(date_string ) )
+
 	# Example: 20180523 - - - (looks like a number, but a string here.)
 	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
 
@@ -230,31 +236,42 @@ def midnight_process(date_string) :
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
-
-	#  Creats a list like South/arc_2018/index-2018-06-01.txt for use with -T
-	daily_image_list(date_string, work_dir )
-
 	yyyy = re.sub(r'(....).*', r'\1', date_string)
 	arc_dir = work_dir + '/arc_' + yyyy
 	image_index = arc_dir + '/index-' + date_string + ".txt"
+	tar_file = arc_dir + "/arc-" + date_string + ".tgz "
 
-	tar_cmd = "tar -c -T " + image_index + " -zf " + arc_dir + "/arc-" + date_string + ".tgz "
+	if os.path.isfile( tar_file ) :
+		messager( "ERROR: {} already exists.  Quitting Midnight process.".format( tar_file ) )
+		return
 
-	messager( "DEBUG: Creating tar file with: " + tar_cmd )
-	try:
-		subprocess.check_call(tar_cmd, shell=True)
-		tar_failed = False
-	except :
-		messager( "ERROR: Unexpected ERROR in tar: {}".format( sys.exc_info()[0] ) )
 
-	tar_size = os.stat(arc_dir + "/arc-" + date_string + ".tgz").st_size
-	messager( "DEBUG: taf file size = " + str(tar_size) )
+
+	#  Creats a list like South/arc_2018/index-2018-06-01.txt for use with -T
+	nnn = daily_image_list(date_string, work_dir )
+	if ( nnn < 50 ) :
+		messager( "WARNING: Index list looks short with {} items.".format( nn ) )
+	else :
+		tar_cmd = "tar -c -T " + image_index + " -zf " + tar_file
+
+		messager( "DEBUG: Creating tar file with: " + tar_cmd )
+		try:
+			subprocess.check_call(tar_cmd, shell=True)
+			tar_failed = False
+		except :
+			messager( "ERROR: Unexpected ERROR in tar: {}".format( sys.exc_info()[0] ) )
+
+
+
+
+	tar_size = stat( tar_file ).st_size
+	messager( "DEBUG: taf file size = {}".format( tar_size ) )
 
 	mp4_file = arc_dir + "/" + date_stamp + ".mp4"
 	# https://stackoverflow.com/questions/82831/how-to-check-whether-a-file-exists?rq=1
 	if os.path.isfile( mp4_file ) :
-		messager( "WARNING: " + mp4_file + " already exists" )
-		os.unlink( mp4_file )
+		messager( "WARNING: {} already exists and will be deleted.".format ( mp4_file ) )
+		unlink( mp4_file )
 
 	messager( "DEBUG: Creating mp4 file" + mp4_file )
 
@@ -371,7 +388,7 @@ def next_image_file() :
 	#  Check the modification time on the image directory.
 	#  If it hasn't changed since our last check, just return() now.
 	# --------------------------------------------------------------------------------
-	image_dir_mtime = os.stat( work_dir ).st_mtime
+	image_dir_mtime = stat( work_dir ).st_mtime
 
 #|||
 #|||
@@ -423,6 +440,7 @@ def next_image_file() :
 
 	digits = 0
 	line = 0
+	current_filename = ""
 	while int(digits) <= int(last_timestamp) :
 		line += 1
 		if line >= file_list_len :
@@ -445,6 +463,7 @@ def next_image_file() :
 
 ###			print "DEBUG: digits = " + digits
 			if int(digits) > int(last_timestamp) :
+				current_filename = file_list[line]
 ###				print "DEBUG: found new image file = " + digits
 				break
 
@@ -473,7 +492,7 @@ def next_image_file() :
 		#   -rw-r--r--  1 pi pi        0 Jun  2 01:54 snapshot-2018-06-02-01-54-13.jpg
 		#   -rw-r--r--  1 pi pi        0 Jun  2 01:59 snapshot-2018-06-02-01-59-13.jpg
 		# ------------------------------------------------------------------------
-		jpg_size = os.stat( work_dir + '/' + file_list[line] ).st_size
+		jpg_size = stat( work_dir + '/' + file_list[line] ).st_size
 		if jpg_size < 500 :
 			store_file_data ( digits, file_list[line] )
 			last_timestamp = digits
@@ -539,6 +558,9 @@ def next_image_file() :
 			midnight_process(re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename))
 
 
+		last_filename = current_filename
+
+
 # ----------------------------------------------------------------------------------------
 #  Build a list of the days files (used as input to tar).
 #@@@
@@ -556,14 +578,19 @@ def daily_image_list( date_string, work_dir ) :
 
 	look_for = "snapshot-" + date_string
 
+	found = 0
 	line = 0
 	while line < file_list_len :
 		if look_for in file_list[line] :
 			FH.write( work_dir + "/" + file_list[line] + "\n" )
+			found += 1
 		line += 1
+
+	messager( "DEBUG: {} items found for index file.".format( found ) )
 
 	FH.close
 
+	return found
 
 
 
