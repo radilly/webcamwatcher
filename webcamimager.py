@@ -783,7 +783,7 @@ def mono_version():
 		tok = re.split(' *', line[0])
 		version = tok[4]
 	except:
-		messager( "ERROR: From mono: {}".format( sys.exc_info()[0] ) )
+		messager( "ERROR: From mono version check: {}".format( sys.exc_info()[0] ) )
 		version = "Not found"
 
 	data['mono_version'] = version
@@ -802,7 +802,9 @@ if __name__ == '__main__':
 	messager("  Starting " + this_script + "  PID=" + str(getpid()))
 
 	write_pid_file()
-	mono_version()
+
+	messager("Mono version: {}" .format( mono_version() ) )
+
 	try:
 		main()
 	except KeyboardInterrupt:

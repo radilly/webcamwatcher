@@ -175,6 +175,7 @@ data_keys = [
 	"cpu_temp_f",
 	"amb_temp",
 	"python_version",
+	"mono_version",
 	"webcamwatch_down"
 	]
 	# amb_temp   {}
@@ -205,6 +206,7 @@ data_format = [
 	"{:6.1f} &deg;F",
 	"{:6.1f} &deg;F",
 	"{}",
+	"{}",
 	"{}"
 	]
 
@@ -229,6 +231,7 @@ thresholds = [
 	55,
 	131,
 	100,
+	-1,
 	-1,
 	0
 	]
@@ -277,7 +280,28 @@ CSV_format = [
 	"{:5.1f}f",
 	"{:5.1f}%",
 	"{:16.10f}",
-	"{}"
+	"{}",
+	]
+
+# This is used to determine which fields should trip the problem flag.
+Prob_Track = [
+	1,
+	1,
+	1,
+	0,
+	0,
+	1,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	1,
 	]
 
 
@@ -293,6 +317,7 @@ CSV_format = [
 # ----------------------------------------------------------------------------------------
 def main():
 	global data
+	global Prob_Track
 
 	python_version = "v " + str(sys.version)
 	python_version = re.sub(' *\n *', '<BR>', python_version )
@@ -326,12 +351,16 @@ def main():
 		webcamwatch_down()
 
 		CSV_rec = datetime.datetime.utcnow().strftime(strftime_FMT) + ","
+		Prob_Flag = " ,"
 
 		for jjj in range(0, len(CSV_keys)):
 			format_str = " " + CSV_format[jjj] + ","
 			CSV_rec = CSV_rec + format_str.format( data[CSV_keys[jjj]] )
+			if Prob_Track[jjj] > 0 :
+				if data[CSV_keys[jjj]] > 0 :
+					Prob_Flag = " <<<<<,"
 
-		print CSV_rec
+		print CSV_rec + Prob_Flag
 
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# NOTE: Would be great to output data and use highcharts
@@ -1651,6 +1680,36 @@ def amb_temp():
 	return data_string
 
 
+# ----------------------------------------------------------------------------------------
+#  Fetch the version of mono
+#
+# ----------------------------------------------------------------------------------------
+def mono_version():
+	global data
+
+	try :
+		response = subprocess.check_output(["/usr/bin/mono", "-V"])
+		line = re.split('\n', response)
+		tok = re.split(' *', line[0])
+		version = tok[4]
+	except:
+		messager( "ERROR: From mono version check: {}".format( sys.exc_info()[0] ) )
+		version = "Not found"
+
+#DEBUG#
+#DEBUG#	for iii in range(0, len(line)):
+#DEBUG#		print "line[{}] = \"{}\"".format(iii, line[iii])
+#DEBUG#
+#DEBUG#	for iii in range(0, len(tok)):
+#DEBUG#		print "tok[{}] = \"{}\"".format(iii, tok[iii])
+#DEBUG#
+#DEBUG#	print "mono version = " + tok[4]
+#DEBUG#
+
+	data['mono_version'] = version
+	return version
+
+
 
 # ----------------------------------------------------------------------------------------
 # The function main contains a "do forever..." (and is called in a try block here)
@@ -1665,6 +1724,9 @@ if __name__ == '__main__':
 
 	write_pid_file()
 	cmx_svc_runtime()	# This reads the PID for the main mono process
+
+	messager("Mono version: {}" .format( mono_version() ) )
+
 	try:
 		main()
 	except KeyboardInterrupt:
