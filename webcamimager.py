@@ -66,6 +66,9 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20180611 RAD As luck would have it, I left a trailing blank on the tar_file name,
+#              which caused the isfile() to fail last night.  The retry shut down the
+#              midnight process, which is tedious, so maybe I can find a better approach.
 # 20180610 RAD Ugly bug with the midnight_process(), or the call to it.  It was getting
 #              last_filename passed to it, but this was only set in the first iteration
 #              when is is read from a file.
@@ -117,6 +120,7 @@ import subprocess
 # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 import datetime
 from time import sleep
+import time
 import sys
 from os import listdir, getpid, stat, unlink
 ## https://docs.python.org/2/tutorial/modules.html#packages
@@ -127,6 +131,7 @@ import shutil
 import re
 
 import socket
+import calendar
 
 
 
@@ -159,6 +164,7 @@ last_image_dir_mtime = 0.0
 ftp_credentials_file = "/home/pi/.ftp.credentials"
 ftp_login = ""
 ftp_password = ""
+current_filename = ""
 
 this_script = sys.argv[0]
 last_image_name = ""
@@ -209,6 +215,25 @@ def main():
 	exit()
 
 
+
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+#  The real code for this can be found in webcamwatch.py
+#
+#  The reasons this might be called:
+#    We're getting 0-length images (or images too small)
+#    We've not has an image uploaded in a while - based on the time stamp - Watch DAYLIGHT SAVINGS
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+def power_cycle():
+	messager( "WARNING: Power-cycle the web camera." )
+	messager( "WARNING: Power-cycle the web camera." )
+	messager( "WARNING: Power-cycle the web camera." )
+
+
+
 # ----------------------------------------------------------------------------------------
 #  Subsequent calls find the avergae utilization since the previous call.
 #
@@ -239,8 +264,14 @@ def midnight_process(date_string) :
 	yyyy = re.sub(r'(....).*', r'\1', date_string)
 	arc_dir = work_dir + '/arc_' + yyyy
 	image_index = arc_dir + '/index-' + date_string + ".txt"
-	tar_file = arc_dir + "/arc-" + date_string + ".tgz "
+	tar_file = arc_dir + "/arc-" + date_string + ".tgz"
 
+
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	#  NOTE: This is a bit draconian ... Need to think through a kinder, gentler approach
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	if os.path.isfile( tar_file ) :
 		messager( "ERROR: {} already exists.  Quitting Midnight process.".format( tar_file ) )
 		return
@@ -261,10 +292,10 @@ def midnight_process(date_string) :
 		except :
 			messager( "ERROR: Unexpected ERROR in tar: {}".format( sys.exc_info()[0] ) )
 
-
-
-
-	tar_size = stat( tar_file ).st_size
+	try:
+		tar_size = stat( tar_file ).st_size
+	except :
+		messager( "ERROR: Unexpected ERROR in stat: {}".format( sys.exc_info()[0] ) )
 	messager( "DEBUG: taf file size = {}".format( tar_size ) )
 
 	mp4_file = arc_dir + "/" + date_stamp + ".mp4"
@@ -377,10 +408,11 @@ def next_image_file() :
 	global last_filename
 	global last_image_dir_mtime
 	global catching_up
+	global current_filename
 
 	# Should only ever happen at startup...
 	if last_timestamp == 0 :
-		last_timestamp = get_stored_ts()
+		last_timestamp = int(get_stored_ts())
 		last_filename = get_stored_filename()
 
 
@@ -425,7 +457,7 @@ def next_image_file() :
 	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
 ###	print "DEBUG: date_stamp = " + date_stamp
 
-	last_day_code = re.sub(r'^......(..)....*', r'\1', last_timestamp)
+	last_day_code = re.sub(r'^......(..)....*', r'\1', str(last_timestamp))
 ###	print "DEBUG: last processed day code = " + last_day_code
 
 	# --------------------------------------------------------------------------------
@@ -438,10 +470,11 @@ def next_image_file() :
 	file_list_len = len( file_list )
 	file_list.sort()
 
-	digits = 0
+	digit_string = ""
+	next_timestamp = 0
 	line = 0
-	current_filename = ""
-	while int(digits) <= int(last_timestamp) :
+	#######################  current_filename = ""
+	while next_timestamp <= last_timestamp :
 		line += 1
 		if line >= file_list_len :
 #DEBUG#			messager( "DEBUG: file # {} of {} (last)".format( line, file_list_len ) )
@@ -454,17 +487,18 @@ def next_image_file() :
 			# snapshot-2018-05-23-16-57-04.jpg
 			tok = re.split('-', re.sub('\.jpg', '', file_list[line]) )
 
-			digits = tok[1]
+			digit_string = tok[1]
 			for iii in range(2, 7) :
-				digits = digits + tok[iii]
+				digit_string = digit_string + tok[iii]
 
 			day_code = tok[3]
+			next_timestamp = int(digit_string)
 
 
-###			print "DEBUG: digits = " + digits
-			if int(digits) > int(last_timestamp) :
+###			print "DEBUG: digit_string = " + digit_string
+			if next_timestamp > last_timestamp :
 				current_filename = file_list[line]
-###				print "DEBUG: found new image file = " + digits
+###				print "DEBUG: found new image file = {}".format( next_timestamp )
 				break
 
 	# --------------------------------------------------------------------------------
@@ -474,7 +508,7 @@ def next_image_file() :
 	#    We ran through the snapshot files and did not find one with a newer
 	#       timestamp in the name.
 	# --------------------------------------------------------------------------------
-	if int(digits) > int(last_timestamp) :
+	if next_timestamp > last_timestamp :
 #DEBUG#		print "DEBUG: Earliest unprocessed image file is " + file_list[line]
 
 		# ------------------------------------------------------------------------
@@ -494,10 +528,12 @@ def next_image_file() :
 		# ------------------------------------------------------------------------
 		jpg_size = stat( work_dir + '/' + file_list[line] ).st_size
 		if jpg_size < 500 :
-			store_file_data ( digits, file_list[line] )
-			last_timestamp = digits
+			store_file_data ( next_timestamp, file_list[line] )
+			last_timestamp = next_timestamp
+			power_cycle()
 			print ""
 			messager( "WARNING: Skipping image file {}/{} size = {}".format( work_dir, file_list[line], jpg_size ) )
+			#  These lines can be used as a shell script...
 			print "rm {}/{}".format( work_dir, file_list[line] )
 			# ----------------------------------------------------------------
 			#  As above, there were a stack of 0-length images.  We want to get
@@ -515,9 +551,32 @@ def next_image_file() :
 		# Progress indicator Ending
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		print "||"
+
+
+
+
+
+		# Either of these returns UTC time
+		epoch_now = int( time.time() )
+###		epoch_now = calendar.timegm( time.gmtime() )
+		# This is in local time, but lacks a time zone
+###		epoch_file = calendar.timegm( time.strptime( str(next_timestamp), "%Y%m%d%H%M%S") )
+		# This should be in UTC time
+		epoch_file = int(os.stat(work_dir + '/' + current_filename).st_mtime)
+
+###		print "DEBUG: time() = {}".format( epoch_now )
+###		print "DEBUG: Snapshot time = {}".format( epoch_file )
+###		print "DEBUG: File age = {}  catching_up = {}".format( epoch_now - epoch_file, catching_up )
+
+		if not catching_up and ( epoch_now - epoch_file > 600 ) :
+			power_cycle()
+
+
+
+
+
 		messager( "DEBUG: Copy {} as {}".format( source_file, main_image ) )
 
-		shutil.copy2( work_dir + '/' + file_list[line], work_dir + '/' + main_image )
 		shutil.copy2( source_file, target_file )
 		push_to_server( target_file, remote_dir )
 
@@ -543,8 +602,8 @@ def next_image_file() :
 
 		push_to_server( thumbnail_file, remote_dir )
 
-		store_file_data ( digits, file_list[line] )
-		last_timestamp = digits
+		store_file_data( next_timestamp, file_list[line] )
+		last_timestamp = next_timestamp
 
 #DEBUG#		print "DEBUG: day = " + tok[3]
 		if last_day_code != day_code :
@@ -557,6 +616,8 @@ def next_image_file() :
 			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 			midnight_process(re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename))
 
+
+		messager( "DEBUG: last_filename = {} current_filename = {}".format( last_filename, current_filename ) )
 
 		last_filename = current_filename
 
@@ -607,7 +668,7 @@ def store_file_data(ts, filename) :
 	global image_data_file
 #DEBUG#	messager( "DEBUG: write " + image_data_file )
 	FH = open(image_data_file, "w")
-	FH.write( ts + "\n" )
+	FH.write( str(ts) + "\n" )
 	FH.write( filename + "\n" )
 	FH.close
 
