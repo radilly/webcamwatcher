@@ -36,6 +36,24 @@
 # ========================================================================================
 #              NOTE: Don't necessarily need "Cumulus MX Exception thrown (see above)"
 #                    messages.  Added end message 01/08/2018.
+# 20180606 RAD Weather Underground uploads continue to throw errors.
+#              It's gotten really bad, so bad that my log can be hard to read
+#              as the stuff that results from the WU exceptions dominates during
+#              some periods.  I suppose it possible to see and exception other
+#              than what become an extremely common, and thus meaningless) one
+#              likely results from many WU issues.  For the moment, I just
+#              commented out a few key lines, starting with '#WU#' to silence
+#              all the noise in the log.  It might be useful to split out any
+#              WU Excpetion processing (first) from a generic Exception case.
+#
+#              NOTE: Making the current if into an elif, and inserting a new if
+#              specifically looking for "WU update:    at System.Net.Web..."
+#              would allows us to minimally process that special case of
+#              Exception and still catch any other CMX Exceptions.
+# 20180606 RAD It appears the Pi Network connection went down in the wee hours
+#              this morning.  I don't think the exception process was helpful.
+#              I switched to urllib2, and imported just a few methods.
+#              NOTE: Compare exception handling for each urlopen call...
 # 20180224 RAD Had a case when the readline() in ws_data_stopped() returned ''
 #              which could not be converted to an integer. Somewhat kludgy fix.
 # 20180108 RAD When I restarted the cumulusmx service the change of PID caused a
@@ -86,7 +104,11 @@
 #
 # ========================================================================================
 
-import urllib
+# import urllib
+# https://docs.python.org/2/howto/urllib2.html
+# https://docs.python.org/2/library/urllib2.html
+from urllib2 import urlopen, URLError, HTTPError
+
 import re
 import datetime
 import RPi.GPIO as GPIO
@@ -770,11 +792,21 @@ def server_stalled():
 	#   free|945512|271656|673856|6796|55352|127056|89248|856264|102396|0|102396
 	# --------------------------------------------------------------------------------
 	try:
-		response = urllib.urlopen('http://dillys.org/wx/WS_Updates.txt')
+		response = urlopen('http://dillys.org/wx/WS_Updates.txt')
 		content = response.read()
-	except:
-		print "Unexpected ERROR in server_stalled:", sys.exc_info()[0]
-		content = "12"      # Assume a good answer...
+#@@@#
+	except URLError as e:
+		if hasattr(e, 'reason'):
+			print 'We failed to reach a server.'
+			print 'Reason: ', e.reason
+		elif hasattr(e, 'code'):
+			print 'The server couldn\'t fulfill the request.'
+			print 'Error code: ', e.code
+####	else:
+    # everything is fine
+#	except:
+#		print "Unexpected ERROR in server_stalled:", sys.exc_info()[0]
+#		content = "1"      # Assume a bad answer...
 	# .................................................................
 	# Strip off the trailing newline which is helpf when catting on the other
 	# side. This should have a value be 1 and 10 - when 10 is realy expected.
@@ -826,7 +858,7 @@ def last_realtime():
 	#  09/10/17 12:03:11 73.0 92 70.6 3.1 4.5 270 ...
 	#  ---------------------------------------------------------------------
 	try :
-		response = urllib.urlopen('http://dillys.org/wx/realtime.txt')
+		response = urlopen('http://dillys.org/wx/realtime.txt')
 		content = response.read()
 	except:
 		print "Unexpected ERROR in last_realtime:", sys.exc_info()[0]
@@ -1184,13 +1216,34 @@ def rf_dropped() :
 		#   2017-11-0913:28:00.388:.....
 		#   2017-11-09 13:28:00.388 WU update:    at System.Net.WebConnection.HandleError(WebExceptionStatus st, System.Exception e, System.String where)
 
-		if "Exception" in lineList[iii] :
+		if "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.Exception" in lineList[iii] :
+#WU#		if "Exception" in lineList[iii] :
 			exception_tstamp = re.sub(r'([-0-9]+ [\.:0-9]+).*', r'\1', lineList[iii] )
+			# If this is an Exception we've not seen before
 			if saved_exception_tstamp != exception_tstamp :
+				# --------------------------------------------------------
 				# This is the signature of the most common exception we seem to see.
-				if "at System.Net.WebConnection.HandleError(WebExceptionStatus" in lineList[iii] :
-					logger_code =110
-					saved_exception_tstamp = exception_tstamp 
+				# --------------------------------------------------------
+				# That said, these all seem to come from WU, Weather Underground processing
+				#   WU update:    at System.Net.WebConnection.HandleError
+				#
+				# Did a little investigation to check that...
+				#     pi@raspberrypi_02:/mnt/root/home/pi/Cumulus_MX/MXdiags $ ls 2*txt
+				#     20180204-140446.txt  20180503-213654.txt  20180523-155342.txt  20180604-131915.txt
+				#     20180204-150113.txt  20180510-081824.txt  20180524-075048.txt  20180607-082958.txt
+				#     pi@raspberrypi_02:/mnt/root/home/pi/Cumulus_MX/MXdiags $ grep Exception 2*txt|wc
+				#        1867   20537  302454
+				#     pi@raspberrypi_02:/mnt/root/home/pi/Cumulus_MX/MXdiags $ grep Exception 2*txt|grep -v 'WU update:'|wc
+				#           0       0       0
+				#     pi@raspberrypi_02:/mnt/root/home/pi/Cumulus_MX/MXdiags $
+				# --------------------------------------------------------
+
+				if "WU update:    at System.Net.WebConnection.HandleError(WebExceptionStatus" in lineList[iii] :
+#WU# This whole if block is never executed if saved_exception_tstamp never changes
+#WU#					logger_code =110
+#WU#					saved_exception_tstamp = exception_tstamp 
+#@@@#					pass
+					pass
 				else :
 					logger_code =111
 
@@ -1220,6 +1273,8 @@ def rf_dropped() :
 ###				check_lines = 12
 ###					exception_tstamp )
 			break
+
+
 
 		# ------------------------------------------------------------------------
 		#   2017-09-15 20:26:45.616 Sensor contact lost; ignoring outdoor data
@@ -1498,7 +1553,7 @@ def camera_down():
 	#___# # <<<<<<<<<<<<<<<<<<<< COMMENTED OUT THE RELAY STUFF
 
 	try:
-		response = urllib.urlopen('http://dillys.org/wx/N_Since_Updated.txt')
+		response = urlopen('http://dillys.org/wx/N_Since_Updated.txt')
 		content = response.read()
 		# ------------------------------------------------------------------
 		# The file contains at least a trailing newline ... I've not looked
@@ -1720,6 +1775,9 @@ if __name__ == '__main__':
 ###	GPIO_setup()
 	#### if sys.argv[1] = "stop"
 	this_script = sys.argv[0]
+
+	print "\n\n\n\n\n"
+
 	messager("  Starting " + this_script + "  PID=" + str(getpid()))
 
 	write_pid_file()
@@ -1787,7 +1845,24 @@ if __name__ == '__main__':
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
+# NOTE: Looks like the network went down - Pi side as far as I can tell
 # ----------------------------------------------------------------------------------------
+#    Unexpected ERROR in camera_down: <type 'exceptions.IOError'>
+#    2018/06/07 12:28:46 DEBUG: content = "0 0 00:00:00_UTC " in camera_down()
+#    2018/06/07 12:28:46, 0, 0, 0,   0,    0.00, 0,    15, 104728, 11%,      0,  0%, 38.6c, 101.5f,  66.2f,   0.5%,     2.7983101852, 0, ,
+#
+#    Unexpected ERROR in server_stalled: <type 'exceptions.IOError'>
+#    Unexpected ERROR in last_realtime: <type 'exceptions.IOError'>
+#    2018/06/07 12:29:10 DEBUG: content = "00/00/00 00:00:00 45.5 80 39.7 0.0 0.7 360 0.00 0.05 30.14 N 0 mph ..." in last_realtime()
+#    Unexpected ERROR in camera_down: <type 'exceptions.IOError'>
+#    2018/06/07 12:29:10 DEBUG: content = "0 0 00:00:00_UTC " in camera_down()
+#    2018/06/07 12:29:10, 0, 0, 0,   0,    0.00, 0,    15, 107312, 11%,      0,  0%, 38.6c, 101.5f,  66.2f,   1.0%,     2.7985879630, 0, ,
+#
+#    Unexpected ERROR in server_stalled: <type 'exceptions.IOError'>
+#    Unexpected ERROR in last_realtime: <type 'exceptions.IOError'>
+#    2018/06/07 12:29:34 DEBUG: content = "00/00/00 00:00:00 45.5 80 39.7 0.0 0.7 360 0.00 0.05 30.14 N 0 mph ..." in last_realtime()
+#    Unexpected ERROR in camera_down: <type 'exceptions.IOError'>
+#
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
