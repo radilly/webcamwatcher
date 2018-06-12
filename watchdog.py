@@ -799,16 +799,20 @@ def server_stalled():
 		if hasattr(e, 'reason'):
 			print 'We failed to reach a server.'
 			print 'Reason: ', e.reason
+			# Avoid downstream issue working with this variable.
+			content = "1"
 		elif hasattr(e, 'code'):
 			print 'The server couldn\'t fulfill the request.'
 			print 'Error code: ', e.code
+			# Avoid downstream issue working with this variable.
+			content = "1"
 ####	else:
     # everything is fine
 #	except:
 #		print "Unexpected ERROR in server_stalled:", sys.exc_info()[0]
 #		content = "1"      # Assume a bad answer...
 	# .................................................................
-	# Strip off the trailing newline which is helpf when catting on the other
+	# Strip off the trailing newline which is helpful when catting on the other
 	# side. This should have a value be 1 and 10 - when 10 is realy expected.
 	# .................................................................
 	content = content.rstrip()
