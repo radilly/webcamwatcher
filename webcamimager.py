@@ -66,6 +66,9 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20180614 RAD Ran into convert trying to create the thumbnail from an incomplete jpg.
+#              Added check_stable_size() to handle this rather than a simple stat().
+#              Since it is delivered asynchronously, more caution is needed.
 # 20180611 RAD As luck would have it, I left a trailing blank on the tar_file name,
 #              which caused the isfile() to fail last night.  The retry shut down the
 #              midnight process, which is tedious, so maybe I can find a better approach.
@@ -123,8 +126,20 @@ from time import sleep
 import time
 import sys
 from os import listdir, getpid, stat, unlink
-## https://docs.python.org/2/tutorial/modules.html#packages
-## from os.path import isfile
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#  In this code I use os.path.isfile() in a few places.  Actually os.path.exists() might
+#  be a better choice for the way I use it, however may be affected by permissions. I was
+#  trying to figure out if there is a better, more specific way to import this, but did
+#  not find a definitive answer.
+#
+#   https://docs.python.org/2/library/os.path.html
+#   https://docs.python.org/2/tutorial/modules.html#packages
+#   http://thomas-cokelaer.info/tutorials/python/module_os.html
+#   http://effbot.org/librarybook/os-path.htm
+#   https://stackoverflow.com/questions/2724348/should-i-use-import-os-path-or-import-os
+#
+# from os.path import isfile
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 import os
 from ftplib import FTP
 import shutil
@@ -228,9 +243,10 @@ def main():
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 def power_cycle():
-	messager( "WARNING: Power-cycle the web camera." )
-	messager( "WARNING: Power-cycle the web camera." )
-	messager( "WARNING: Power-cycle the web camera." )
+	print ""
+	print ""
+	messager( "WARNING: >>>>> Power-cycle the web camera! <<<<<" )
+	messager( "WARNING: >>>>> Power-cycle the web camera! <<<<<" )
 
 
 
@@ -510,6 +526,8 @@ def next_image_file() :
 	# --------------------------------------------------------------------------------
 	if next_timestamp > last_timestamp :
 #DEBUG#		print "DEBUG: Earliest unprocessed image file is " + file_list[line]
+		source_file = work_dir + '/' + file_list[line]
+		target_file = work_dir + '/' + main_image
 
 		# ------------------------------------------------------------------------
 		# If we have a backlog of at least 3 files (might no be snapshots),
@@ -526,15 +544,16 @@ def next_image_file() :
 		#   -rw-r--r--  1 pi pi        0 Jun  2 01:54 snapshot-2018-06-02-01-54-13.jpg
 		#   -rw-r--r--  1 pi pi        0 Jun  2 01:59 snapshot-2018-06-02-01-59-13.jpg
 		# ------------------------------------------------------------------------
-		jpg_size = stat( work_dir + '/' + file_list[line] ).st_size
+		jpg_size = check_stable_size( source_file )
+
 		if jpg_size < 500 :
-			store_file_data ( next_timestamp, file_list[line] )
-			last_timestamp = next_timestamp
 			power_cycle()
 			print ""
-			messager( "WARNING: Skipping image file {}/{} size = {}".format( work_dir, file_list[line], jpg_size ) )
+			messager( "WARNING: Skipping image file {} size = {}".format( source_file, jpg_size ) )
 			#  These lines can be used as a shell script...
 			print "rm {}/{}".format( work_dir, file_list[line] )
+			store_file_data ( next_timestamp, file_list[line] )
+			last_timestamp = next_timestamp
 			# ----------------------------------------------------------------
 			#  As above, there were a stack of 0-length images.  We want to get
 			#  through them quickly.  The folder is "touched" so that mtime
@@ -544,8 +563,6 @@ def next_image_file() :
 			return
 
 
-		source_file = work_dir + '/' + file_list[line]
-		target_file = work_dir + '/' + main_image
 
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# Progress indicator Ending
@@ -562,7 +579,7 @@ def next_image_file() :
 		# This is in local time, but lacks a time zone
 ###		epoch_file = calendar.timegm( time.strptime( str(next_timestamp), "%Y%m%d%H%M%S") )
 		# This should be in UTC time
-		epoch_file = int(os.stat(work_dir + '/' + current_filename).st_mtime)
+		epoch_file = int(stat(work_dir + '/' + current_filename).st_mtime)
 
 ###		print "DEBUG: time() = {}".format( epoch_now )
 ###		print "DEBUG: Snapshot time = {}".format( epoch_file )
@@ -620,6 +637,35 @@ def next_image_file() :
 		messager( "DEBUG: last_filename = {} current_filename = {}".format( last_filename, current_filename ) )
 
 		last_filename = current_filename
+
+
+# ----------------------------------------------------------------------------------------
+#  A single stat() may not be enough.  It is possible that the files is in the
+#  process of being written.  In the message below we had determined that the file
+#  was at least 500 bytes.  The final size was 118090. When I ran the cobert by hand...
+#   /usr/bin/convert South/snapshot-2018-06-14-12-37-03.jpg -resize 30% South/SSS_thumb.jpg
+#  it worked fine, so it seems convert tried to read an incomplete file.
+#
+#  So let's make sure the size in the same on 2 checks in a row...
+#
+#
+#   2018/06/14 16:37:09 DEBUG: convert returned data: "convert: Premature end of JPEG file
+#      `South/S.jpg' @ warning/jpeg.c/JPEGWarningHandler/352.
+#@@@
+# ----------------------------------------------------------------------------------------
+def check_stable_size( filename ) :
+
+	last_size = 0
+	for iii in range(10) :
+		file_size = stat( filename ).st_size
+		if file_size == last_size :
+			break
+
+		last_size = file_size
+		sleep( 0.5 )
+
+	return  last_size
+
 
 
 # ----------------------------------------------------------------------------------------
