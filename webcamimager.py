@@ -170,6 +170,23 @@ main_image = "S.jpg"
 thumbnail_image = "S_thumb.jpg"
 remote_dir = "South"
 
+work_dir = sys.argv[1] if len(sys.argv) >= 2 else "South"
+
+main_image = sys.argv[2] if len(sys.argv) >= 3 else "S.jpg"
+
+thumbnail_image = sys.argv[3] if len(sys.argv) >= 4 else "S_thumb.jpg"
+
+remote_dir = sys.argv[4] if len(sys.argv) >= 5 else "South"
+
+
+
+
+# startingpoint = sys.argv[1] if len(sys.argv) >= 2 else 'blah'
+
+
+
+
+
 # ========================================================================================
 
 
@@ -890,7 +907,7 @@ def mono_version():
 		tok = re.split(' *', line[0])
 		version = tok[4]
 	except:
-		messager( "ERROR: From mono version check: {}".format( sys.exc_info()[0] ) )
+		messager( "WARNING: From mono version check: {}".format( sys.exc_info()[0] ) )
 		version = "Not found"
 
 	data['mono_version'] = version
