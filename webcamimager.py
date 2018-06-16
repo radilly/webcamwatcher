@@ -12,6 +12,17 @@
 #   nohup /usr/bin/python -u /home/pi/webcamimager.py >> /home/pi/webcamimager.log 2>&1 &
 #
 # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+#    * NOTE: When I started this up on the North camera on Pi 03 I had to tweak / create
+#            / install a few things to get going...
+#  166  sudo apt-get install graphicsmagick-imagemagick-compat
+#  146  vi .ftp.credentials
+#
+# Need to use today's date or midnight_process() fails somewhere...
+#  150  printf "20180523214508\nsnapshot-2018-05-23-21-45-08.jpg\n" > webcamimager__.dat
+#  171  printf "20180616000001\nsnapshot-2018-06-16-00-00-01.jpg\n" > webcamimager__.dat
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#
+# vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 #    * NOTE: Should look more carefully of the use of subprocess
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
