@@ -52,6 +52,9 @@
 #
 #   NOTE: This should be able to be run as a service. (systemctl)
 #
+#   NOTE: These packages are needed:
+#             sudo apt-get install proftpd
+#             sudo apt-get install graphicsmagick-imagemagick-compat
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 #
 #   Considered using something to watch for directory changes.  Not sure it's
