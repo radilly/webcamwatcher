@@ -1006,6 +1006,66 @@ if __name__ == '__main__':
 		print ""
 		messager("  Good bye from " + this_script)
 
+
+
+
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+#      push_to_test(source_file, "TEST")
+#      messager( "DEBUG: FTP'ing {} to Pi 03 TEST".format( source_file ) )
+
+# ----------------------------------------------------------------------------------------
+#  This pushes the specified file to the (hosted) web server via FTP.
+#
+#
+#  FTP User: camdilly
+#  FTP PWD: /home/content/b/o/b/bobdilly/html/WX
+#
+#  https://pythonspot.com/en/ftp-client-in-python/
+#  https://docs.python.org/2/library/ftplib.html
+# ----------------------------------------------------------------------------------------
+#@@@
+# Variant of push_to_server(local_file, remote_path) :
+def push_to_test(source_file, remote_path) :
+#      source_file = work_dir + '/' + file_list[line]
+       global ftp_login
+       global ftp_password
+
+       if re.search('/', source_file) :
+               local_file_bare = re.sub(r'.*/', r'', source_file)
+
+       # --------------------------------------------------------------------------------
+       #
+       # See https://stackoverflow.com/questions/567622/is-there-a-pythonic-way-to-try-something-up-to-a-maximum-number-of-times
+       # --------------------------------------------------------------------------------
+       for iii in range(5) :
+               try :
+                       ftp = FTP('192.168.1.152')
+                       ftp.login( 'pi', 'raspberry' )
+                       ftp.cwd( remote_path )
+                       ftp.storbinary('STOR ' +  local_file_bare, open(source_file, 'rb'))
+                       ftp.quit()
+                       # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+                       # Yes, that's a return that's not at the funtion end
+                       # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+                       return
+               except socket.error, e :
+                       iii += 1
+                       print "FTP Socket Error %d: %s" % (e.args[0], e.args[1])
+                       for jjj in range(0, len(e.args) - 1) :
+                               print "    {}",format( e.args[jjj] )
+                       # Increase the sleep time with each iteration
+                       sleep(iii)
+       return
+
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
