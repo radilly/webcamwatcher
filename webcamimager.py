@@ -296,40 +296,27 @@ def midnight_process(date_string) :
 
 	yyyy = re.sub(r'(....).*', r'\1', date_string)
 	arc_dir = work_dir + '/arc_' + yyyy
-	image_index = arc_dir + '/index-' + date_string + ".txt"
+########################################################################################################################
+########################################################################################################################
+########################################################################################################################
+#DELETE#	image_index = arc_dir + '/index-' + date_string + ".txt"
 	tar_file = arc_dir + "/arc-" + date_string + ".tgz"
 
+	if not os.path.isfile( arc_dir ) :
+		messager( "INFO: Created {}.  HAPPY NEW YEAR.".format( arc_dir) )
+		os.mkdir( arc_dir, 0755 )
 
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	#  NOTE: This is a bit draconian ... Need to think through a kinder, gentler approach
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	tar_size = tar_dailies(date_string)
+
 	if os.path.isfile( tar_file ) :
 		messager( "ERROR: {} already exists.  Quitting Midnight process.".format( tar_file ) )
 		return
 
+	if tar_size < 0 :
+		messager( "ERROR: tar_dailies() failed.  Quitting Midnight process." )
+		return
 
 
-	#  Creats a list like South/arc_2018/index-2018-06-01.txt for use with -T
-	nnn = daily_image_list(date_string, work_dir )
-	if ( nnn < 50 ) :
-		messager( "WARNING: Index list looks short with {} items.".format( nn ) )
-	else :
-		tar_cmd = "tar -c -T " + image_index + " -zf " + tar_file
-
-		messager( "DEBUG: Creating tar file with: " + tar_cmd )
-		try:
-			subprocess.check_call(tar_cmd, shell=True)
-			tar_failed = False
-		except :
-			messager( "ERROR: Unexpected ERROR in tar: {}".format( sys.exc_info()[0] ) )
-
-	try:
-		tar_size = stat( tar_file ).st_size
-	except :
-		messager( "ERROR: Unexpected ERROR in stat: {}".format( sys.exc_info()[0] ) )
-	messager( "DEBUG: taf file size = {}".format( tar_size ) )
 
 	mp4_file = arc_dir + "/" + date_stamp + ".mp4"
 	# https://stackoverflow.com/questions/82831/how-to-check-whether-a-file-exists?rq=1
@@ -373,6 +360,87 @@ def midnight_process(date_string) :
 			messager( "ERROR: Unexpected ERROR in rm: {}".format( sys.exc_info()[0] ) )
 	else :
 		messager( "WARNING: Tar is too small (or ffmpeg failed) to justify deleting jpg files." )
+
+
+
+
+
+# ----------------------------------------------------------------------------------------
+#  This handles the tar of a daily set of image snapshots
+#
+#  Example argument:   2018-05-23
+# ----------------------------------------------------------------------------------------
+def tar_dailies(date_string) :
+	global work_dir 
+	# global only technically needed if we write to variable
+	tar_size = -1
+	tar_failed = True
+
+
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	#  Tinkered with a few ideas for tar.
+	#  Could not get --directory to work as I expected from the man page.
+	#  I am also a little concerned about using a wildcard with the tar command.
+	#  Seems like it might be safer to build a table of files, and the -T option
+	#   (as I have been doing on the hosted server).  daily_image_list() builds it.
+	#
+	#   tar -c -zf South/arc_2018/arc-2018-06-01.tgz -T South/arc_2018/index-2018-06-01.txt
+	#   tar tzvf South/arc_2018/arc-2018-06-01.tgz | less
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+	yyyy = re.sub(r'(....).*', r'\1', date_string)
+	arc_dir = work_dir + '/arc_' + yyyy
+	image_index = arc_dir + '/index-' + date_string + ".txt"
+	tar_file = arc_dir + "/arc-" + date_string + ".tgz"
+
+
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	#  NOTE: This is a bit draconian ... Need to think through a kinder, gentler approach
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	if os.path.isfile( tar_file ) :
+		messager( "ERROR: {} already exists.  Quitting tar process.".format( tar_file ) )
+		return tar_size
+
+	#
+	#  The --directory flag would be elegant, if I could get it to work...
+	#
+	current_directory = os.getcwd()
+	os.chdir( work_dir )
+	
+
+	#  Creats a list like South/arc_2018/index-2018-06-01.txt for use with -T
+	nnn = daily_image_list(date_string, '.' )
+	if ( nnn < 50 ) :
+		messager( "WARNING: Index list looks short with {} items.".format( nn ) )
+	else :
+		tar_cmd = "tar -c -T " + image_index + " -zf " + tar_file
+
+		messager( "DEBUG: Creating tar file with: " + tar_cmd )
+		try:
+			subprocess.check_call(tar_cmd, shell=True)
+			tar_failed = False
+		except :
+			messager( "ERROR: Unexpected ERROR in tar: {}".format( sys.exc_info()[0] ) )
+
+	try:
+		tar_size = stat( tar_file ).st_size
+	except :
+		messager( "ERROR: Unexpected ERROR in stat: {}".format( sys.exc_info()[0] ) )
+		tar_size = -1
+
+	messager( "DEBUG: tar file size = {}".format( tar_size ) )
+
+	os.chdir( current_directory )
+
+	##### if not tar_failed :
+
+	return tar_size
+
+
 
 
 # ----------------------------------------------------------------------------------------
@@ -954,7 +1022,7 @@ if __name__ == '__main__':
 #  INFO: MIDNIGHT ROLLOVER!
 #  INFO: MIDNIGHT ROLLOVER!
 #  2018/06/04 04:03:46 DEBUG: Creating tar file with: tar -c -T South/arc_2018/index-2018-06-03.txt -zf South/arc_2018/arc-2018-06-03.tgz
-#  2018/06/04 04:03:50 DEBUG: taf file size = 15671428
+#  2018/06/04 04:03:50 DEBUG: tar file size = 15671428
 #  2018/06/04 04:03:50 DEBUG: Creating mp4 fileSouth/20180603.mp4
 #  2018/06/04 04:03:50 DEBUG: cat_cmd = "cat South/snapshot-2018-06-03*.jpg"
 #  2018/06/04 04:03:50 DEBUG: ffmpeg_opts = "-f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 "
