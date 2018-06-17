@@ -313,19 +313,21 @@ def midnight_process(date_string) :
 #DELETE#	image_index = arc_dir + '/index-' + date_string + ".txt"
 	tar_file = arc_dir + "/arc-" + date_string + ".tgz"
 
-	if not os.path.isfile( arc_dir ) :
+	if not os.path.exists( arc_dir ) :
 		messager( "INFO: Created {}.  HAPPY NEW YEAR.".format( arc_dir) )
 		os.mkdir( arc_dir, 0755 )
-
-	tar_size = tar_dailies(date_string)
 
 	if os.path.isfile( tar_file ) :
 		messager( "ERROR: {} already exists.  Quitting Midnight process.".format( tar_file ) )
 		return
 
+	tar_size = tar_dailies(date_string)
+
 	if tar_size < 0 :
 		messager( "ERROR: tar_dailies() failed.  Quitting Midnight process." )
 		return
+	else :
+		tar_failed = False
 
 
 
