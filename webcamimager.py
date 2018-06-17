@@ -14,8 +14,10 @@
 # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 #    * NOTE: When I started this up on the North camera on Pi 03 I had to tweak / create
 #            / install a few things to get going...
-#  166  sudo apt-get install graphicsmagick-imagemagick-compat
-#  146  vi .ftp.credentials
+#       sudo apt-get install proftpd      - to allow webcam to upload....
+#       sudo apt-get install graphicsmagick-imagemagick-compat
+#       sudo apt-get install ffmpeg
+#       vi .ftp.credentials
 #
 # Need to use today's date or midnight_process() fails somewhere...
 #  150  printf "20180523214508\nsnapshot-2018-05-23-21-45-08.jpg\n" > webcamimager__.dat
