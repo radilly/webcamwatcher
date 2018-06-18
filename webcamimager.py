@@ -166,6 +166,9 @@ import calendar
 
 
 
+import RPi.GPIO as GPIO
+relay_GPIO = 17
+
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
@@ -267,19 +270,47 @@ def main():
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
-#  The real code for this can be found in webcamwatch.py
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# Clean up any GPIO configs - typically on exit.
 #
-#  The reasons this might be called:
-#    We're getting 0-length images (or images too small)
-#    We've not has an image uploaded in a while - based on the time stamp - Watch DAYLIGHT SAVINGS
 # ----------------------------------------------------------------------------------------
+def destroy():
+	##DEBUG## ___print "\nShutting down..."
+	messager("Shutting down...\n")
+	GPIO.output(relay_GPIO, GPIO.HIGH)
+	GPIO.cleanup()
+
 # ----------------------------------------------------------------------------------------
+# Set up the GPIO.
+# Caller can specify the initial state.
+#
 # ----------------------------------------------------------------------------------------
-def power_cycle():
-	print ""
-	print ""
-	messager( "WARNING: >>>>> Power-cycle the web camera! <<<<<" )
-	messager( "WARNING: >>>>> Power-cycle the web camera! <<<<<" )
+def setup_gpio( initial_state ):
+	GPIO.setwarnings(False)
+	#  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+	GPIO.setmode(GPIO.BCM)
+	## GPIO.setup(relay_GPIO, GPIO.OUT, initial=GPIO.HIGH)
+	GPIO.setup(relay_GPIO, GPIO.OUT, initial=initial_state)
+
+# ----------------------------------------------------------------------------------------
+# Cycle the power on the relay / GPIO.
+# The off time can be specified.  Here in secs.
+#
+# ----------------------------------------------------------------------------------------
+def power_cycle( interval ):
+	### sleep(1)
+
+	messager( '...open relay contacts.')
+	GPIO.output(relay_GPIO, GPIO.LOW)
+
+	sleep( interval )
+
+	messager('...close relay contacts.')
+	GPIO.output(relay_GPIO, GPIO.HIGH)
+
 
 
 
@@ -650,7 +681,7 @@ def next_image_file() :
 		jpg_size = check_stable_size( source_file )
 
 		if jpg_size < 500 :
-			power_cycle()
+			power_cycle( 5 )
 			print ""
 			messager( "WARNING: Skipping image file {} size = {}".format( source_file, jpg_size ) )
 			#  These lines can be used as a shell script...
@@ -1012,6 +1043,8 @@ if __name__ == '__main__':
 	messager("  Starting " + this_script + "  PID=" + str(getpid()))
 
 	write_pid_file()
+
+	setup_gpio( GPIO.HIGH )
 
 	messager("Mono version: {}" .format( mono_version() ) )
 
