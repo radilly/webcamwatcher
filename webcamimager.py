@@ -768,7 +768,7 @@ def next_image_file() :
 			midnight_process(re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename))
 
 
-		messager( "DEBUG: last_filename = {} current_filename = {}".format( last_filename, current_filename ) )
+#DEBUG#		messager( "DEBUG: last_filename = {} current_filename = {}".format( last_filename, current_filename ) )
 
 		last_filename = current_filename
 
