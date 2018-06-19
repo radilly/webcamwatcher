@@ -734,7 +734,8 @@ def next_image_file() :
 		thumbnail_file = work_dir + '/' + thumbnail_image
 
 		convert = ""
-		messager( "DEBUG: Create thumbnail {} and upload to {}".format(thumbnail_file, remote_dir ) )
+#DEBUG#		messager( "DEBUG: Create thumbnail {} and upload to {}".format(thumbnail_file, remote_dir ) )
+		messager( "DEBUG: Create thumbnail and upload to {}".format( remote_dir ) )
 		convert_cmd = ['/usr/bin/convert',
 				work_dir + '/' + main_image,
 				'-resize', '30%',
@@ -770,6 +771,9 @@ def next_image_file() :
 
 #DEBUG#		messager( "DEBUG: last_filename = {} current_filename = {}".format( last_filename, current_filename ) )
 
+		# First '.' right after processing is done...
+		sys.stdout.write('.')
+		sys.stdout.flush()
 		last_filename = current_filename
 
 
