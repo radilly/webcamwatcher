@@ -212,7 +212,8 @@ remote_dir = sys.argv[4] if len(sys.argv) >= 5 else "South"
 # Real mtime will always be larger
 last_image_dir_mtime = 0.0
 
-ftp_credentials_file = "/home/pi/.ftp.credentials"
+# ftp_credentials_file = "/home/pi/.ftp.credentials"
+ftp_credentials_file = work_dir + "/.ftp.credentials"
 ftp_login = ""
 ftp_password = ""
 current_filename = ""
