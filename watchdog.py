@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #
 # Restart using...
-#   kill -9 `cat watchdog.PID` ; nohup /usr/bin/python -u /mnt/root/home/pi/watchdog.py >> /mnt/root/home/pi/watchdog.log 2>&1 &
+#   kill -9 `cat /mnt/root/home/pi/watchdog.PID` ; nohup /usr/bin/python -u /mnt/root/home/pi/watchdog.py >> /mnt/root/home/pi/watchdog.log 2>&1 &
 #
 # Stop with ... 
 #   kill -9 `cat watchdog.PID`
@@ -795,7 +795,7 @@ def server_stalled():
 		response = urlopen('http://dillys.org/wx/WS_Updates.txt')
 		content = response.read()
 #@@@#
-	except URLError as e:
+	except URLError as e :
 		if hasattr(e, 'reason'):
 			print 'We failed to reach a server.'
 			print 'Reason: ', e.reason
@@ -808,7 +808,7 @@ def server_stalled():
 			content = "1"
 ####	else:
     # everything is fine
-#	except:
+#	except :
 #		print "Unexpected ERROR in server_stalled:", sys.exc_info()[0]
 #		content = "1"      # Assume a bad answer...
 	# .................................................................
@@ -829,7 +829,7 @@ def server_stalled():
 		# ...... REMOVE ...........................................
 		####### unique_count = int(result.group(1))
 		# .........................................................
-	except:
+	except :
 		# .........................................................
 		# Big value - obvious if debugging...
 		# .........................................................
@@ -864,7 +864,7 @@ def last_realtime():
 	try :
 		response = urlopen('http://dillys.org/wx/realtime.txt')
 		content = response.read()
-	except:
+	except :
 		print "Unexpected ERROR in last_realtime:", sys.exc_info()[0]
 		# --------------------------------------------------------------
 		#  https://docs.python.org/2/tutorial/errors.html
@@ -1100,13 +1100,7 @@ def mem_usage():
 
 # ----------------------------------------------------------------------------------------
 # 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
+# NOTE: This is sort of a hack.  WU has been behaving badly so I'm not tracking it...
 # 
 # 
 # ----------------------------------------------------------------------------------------
@@ -1566,7 +1560,7 @@ def camera_down():
 		# systemd seems to complain about urlopen failing in restart...
 		#     Maybe content = "0 0 00:00:00_UTC" if urlopen fails??
 		# ------------------------------------------------------------------
-	except:
+	except :
 		print "Unexpected ERROR in camera_down:", sys.exc_info()[0]
 		content = "0 0 00:00:00_UTC "
 		messager( "DEBUG: content = \"" + content + "\" in camera_down()" )
@@ -1592,7 +1586,7 @@ def camera_down():
 	##### interval = int(result.group(1))
 	try:
 		interval = int(words[0])
-	except:
+	except :
 		interval = -99999
 		messager( "DEBUG: camera_down(): interval looked invalid, \"" + words[0] + "\"" )
 
@@ -1645,16 +1639,21 @@ def camera_down():
 #
 # 2017-12-22 def last_restarted() was rolled into this routine.
 # ----------------------------------------------------------------------------------------
-#      $ systemctl status cumulusmx | grep since
-#        Active: active (running) since Thu 2017-10-19 17:34:34 EDT; 2 weeks 3 days ago
-# ----------------------------------------------------------------------------------------
 def cmx_svc_runtime():
 	global data
-	output = subprocess.check_output(["/bin/systemctl", "status", "cumulusmx"])
-	lines = re.split('\n', output)
 
+	try :
+		output = subprocess.check_output(["/bin/systemctl", "status", "cumulusmx"])
+		lines = re.split('\n', output)
+	except :
+		messager( "ERROR: From systemctl status: {}".format( sys.exc_info()[0] ) )
+		lines[0] = "   Active: active (running) since DOWN; DOWN"
+		lines[1] = " Main PID: DOWN (mono)"
 
-
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	#   Active: active (running) since Sat 2018-06-23 10:10:30 EDT; 4s ago
+	# Main PID: 3364 (mono)
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	for iii in range(0, len(lines)):
 		if re.search('Main PID:', lines[iii]) :
 			mono_pid = re.sub('.*Main PID:.', '', lines[iii])
@@ -1696,8 +1695,14 @@ def cmx_svc_runtime():
 def webcamwatch_down():
 	global data
 	ret_val = 1
-	output = subprocess.check_output(["/bin/systemctl", "status", "wxwatchdog"])
-	lines = re.split('\n', output)
+
+	try :
+		output = subprocess.check_output(["/bin/systemctl", "status", "wxwatchdog"])
+		lines = re.split('\n', output)
+	except :
+		messager( "ERROR: From systemctl status: {}".format( sys.exc_info()[0] ) )
+		lines[0] = "   Active: active (running) since DOWN; DOWN"
+
 
 	for iii in range(0, len(lines)):
 		if re.search('Active:', lines[iii]) :
@@ -1751,19 +1756,9 @@ def mono_version():
 		line = re.split('\n', response)
 		tok = re.split(' *', line[0])
 		version = tok[4]
-	except:
+	except :
 		messager( "ERROR: From mono version check: {}".format( sys.exc_info()[0] ) )
 		version = "Not found"
-
-#DEBUG#
-#DEBUG#	for iii in range(0, len(line)):
-#DEBUG#		print "line[{}] = \"{}\"".format(iii, line[iii])
-#DEBUG#
-#DEBUG#	for iii in range(0, len(tok)):
-#DEBUG#		print "tok[{}] = \"{}\"".format(iii, tok[iii])
-#DEBUG#
-#DEBUG#	print "mono version = " + tok[4]
-#DEBUG#
 
 	data['mono_version'] = version
 	return version
@@ -1791,7 +1786,7 @@ if __name__ == '__main__':
 
 	try:
 		main()
-	except KeyboardInterrupt:
+	except KeyboardInterrupt :
 		messager("  Good bye from " + this_script)
 #		destroy()
 
