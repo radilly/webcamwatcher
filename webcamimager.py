@@ -678,15 +678,30 @@ def next_image_file() :
 		#   -rw-r--r--  1 pi pi    11555 Jun  2 01:49 snapshot-2018-06-02-01-49-13.jpg
 		#   -rw-r--r--  1 pi pi        0 Jun  2 01:54 snapshot-2018-06-02-01-54-13.jpg
 		#   -rw-r--r--  1 pi pi        0 Jun  2 01:59 snapshot-2018-06-02-01-59-13.jpg
+		#
+		# ------------------------------------------------------------------------
+		#  2018/06/20 10:55:57 DEBUG: Create thumbnail and upload to South
+		#  ......................2018/06/20 10:57:54 ...open relay contacts.
+		#  2018/06/20 10:57:59 ...close relay contacts.
+		#  
+		#  2018/06/20 10:57:59 WARNING: Skipping image file ......-57-56.jpg size = 0
+		#  rm /home/pi/South/snapshot-2018-06-20-06-57-56.jpg
+		#  .....||
+		#  2018/06/20 10:58:35 DEBUG: Copy ......-58-32.jpg as S.jpg
 		# ------------------------------------------------------------------------
 		jpg_size = check_stable_size( source_file )
 
 		if jpg_size < 500 :
-			power_cycle( 5 )
 			print ""
+			power_cycle( 5 )
 			messager( "WARNING: Skipping image file {} size = {}".format( source_file, jpg_size ) )
 			#  These lines can be used as a shell script...
 			print "rm {}/{}".format( work_dir, file_list[line] )
+
+			try:
+				subprocess.check_output("rm {}/{}".format( work_dir, file_list[line] ), shell=True)
+			except :
+				messager( "ERROR: Unexpected ERROR in rm: {}".format( sys.exc_info()[0] ) )
 			store_file_data ( next_timestamp, file_list[line] )
 			last_timestamp = next_timestamp
 			# ----------------------------------------------------------------
@@ -697,17 +712,16 @@ def next_image_file() :
 			subprocess.check_output( ['/usr/bin/touch', work_dir] )
 			return
 
-
-
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# Progress indicator Ending
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		print "||"
 
 
-
-
-
+		# ------------------------------------------------------------------------
+		#  This is pretty much untested.  And may cause DST issues...
+		#    though we attempt to use UTC...
+		# ------------------------------------------------------------------------
 		# Either of these returns UTC time
 		epoch_now = int( time.time() )
 ###		epoch_now = calendar.timegm( time.gmtime() )
