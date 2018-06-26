@@ -82,6 +82,9 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20180626 RAD Again convert failed to create the thumbnail from an incomplete jpg. It
+#              was sleeping for 0.5 secs, but I changed to a full sec, in case the
+#              the incoming FTP is "bursty."
 # 20180614 RAD Ran into convert trying to create the thumbnail from an incomplete jpg.
 #              Added check_stable_size() to handle this rather than a simple stat().
 #              Since it is delivered asynchronously, more caution is needed.
@@ -252,7 +255,8 @@ def main():
 	fetch_FTP_credentials()
 
 	python_version = "v " + str(sys.version)
-	print "Python version = " + python_version
+	python_version = re.sub(r'\n', r', ', python_version )
+	messager( "INFO: Python version: {}".format( python_version ) )
 
 	while True:
 		next_image_file()
@@ -882,14 +886,18 @@ def next_image_file() :
 # ----------------------------------------------------------------------------------------
 def check_stable_size( filename ) :
 
+	# FORCE A NEWLINE WHEN DEBUGGING
+	print ""
+
 	last_size = 0
-	for iii in range(10) :
+	for iii in range(15) :
 		file_size = stat( filename ).st_size
 		if file_size == last_size :
 			break
 
 		last_size = file_size
-		sleep( 0.5 )
+		messager( "DEBUG: check_stable_size wait #{}.".format( iii+1 ) )
+		sleep( 1 )
 
 	return  last_size
 
@@ -1223,7 +1231,7 @@ def wait_ffmpeg() :
 if __name__ == '__main__':
 	#### if sys.argv[1] = "stop"
 	print "\n\n\n\n"
-	messager("  Starting " + this_script + "  PID=" + str(getpid()))
+	messager("INFO: Starting " + this_script + "  PID=" + str(getpid()))
 
 ###		For testing
 ###	wait_ffmpeg()
@@ -1235,7 +1243,7 @@ if __name__ == '__main__':
 
 	setup_gpio( GPIO.HIGH )
 
-	messager("Mono version: {}" .format( mono_version() ) )
+	messager("INFO: Mono version: {}" .format( mono_version() ) )
 
 	try:
 		main()
