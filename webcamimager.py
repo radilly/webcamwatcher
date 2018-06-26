@@ -5,7 +5,7 @@
 # To set the reference date back...
 #     printf "20180523214508\nsnapshot-2018-05-23-21-45-08.jpg\n" > webcamimager__.dat
 #
-# Stop with ... 
+# Stop with ...
 #   kill -9 `cat webcamimager.PID`
 #
 # Start with ...
@@ -14,9 +14,9 @@
 # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 #    * NOTE: When I started this up on the North camera on Pi 03 I had to tweak / create
 #            / install a few things to get going...
-#       sudo apt-get install proftpd      - to allow webcam to upload....
+#       sudo apt-get install proftpd      - - - - to allow webcam to upload....
 #       sudo apt-get install graphicsmagick-imagemagick-compat
-#       sudo apt-get install ffmpeg
+#       sudo apt-get install ffmpeg       - - - - This is a fairly big package....
 #       vi .ftp.credentials
 #
 # Need to use today's date or midnight_process() fails somewhere...
@@ -368,34 +368,51 @@ def midnight_process(date_string) :
 
 
 
-	mp4_file = arc_dir + "/" + date_stamp + ".mp4"
-	# https://stackoverflow.com/questions/82831/how-to-check-whether-a-file-exists?rq=1
-	if os.path.isfile( mp4_file ) :
-		messager( "WARNING: {} already exists and will be deleted.".format ( mp4_file ) )
-		unlink( mp4_file )
 
-	messager( "DEBUG: Creating mp4 file" + mp4_file )
 
-	cat_cmd = r"cat {}/snapshot-{}*.jpg".format( work_dir, date_string )
-	messager( "DEBUG: cat_cmd = \"{}\"".format( cat_cmd ) )
+########################################################################################################################
+########################################################################################################################
+########################################################################################################################
 
-	ffmpeg_opts = "-f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 "
-	messager( "DEBUG: ffmpeg_opts = \"{}\"".format( ffmpeg_opts ) )
+	ffmpeg_failed = generate_video(date_string)
 
-	ffmpeg_cmd = cat_cmd + r" | ffmpeg " + ffmpeg_opts + mp4_file 
-	messager( "DEBUG: ffmpeg_cmd = \"{}\"".format( ffmpeg_cmd ) )
+########################################################################################################################
+########################################################################################################################
+########################################################################################################################
+#	mp4_file = arc_dir + "/" + date_stamp + ".mp4"
+#	# https://stackoverflow.com/questions/82831/how-to-check-whether-a-file-exists?rq=1
+#	if os.path.isfile( mp4_file ) :
+#		messager( "WARNING: {} already exists and will be deleted.".format ( mp4_file ) )
+#		unlink( mp4_file )
+#
+#	messager( "DEBUG: Creating mp4 file" + mp4_file )
+#
+#	cat_cmd = r"cat {}/snapshot-{}*.jpg".format( work_dir, date_string )
+#	messager( "DEBUG: cat_cmd = \"{}\"".format( cat_cmd ) )
+#
+#	ffmpeg_opts = "-f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 "
+#	messager( "DEBUG: ffmpeg_opts = \"{}\"".format( ffmpeg_opts ) )
+#
+#	ffmpeg_cmd = cat_cmd + r" | ffmpeg " + ffmpeg_opts + mp4_file
+#	messager( "DEBUG: ffmpeg_cmd = \"{}\"".format( ffmpeg_cmd ) )
+#
+#	messager( "DEBUG: Creating mp4 using cmd: " + ffmpeg_cmd )
+#	try:
+#		subprocess.check_output(ffmpeg_cmd , shell=True)
+#		ffmpeg_failed = False
+#	except :
+####	except CalledProcessError, EHandle:
+#		messager( "ERROR: Unexpected ERROR in ffmpeg: {}".format( sys.exc_info()[0] ) )
+#		ffmpeg_failed = True
+#
+#	if ffmpeg_failed :
+#		messager( "WARNING: ffmpeg failed." )
+########################################################################################################################
+########################################################################################################################
+########################################################################################################################
 
-	messager( "DEBUG: Creating mp4 using cmd: " + ffmpeg_cmd )
-	try:
-		subprocess.check_output(ffmpeg_cmd , shell=True)
-		ffmpeg_failed = False
-	except :
-###	except CalledProcessError, EHandle:
-		messager( "ERROR: Unexpected ERROR in ffmpeg: {}".format( sys.exc_info()[0] ) )
-		ffmpeg_failed = True
 
-	if ffmpeg_failed :
-		messager( "WARNING: ffmpeg failed." )
+
 
 	if tar_size <= 5000000 :
 		messager( "WARNING: Tar is too small to justify deleting jpg files." )
@@ -416,12 +433,69 @@ def midnight_process(date_string) :
 
 
 # ----------------------------------------------------------------------------------------
+#  This handles the generate of an mp4 file
+#
+#  Storing 1 image every 2 minutes yields ( 60 / 2 ) * 24 = 720 frames
+#
+#  Example argument:   2018-05-23
+# ----------------------------------------------------------------------------------------
+def generate_video(date_string) :
+	global work_dir
+
+	ffmpeg_failed = True
+
+	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
+	yyyy = re.sub(r'(....).*', r'\1', date_string)
+
+	arc_dir = work_dir + '/arc_' + yyyy
+
+	mp4_file = arc_dir + "/" + date_stamp + ".mp4"
+
+	# https://stackoverflow.com/questions/82831/how-to-check-whether-a-file-exists?rq=1
+	if os.path.isfile( mp4_file ) :
+		messager( "WARNING: {} already exists and will be deleted.".format ( mp4_file ) )
+		unlink( mp4_file )
+
+	messager( "DEBUG: Creating mp4 file" + mp4_file )
+
+	cat_cmd = r"cat {}/snapshot-{}*.jpg".format( work_dir, date_string )
+	messager( "DEBUG: cat_cmd = \"{}\"".format( cat_cmd ) )
+
+	ffmpeg_opts = "-f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 "
+	messager( "DEBUG: ffmpeg_opts = \"{}\"".format( ffmpeg_opts ) )
+
+	ffmpeg_cmd = cat_cmd + r" | ffmpeg " + ffmpeg_opts + mp4_file
+	messager( "DEBUG: ffmpeg_cmd = \"{}\"".format( ffmpeg_cmd ) )
+
+	messager( "DEBUG: calling = wait_ffmpeg()" )
+	wait_ffmpeg()
+
+	messager( "DEBUG: Creating mp4 using cmd: " + ffmpeg_cmd )
+	try:
+		subprocess.check_output(ffmpeg_cmd , shell=True)
+		ffmpeg_failed = False
+	except :
+###	except CalledProcessError, EHandle:
+		messager( "ERROR: Unexpected ERROR in ffmpeg: {}".format( sys.exc_info()[0] ) )
+		ffmpeg_failed = True
+
+	if ffmpeg_failed :
+		messager( "WARNING: ffmpeg failed." )
+
+	return ffmpeg_failed
+
+
+
+
+
+
+# ----------------------------------------------------------------------------------------
 #  This handles the tar of a daily set of image snapshots
 #
 #  Example argument:   2018-05-23
 # ----------------------------------------------------------------------------------------
 def tar_dailies(date_string) :
-	global work_dir 
+	global work_dir
 	# global only technically needed if we write to variable
 	tar_size = -1
 	tar_failed = True
@@ -683,7 +757,7 @@ def next_image_file() :
 		#  2018/06/20 10:55:57 DEBUG: Create thumbnail and upload to South
 		#  ......................2018/06/20 10:57:54 ...open relay contacts.
 		#  2018/06/20 10:57:59 ...close relay contacts.
-		#  
+		#
 		#  2018/06/20 10:57:59 WARNING: Skipping image file ......-57-56.jpg size = 0
 		#  rm /home/pi/South/snapshot-2018-06-20-06-57-56.jpg
 		#  .....||
@@ -735,7 +809,7 @@ def next_image_file() :
 ###		print "DEBUG: File age = {}  catching_up = {}".format( epoch_now - epoch_file, catching_up )
 
 		if not catching_up and ( epoch_now - epoch_file > 600 ) :
-			power_cycle()
+			power_cycle( 5 )
 
 
 
@@ -822,6 +896,66 @@ def check_stable_size( filename ) :
 
 
 # ----------------------------------------------------------------------------------------
+#  Build a list of the dark image files - the nighttime images.
+#  These are images we want to delect if we want to generate an mp4 which just
+#  covers first light to dusk using ffmpeg, which is more interesting than nighttime.
+#
+#
+#  Could build an array with array.append() - but for not output a file...
+#
+# ----------------------------------------------------------------------------------------
+def daylight_image_list( date_string, work_dir ) :
+	threshold = 13500
+
+	yyyy = re.sub(r'(....).*', r'\1', date_string)
+	arc_dir = work_dir + '/arc_' + yyyy
+
+	file_list = listdir( work_dir )
+	file_list_len = len( file_list )
+	file_list.sort()
+
+	image_index = arc_dir + '/index_to_remove-' + date_string + ".txt"
+	FH = open(image_index, "w")
+
+	look_for = "snapshot-" + date_string
+	messager( "DEBUG: look_for = {}.".format( look_for ) )
+
+	found = 0
+
+	for iii in range(0, file_list_len ) :
+		messager( "DEBUG: file[{}] = {}.".format( iii, file_list[iii] ) )
+		if look_for in file_list[iii] :
+			file_size = stat( work_dir + '/' + file_list[iii] ).st_size
+			messager( "DEBUG: file {} is {} bytes.".format( file_list[iii], file_size ) )
+			if file_size > threshold :
+				break
+			FH.write( work_dir + "/" + file_list[iii] + "\n" )
+			found += 1
+
+
+
+	for iii in range(file_list_len - 1, -1, -1):
+		messager( "DEBUG: file[{}] = {}.".format( iii, file_list[iii] ) )
+		if look_for in file_list[iii] :
+			file_size = stat( work_dir + '/' + file_list[iii] ).st_size
+			messager( "DEBUG: file {} is {} bytes.".format( file_list[iii], file_size ) )
+			if file_size > threshold :
+				break
+			FH.write( work_dir + "/" + file_list[iii] + "\n" )
+			found += 1
+
+	FH.close
+
+	messager( "DEBUG: {} items found for index file.".format( found ) )
+
+	return found
+
+
+
+
+
+
+# ----------------------------------------------------------------------------------------
 #  Build a list of the days files (used as input to tar).
 #@@@
 # ----------------------------------------------------------------------------------------
@@ -830,13 +964,13 @@ def daily_image_list( date_string, work_dir ) :
 	yyyy = re.sub(r'(....).*', r'\1', date_string)
 	arc_dir = work_dir + '/arc_' + yyyy
 
+	look_for = "snapshot-" + date_string
+
 	file_list = listdir( work_dir )
 	file_list_len = len( file_list )
 
 	image_index = arc_dir + '/index-' + date_string + ".txt"
 	FH = open(image_index, "w")
-
-	look_for = "snapshot-" + date_string
 
 	found = 0
 	line = 0
@@ -1052,6 +1186,36 @@ def mono_version():
 
 
 # ----------------------------------------------------------------------------------------
+#  Wait for ffmpeg (to complete)
+#
+#@@@
+# ----------------------------------------------------------------------------------------
+def wait_ffmpeg() :
+	deley_secs = 3
+	# Total wait approximately 3 * 35 = 105 sec (15 sec shy of 2 minutes)
+
+	for iii in range(35) :
+#		messager( "DEBUG: iteration {}".format( iii ) )
+		try:
+			response = subprocess.check_output(["/bin/ps", "-ef"])
+			line = re.split('\n', response)
+		except :
+			messager( "ERROR: Unexpected ERROR in ps -ef: {}".format( sys.exc_info()[0] ) )
+			line = []
+
+
+		for jjj in range( len(line) ) :
+			if "ffmpeg" in line[jjj] :
+				messager( "DEBUG: delay {} sec - ffmpeg process found, '{}'".format( deley_secs, line[jjj] ) )
+				sleep( deley_secs )
+				break
+
+#		messager( "DEBUG: jjj+1 = {}  len(line) = {}".format( jjj + 1, len(line) ) )
+		if jjj + 1 >= len(line) :
+			return
+
+
+# ----------------------------------------------------------------------------------------
 # The function main contains a "do forever..." (and is called in a try block here)
 #
 # This handles the startup and shutdown of the script.
@@ -1060,6 +1224,12 @@ if __name__ == '__main__':
 	#### if sys.argv[1] = "stop"
 	print "\n\n\n\n"
 	messager("  Starting " + this_script + "  PID=" + str(getpid()))
+
+###		For testing
+###	wait_ffmpeg()
+###	exit()
+###	daylight_image_list( "2018-06-22", "/home/pi/South" )
+###	exit()
 
 	write_pid_file()
 
