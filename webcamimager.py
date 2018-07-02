@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python -u
 #@@@ ... Restart using...
 #   kill -9 `cat webcamimager.PID` ; nohup /usr/bin/python -u /home/pi/webcamimager.py >> /home/pi/webcamimager.log 2>&1 &
 #
@@ -82,6 +82,8 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20180626 RAD Getting to run this as a service.  Changed all active calls from messager()
+#              to logger(). Some work on parameter parsing.
 # 20180626 RAD Again convert failed to create the thumbnail from an incomplete jpg. It
 #              was sleeping for 0.5 secs, but I changed to a full sec, in case the
 #              the incoming FTP is "bursty."
@@ -187,19 +189,37 @@ relay_GPIO = 17
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
-work_dir = "South"
-main_image = "S.jpg"
-thumbnail_image = "S_thumb.jpg"
-remote_dir = "South"
+### ......................................................................................................................................... work_dir = "South"
+### ......................................................................................................................................... main_image = "S.jpg"
+### ......................................................................................................................................... thumbnail_image = "S_thumb.jpg"
+### ......................................................................................................................................... remote_dir = "South"
 
-work_dir = sys.argv[1] if len(sys.argv) >= 2 else "South"
-
-main_image = sys.argv[2] if len(sys.argv) >= 3 else "S.jpg"
-
-thumbnail_image = sys.argv[3] if len(sys.argv) >= 4 else "S_thumb.jpg"
-
-remote_dir = sys.argv[4] if len(sys.argv) >= 5 else "South"
-
+	#
+work_dir = ""
+main_image = ""
+thumbnail_image = ""
+remote_dir = ""
+	#
+	#    if len(sys.argv) >= 2 :
+	#    	work_dir = sys.argv[1]
+	#    else :
+	#    	work_dir = "South"
+	#
+	#    if len(sys.argv) >= 3 :
+	#    	main_image = sys.argv[2]
+	#    else :
+	#	main_image = "S.jpg"
+	#
+	#    if len(sys.argv) >= 4 :
+	#    	thumbnail_image = sys.argv[3]
+	#    else :
+	#    	thumbnail_image = "S_thumb.jpg"
+	#
+	#    if len(sys.argv) >= 5 :
+	#    	remote_dir = sys.argv[4]
+	#    else :
+	#    	remote_dir = "South"
+	#
 
 
 
@@ -215,8 +235,6 @@ remote_dir = sys.argv[4] if len(sys.argv) >= 5 else "South"
 # Real mtime will always be larger
 last_image_dir_mtime = 0.0
 
-# ftp_credentials_file = "/home/pi/.ftp.credentials"
-ftp_credentials_file = work_dir + "/.ftp.credentials"
 ftp_login = ""
 ftp_password = ""
 current_filename = ""
@@ -252,11 +270,47 @@ data['camera_down'] = 0
 def main():
 	global ftp_login
 	global ftp_password
-	fetch_FTP_credentials()
+	global work_dir, main_image, thumbnail_image, remote_dir
+
+	if len(sys.argv) >= 2 :
+		work_dir = sys.argv[1]
+		logger( "INFO: arg 1 = \"{}\" (work_dir)".format(work_dir) )
+	else :
+		logger( "INFO: work_dir= \"{}\"".format(work_dir) )
+		work_dir = "South"
+
+	if len(sys.argv) >= 3 :
+		main_image = sys.argv[2]
+		logger( "INFO: arg 2 = \"{}\" (main_image)".format(main_image) )
+	else :
+		logger( "INFO: main_image= \"{}\"".format(main_image) )
+		main_image = "S.jpg"
+
+	if len(sys.argv) >= 4 :
+		thumbnail_image = sys.argv[3]
+		logger( "INFO: arg 3 = \"{}\" (thumbnail_image)".format(thumbnail_image) )
+	else :
+		logger( "INFO: thumbnail_image= \"{}\"".format(thumbnail_image) )
+		thumbnail_image = "S_thumb.jpg"
+
+	if len(sys.argv) >= 5 :
+		remote_dir = sys.argv[4]
+		logger( "INFO: arg 4 = \"{}\" (remote_dir)".format(remote_dir) )
+	else :
+		logger( "INFO: remote_dir= \"{}\"".format(remote_dir) )
+		remote_dir = "South"
+
+	setup_gpio( GPIO.HIGH )
+
+	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
+	nvers = mono_version()
+	messager("INFO: Mono version: {}" .format( nvers ) )
+	logger("INFO: Mono version: {}" .format( nvers ) )
 
 	python_version = "v " + str(sys.version)
 	python_version = re.sub(r'\n', r', ', python_version )
 	messager( "INFO: Python version: {}".format( python_version ) )
+	logger( "INFO: Python version: {}".format( python_version ) )
 
 	while True:
 		next_image_file()
@@ -284,7 +338,7 @@ def main():
 # ----------------------------------------------------------------------------------------
 def destroy():
 	##DEBUG## ___print "\nShutting down..."
-	messager("Shutting down...\n")
+	logger("Shutting down...\n")
 	GPIO.output(relay_GPIO, GPIO.HIGH)
 	GPIO.cleanup()
 
@@ -308,12 +362,12 @@ def setup_gpio( initial_state ):
 def power_cycle( interval ):
 	### sleep(1)
 
-	messager( '...open relay contacts.')
+	logger( '...open relay contacts.')
 	GPIO.output(relay_GPIO, GPIO.LOW)
 
 	sleep( interval )
 
-	messager('...close relay contacts.')
+	logger('...close relay contacts.')
 	GPIO.output(relay_GPIO, GPIO.HIGH)
 
 
@@ -325,10 +379,11 @@ def power_cycle( interval ):
 #  Example argument:   2018-05-23
 # ----------------------------------------------------------------------------------------
 def midnight_process(date_string) :
+	global work_dir
 	ffmpeg_failed = True
 	tar_failed = True
 
-	messager( "DEBUG: Called midnight_process( {} )".format(date_string ) )
+	logger( "DEBUG: Called midnight_process( {} )".format(date_string ) )
 
 	# Example: 20180523 - - - (looks like a number, but a string here.)
 	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
@@ -355,17 +410,17 @@ def midnight_process(date_string) :
 	tar_file = arc_dir + "/arc-" + date_string + ".tgz"
 
 	if not os.path.exists( arc_dir ) :
-		messager( "INFO: Created {}.  HAPPY NEW YEAR.".format( arc_dir) )
+		logger( "INFO: Created {}.  HAPPY NEW YEAR.".format( arc_dir) )
 		os.mkdir( arc_dir, 0755 )
 
 	if os.path.isfile( tar_file ) :
-		messager( "ERROR: {} already exists.  Quitting Midnight process.".format( tar_file ) )
+		logger( "ERROR: {} already exists.  Quitting Midnight process.".format( tar_file ) )
 		return
 
 	tar_size = tar_dailies(date_string)
 
 	if tar_size < 0 :
-		messager( "ERROR: tar_dailies() failed.  Quitting Midnight process." )
+		logger( "ERROR: tar_dailies() failed.  Quitting Midnight process." )
 		return
 	else :
 		tar_failed = False
@@ -419,18 +474,18 @@ def midnight_process(date_string) :
 
 
 	if tar_size <= 5000000 :
-		messager( "WARNING: Tar is too small to justify deleting jpg files." )
+		logger( "WARNING: Tar is too small to justify deleting jpg files." )
 
 	# Could also check if ffmpeg worked ... but if we have a good tar file ...
 	if tar_size > 5000000 and not ffmpeg_failed and not tar_failed :
-		messager( "INFO: Tar is large enough to delete jpg files." )
+		logger( "INFO: Tar is large enough to delete jpg files." )
 
 		try:
 			subprocess.check_output("rm " + work_dir + "/snapshot-" + date_string + r"*.jpg", shell=True)
 		except :
-			messager( "ERROR: Unexpected ERROR in rm: {}".format( sys.exc_info()[0] ) )
+			logger( "ERROR: Unexpected ERROR in rm: {}".format( sys.exc_info()[0] ) )
 	else :
-		messager( "WARNING: Tar is too small (or ffmpeg failed) to justify deleting jpg files." )
+		logger( "WARNING: Tar is too small (or ffmpeg failed) to justify deleting jpg files." )
 
 
 
@@ -457,40 +512,39 @@ def generate_video(date_string) :
 
 	# https://stackoverflow.com/questions/82831/how-to-check-whether-a-file-exists?rq=1
 	if os.path.isfile( mp4_file ) :
-		messager( "WARNING: {} already exists and will be deleted.".format ( mp4_file ) )
+		logger( "WARNING: {} already exists and will be deleted.".format ( mp4_file ) )
 		unlink( mp4_file )
 
-	messager( "DEBUG: Creating mp4 file" + mp4_file )
+	logger( "DEBUG: Creating mp4 file" + mp4_file )
 
 	cat_cmd = r"cat {}/snapshot-{}*.jpg".format( work_dir, date_string )
-	messager( "DEBUG: cat_cmd = \"{}\"".format( cat_cmd ) )
+	logger( "DEBUG: cat_cmd = \"{}\"".format( cat_cmd ) )
 
 	ffmpeg_opts = "-f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 "
-	messager( "DEBUG: ffmpeg_opts = \"{}\"".format( ffmpeg_opts ) )
+	logger( "DEBUG: ffmpeg_opts = \"{}\"".format( ffmpeg_opts ) )
 
 	ffmpeg_cmd = cat_cmd + r" | ffmpeg " + ffmpeg_opts + mp4_file
-	messager( "DEBUG: ffmpeg_cmd = \"{}\"".format( ffmpeg_cmd ) )
+	logger( "DEBUG: ffmpeg_cmd = \"{}\"".format( ffmpeg_cmd ) )
 
-	messager( "DEBUG: calling = wait_ffmpeg()" )
+	logger( "DEBUG: calling = wait_ffmpeg()" )
 	wait_ffmpeg()
 
-	messager( "DEBUG: Creating mp4 using cmd: " + ffmpeg_cmd )
+	logger( "DEBUG: Creating mp4 using cmd: " + ffmpeg_cmd )
 	try:
-		subprocess.check_output(ffmpeg_cmd , shell=True)
+		convert = subprocess.check_output(ffmpeg_cmd , shell=True)
 		ffmpeg_failed = False
 	except :
 ###	except CalledProcessError, EHandle:
-		messager( "ERROR: Unexpected ERROR in ffmpeg: {}".format( sys.exc_info()[0] ) )
+		logger( "ERROR: Unexpected ERROR in ffmpeg: {}".format( sys.exc_info()[0] ) )
 		ffmpeg_failed = True
 
+	if len(convert) > 0 :
+		logger( "DEBUG: convert returned data: \"" + convert + "\"" )
+
 	if ffmpeg_failed :
-		messager( "WARNING: ffmpeg failed." )
+		logger( "WARNING: ffmpeg failed." )
 
 	return ffmpeg_failed
-
-
-
-
 
 
 # ----------------------------------------------------------------------------------------
@@ -530,7 +584,7 @@ def tar_dailies(date_string) :
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	if os.path.isfile( tar_file ) :
-		messager( "ERROR: {} already exists.  Quitting tar process.".format( tar_file ) )
+		logger( "ERROR: {} already exists.  Quitting tar process.".format( tar_file ) )
 		return tar_size
 
 	#
@@ -543,24 +597,24 @@ def tar_dailies(date_string) :
 	#  Creats a list like South/arc_2018/index-2018-06-01.txt for use with -T
 	nnn = daily_image_list(date_string, '.' )
 	if ( nnn < 50 ) :
-		messager( "WARNING: Index list looks short with {} items.".format( nn ) )
+		logger( "WARNING: Index list looks short with {} items.".format( nn ) )
 	else :
 		tar_cmd = "tar -c -T " + image_index + " -zf " + tar_file
 
-		messager( "DEBUG: Creating tar file with: " + tar_cmd )
+		logger( "DEBUG: Creating tar file with: " + tar_cmd )
 		try:
 			subprocess.check_call(tar_cmd, shell=True)
 			tar_failed = False
 		except :
-			messager( "ERROR: Unexpected ERROR in tar: {}".format( sys.exc_info()[0] ) )
+			logger( "ERROR: Unexpected ERROR in tar: {}".format( sys.exc_info()[0] ) )
 
 	try:
 		tar_size = stat( tar_file ).st_size
 	except :
-		messager( "ERROR: Unexpected ERROR in stat: {}".format( sys.exc_info()[0] ) )
+		logger( "ERROR: Unexpected ERROR in stat: {}".format( sys.exc_info()[0] ) )
 		tar_size = -1
 
-	messager( "DEBUG: tar file size = {}".format( tar_size ) )
+	logger( "DEBUG: tar file size = {}".format( tar_size ) )
 
 	os.chdir( current_directory )
 
@@ -633,6 +687,7 @@ def tar_dailies(date_string) :
 #    .
 # ----------------------------------------------------------------------------------------
 def next_image_file() :
+	global work_dir
 	global last_timestamp
 	global last_filename
 	global last_image_dir_mtime
@@ -670,8 +725,7 @@ def next_image_file() :
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# Progress indicator
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		sys.stdout.write('.')
-		sys.stdout.flush()
+		log_string('.')
 		last_image_dir_mtime = image_dir_mtime
 		return
 
@@ -709,7 +763,7 @@ def next_image_file() :
 #DEBUG#			messager( "DEBUG: file # {} of {} (last)".format( line, file_list_len ) )
 			if catching_up :
 				catching_up = False
-				messager( "INFO: Catch-up mode off" )
+				logger( "INFO: Catch-up mode off" )
 			break
 
 		if "snapshot" in file_list[line] :
@@ -747,7 +801,8 @@ def next_image_file() :
 		# shorten the sleep time
 		# ------------------------------------------------------------------------
 		if (file_list_len - line) > 3 :
-			messager( "DEBUG: file # {} of {} (Catching up)".format( line, file_list_len ) )
+			log_string( "\n" )
+			logger( "DEBUG: file # {} of {} (Catching up)".format( line, file_list_len ) )
 			catching_up = True
 
 		# ------------------------------------------------------------------------
@@ -767,19 +822,26 @@ def next_image_file() :
 		#  .....||
 		#  2018/06/20 10:58:35 DEBUG: Copy ......-58-32.jpg as S.jpg
 		# ------------------------------------------------------------------------
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# Progress indicator Ending
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		log_string( "||\n" )
+###		print "||"
+
 		jpg_size = check_stable_size( source_file )
 
 		if jpg_size < 500 :
-			print ""
+			log_string( "\n" )
+###			print ""
 			power_cycle( 5 )
-			messager( "WARNING: Skipping image file {} size = {}".format( source_file, jpg_size ) )
+			logger( "WARNING: Skipping image file {} size = {}".format( source_file, jpg_size ) )
 			#  These lines can be used as a shell script...
-			print "rm {}/{}".format( work_dir, file_list[line] )
+###			print "rm {}/{}".format( work_dir, file_list[line] )
 
 			try:
 				subprocess.check_output("rm {}/{}".format( work_dir, file_list[line] ), shell=True)
 			except :
-				messager( "ERROR: Unexpected ERROR in rm: {}".format( sys.exc_info()[0] ) )
+				logger( "ERROR: Unexpected ERROR in rm: {}".format( sys.exc_info()[0] ) )
 			store_file_data ( next_timestamp, file_list[line] )
 			last_timestamp = next_timestamp
 			# ----------------------------------------------------------------
@@ -790,26 +852,17 @@ def next_image_file() :
 			subprocess.check_output( ['/usr/bin/touch', work_dir] )
 			return
 
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		# Progress indicator Ending
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		print "||"
-
-
 		# ------------------------------------------------------------------------
 		#  This is pretty much untested.  And may cause DST issues...
 		#    though we attempt to use UTC...
 		# ------------------------------------------------------------------------
-		# Either of these returns UTC time
+		# Returns current UTC time
 		epoch_now = int( time.time() )
-###		epoch_now = calendar.timegm( time.gmtime() )
-		# This is in local time, but lacks a time zone
-###		epoch_file = calendar.timegm( time.strptime( str(next_timestamp), "%Y%m%d%H%M%S") )
-		# This should be in UTC time
+		# This should be the file modification tim in UTC time
 		epoch_file = int(stat(work_dir + '/' + current_filename).st_mtime)
 
-###		print "DEBUG: time() = {}".format( epoch_now )
-###		print "DEBUG: Snapshot time = {}".format( epoch_file )
+###		print "DEBUG: epoch_now = {}".format( epoch_now )
+###		print "DEBUG: epoch_file = {}".format( epoch_file )
 ###		print "DEBUG: File age = {}  catching_up = {}".format( epoch_now - epoch_file, catching_up )
 
 		if not catching_up and ( epoch_now - epoch_file > 600 ) :
@@ -819,7 +872,7 @@ def next_image_file() :
 
 
 
-		messager( "DEBUG: Copy {} as {}".format( source_file, main_image ) )
+		logger( "DEBUG: Copy {} as {}".format( source_file, main_image ) )
 
 		shutil.copy2( source_file, target_file )
 		push_to_server( target_file, remote_dir )
@@ -828,7 +881,7 @@ def next_image_file() :
 
 		convert = ""
 #DEBUG#		messager( "DEBUG: Create thumbnail {} and upload to {}".format(thumbnail_file, remote_dir ) )
-		messager( "DEBUG: Create thumbnail and upload to {}".format( remote_dir ) )
+		logger( "DEBUG: Create thumbnail and upload to {}".format( remote_dir ) )
 		convert_cmd = ['/usr/bin/convert',
 				work_dir + '/' + main_image,
 				'-resize', '30%',
@@ -837,13 +890,13 @@ def next_image_file() :
 			convert = subprocess.check_output( convert_cmd, stderr=subprocess.STDOUT )
 			subprocess.check_output( ['/usr/bin/touch', work_dir] )
 		except:
-			messager( "ERROR: Unexpected ERROR in convert: {}".format( sys.exc_info()[0] ) )
+			logger( "ERROR: Unexpected ERROR in convert: {}".format( sys.exc_info()[0] ) )
 
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# Generally nothing, unless -verbose is used...
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		if len(convert) > 0 :
-			messager( "DEBUG: convert returned data: \"" + convert + "\"" )
+			logger( "DEBUG: convert returned data: \"" + convert + "\"" )
 
 		push_to_server( thumbnail_file, remote_dir )
 
@@ -852,10 +905,10 @@ def next_image_file() :
 
 #DEBUG#		print "DEBUG: day = " + tok[3]
 		if last_day_code != day_code :
-			print "INFO: MIDNIGHT ROLLOVER!"
-			print "INFO: MIDNIGHT ROLLOVER!"
-			print "INFO: MIDNIGHT ROLLOVER!"
-			print "INFO: MIDNIGHT ROLLOVER!"
+			logger( "INFO: MIDNIGHT ROLLOVER!" )
+			logger( "INFO: MIDNIGHT ROLLOVER!" )
+			logger( "INFO: MIDNIGHT ROLLOVER!" )
+			logger( "INFO: MIDNIGHT ROLLOVER!" )
 			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 			# snapshot-2018-05-23-16-57-04.jpg
 			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -865,8 +918,9 @@ def next_image_file() :
 #DEBUG#		messager( "DEBUG: last_filename = {} current_filename = {}".format( last_filename, current_filename ) )
 
 		# First '.' right after processing is done...
-		sys.stdout.write('.')
-		sys.stdout.flush()
+		log_string('.')
+###		sys.stdout.write('.')
+###		sys.stdout.flush()
 		last_filename = current_filename
 
 
@@ -886,17 +940,14 @@ def next_image_file() :
 # ----------------------------------------------------------------------------------------
 def check_stable_size( filename ) :
 
-	# FORCE A NEWLINE WHEN DEBUGGING
-	print ""
-
-	last_size = 0
+	last_size = -1
 	for iii in range(15) :
 		file_size = stat( filename ).st_size
 		if file_size == last_size :
 			break
 
 		last_size = file_size
-		messager( "DEBUG: check_stable_size wait #{}.".format( iii+1 ) )
+		logger( "DEBUG: check_stable_size wait #{}.  {} bytes.".format(iii+1, file_size) )
 		sleep( 1 )
 
 	return  last_size
@@ -912,13 +963,13 @@ def check_stable_size( filename ) :
 #  Could build an array with array.append() - but for not output a file...
 #
 # ----------------------------------------------------------------------------------------
-def daylight_image_list( date_string, work_dir ) :
+def daylight_image_list( date_string, working_dir ) :
 	threshold = 13500
 
 	yyyy = re.sub(r'(....).*', r'\1', date_string)
-	arc_dir = work_dir + '/arc_' + yyyy
+	arc_dir = working_dir + '/arc_' + yyyy
 
-	file_list = listdir( work_dir )
+	file_list = listdir( working_dir )
 	file_list_len = len( file_list )
 	file_list.sort()
 
@@ -926,35 +977,35 @@ def daylight_image_list( date_string, work_dir ) :
 	FH = open(image_index, "w")
 
 	look_for = "snapshot-" + date_string
-	messager( "DEBUG: look_for = {}.".format( look_for ) )
+	logger( "DEBUG: look_for = {}.".format( look_for ) )
 
 	found = 0
 
 	for iii in range(0, file_list_len ) :
-		messager( "DEBUG: file[{}] = {}.".format( iii, file_list[iii] ) )
+		logger( "DEBUG: file[{}] = {}.".format( iii, file_list[iii] ) )
 		if look_for in file_list[iii] :
-			file_size = stat( work_dir + '/' + file_list[iii] ).st_size
-			messager( "DEBUG: file {} is {} bytes.".format( file_list[iii], file_size ) )
+			file_size = stat( working_dir + '/' + file_list[iii] ).st_size
+			logger( "DEBUG: file {} is {} bytes.".format( file_list[iii], file_size ) )
 			if file_size > threshold :
 				break
-			FH.write( work_dir + "/" + file_list[iii] + "\n" )
+			FH.write( working_dir + "/" + file_list[iii] + "\n" )
 			found += 1
 
 
 
 	for iii in range(file_list_len - 1, -1, -1):
-		messager( "DEBUG: file[{}] = {}.".format( iii, file_list[iii] ) )
+		logger( "DEBUG: file[{}] = {}.".format( iii, file_list[iii] ) )
 		if look_for in file_list[iii] :
-			file_size = stat( work_dir + '/' + file_list[iii] ).st_size
-			messager( "DEBUG: file {} is {} bytes.".format( file_list[iii], file_size ) )
+			file_size = stat( working_dir + '/' + file_list[iii] ).st_size
+			logger( "DEBUG: file {} is {} bytes.".format( file_list[iii], file_size ) )
 			if file_size > threshold :
 				break
-			FH.write( work_dir + "/" + file_list[iii] + "\n" )
+			FH.write( working_dir + "/" + file_list[iii] + "\n" )
 			found += 1
 
 	FH.close
 
-	messager( "DEBUG: {} items found for index file.".format( found ) )
+	logger( "DEBUG: {} items found for index file.".format( found ) )
 
 	return found
 
@@ -967,14 +1018,14 @@ def daylight_image_list( date_string, work_dir ) :
 #  Build a list of the days files (used as input to tar).
 #@@@
 # ----------------------------------------------------------------------------------------
-def daily_image_list( date_string, work_dir ) :
+def daily_image_list( date_string, working_dir ) :
 
 	yyyy = re.sub(r'(....).*', r'\1', date_string)
-	arc_dir = work_dir + '/arc_' + yyyy
+	arc_dir = working_dir + '/arc_' + yyyy
 
 	look_for = "snapshot-" + date_string
 
-	file_list = listdir( work_dir )
+	file_list = listdir( working_dir )
 	file_list_len = len( file_list )
 
 	image_index = arc_dir + '/index-' + date_string + ".txt"
@@ -984,11 +1035,11 @@ def daily_image_list( date_string, work_dir ) :
 	line = 0
 	while line < file_list_len :
 		if look_for in file_list[line] :
-			FH.write( work_dir + "/" + file_list[line] + "\n" )
+			FH.write( working_dir + "/" + file_list[line] + "\n" )
 			found += 1
 		line += 1
 
-	messager( "DEBUG: {} items found for index file.".format( found ) )
+	logger( "DEBUG: {} items found for index file.".format( found ) )
 
 	FH.close
 
@@ -1024,7 +1075,7 @@ def get_stored_ts() :
 	FH.close
 
 	ts = str(content[0].strip("\n"))
-	messager( "DEBUG: Stored ts = " + ts )
+	logger( "DEBUG: Stored ts = " + ts )
 
 	return ts
 
@@ -1039,7 +1090,7 @@ def get_stored_filename() :
 	FH.close
 
 	filename = str(content[1].strip("\n"))
-	messager( "DEBUG: Stored filename = " + filename )
+	logger( "DEBUG: Stored filename = " + filename )
 
 	return filename
 
@@ -1093,9 +1144,9 @@ def push_to_server(local_file, remote_path) :
 			return
 		except socket.error, e :
 			iii += 1
-			print "FTP Socket Error %d: %s" % (e.args[0], e.args[1])
+			logger( "FTP Socket Error %d: %s" % (e.args[0], e.args[1]) )
 			for jjj in range(0, len(e.args) - 1) :
-				print "    {}",format( e.args[jjj] )
+				logger( "    {}",format( e.args[jjj] ) )
 			# Increase the sleep time with each iteration
 			sleep(iii)
 ###		except :
@@ -1119,7 +1170,7 @@ def push_to_server(local_file, remote_path) :
 #  FTP User: camdilly
 #  FTP PWD: /home/content/b/o/b/bobdilly/html/WX
 # ----------------------------------------------------------------------------------------
-def fetch_FTP_credentials() :
+def fetch_FTP_credentials( ftp_credentials_file ) :
 	global ftp_login
 	global ftp_password
 
@@ -1143,12 +1194,21 @@ def fetch_FTP_credentials() :
 def logger(message):
 	timestamp = datetime.datetime.utcnow().strftime(strftime_FMT)
 
-	print timestamp + " " + message
+	FH = open(logger_file, "a")
+	FH.write( "{} {}\n".format( timestamp, message) )
+	FH.close
 
-	if 0 > 1 :
-		FH = open(logger_file, "a")
-		FH.write(timestamp + message + "\n")
-		FH.close
+
+# ----------------------------------------------------------------------------------------
+# This prints just a symbol or two - for a progress indicator.
+#
+#		sys.stdout.write('.')
+#		sys.stdout.flush()
+# ----------------------------------------------------------------------------------------
+def log_string(text):
+	FH = open(logger_file, "a")
+	FH.write( text )
+	FH.close
 
 # ----------------------------------------------------------------------------------------
 # Print message with a leading timestamp.
@@ -1156,7 +1216,7 @@ def logger(message):
 # ----------------------------------------------------------------------------------------
 def messager(message):
 	timestamp = datetime.datetime.utcnow().strftime(strftime_FMT)
-	print timestamp + " " + message
+	print "{} {}".format( timestamp, message)
 
 # ----------------------------------------------------------------------------------------
 # Write the PID of this Python script to a .PID file by the name name.
@@ -1185,7 +1245,7 @@ def mono_version():
 		tok = re.split(' *', line[0])
 		version = tok[4]
 	except:
-		messager( "WARNING: From mono version check: {}".format( sys.exc_info()[0] ) )
+		logger( "WARNING: From mono version check: {}".format( sys.exc_info()[0] ) )
 		version = "Not found"
 
 	data['mono_version'] = version
@@ -1199,7 +1259,7 @@ def mono_version():
 #@@@
 # ----------------------------------------------------------------------------------------
 def wait_ffmpeg() :
-	deley_secs = 3
+	delay_secs = 3
 	# Total wait approximately 3 * 35 = 105 sec (15 sec shy of 2 minutes)
 
 	for iii in range(35) :
@@ -1208,14 +1268,14 @@ def wait_ffmpeg() :
 			response = subprocess.check_output(["/bin/ps", "-ef"])
 			line = re.split('\n', response)
 		except :
-			messager( "ERROR: Unexpected ERROR in ps -ef: {}".format( sys.exc_info()[0] ) )
+			logger( "ERROR: Unexpected ERROR in ps -ef: {}".format( sys.exc_info()[0] ) )
 			line = []
 
 
 		for jjj in range( len(line) ) :
 			if "ffmpeg" in line[jjj] :
-				messager( "DEBUG: delay {} sec - ffmpeg process found, '{}'".format( deley_secs, line[jjj] ) )
-				sleep( deley_secs )
+				logger( "DEBUG: #{} delay {} sec: '{}'".format( iii, iii * delay_secs, line[jjj] ) )
+				sleep( delay_secs )
 				break
 
 #		messager( "DEBUG: jjj+1 = {}  len(line) = {}".format( jjj + 1, len(line) ) )
@@ -1229,9 +1289,46 @@ def wait_ffmpeg() :
 # This handles the startup and shutdown of the script.
 # ----------------------------------------------------------------------------------------
 if __name__ == '__main__':
+	global work_dir, main_image, thumbnail_image, remote_dir
 	#### if sys.argv[1] = "stop"
-	print "\n\n\n\n"
+	log_string( "\n\n\n\n" )
+#	print "\n\n\n\n"
 	messager("INFO: Starting " + this_script + "  PID=" + str(getpid()))
+	logger("INFO: Starting " + this_script + "  PID=" + str(getpid()))
+
+###	work_dir = sys.argv[1] if len(sys.argv) >= 2 else "South"
+###	main_image = sys.argv[2] if len(sys.argv) >= 3 else "S.jpg"
+###	thumbnail_image = sys.argv[3] if len(sys.argv) >= 4 else "S_thumb.jpg"
+###	remote_dir = sys.argv[4] if len(sys.argv) >= 5 else "South"
+
+#	if len(sys.argv) >= 2 :
+#		work_dir = sys.argv[1]
+#		logger( "INFO: arg 1 = \"{}\" (work_dir)".format(work_dir) )
+#	else :
+#		logger( "INFO: work_dir= \"{}\"".format(work_dir) )
+#		work_dir = "South"
+#
+#	if len(sys.argv) >= 3 :
+#		main_image = sys.argv[2]
+#		logger( "INFO: arg 1 = \"{}\" (main_image)".format(main_image) )
+#	else :
+#		logger( "INFO: main_image= \"{}\"".format(main_image) )
+#		main_image = "S.jpg"
+#
+#	if len(sys.argv) >= 4 :
+#		thumbnail_image = sys.argv[3]
+#		logger( "INFO: arg 1 = \"{}\" (thumbnail_image)".format(thumbnail_image) )
+#	else :
+#		logger( "INFO: thumbnail_image= \"{}\"".format(thumbnail_image) )
+#		thumbnail_image = "S_thumb.jpg"
+#
+#	if len(sys.argv) >= 5 :
+#		remote_dir = sys.argv[4]
+#		logger( "INFO: arg 1 = \"{}\" (remote_dir)".format(remote_dir) )
+#	else :
+#		logger( "INFO: remote_dir= \"{}\"".format(remote_dir) )
+#		remote_dir = "South"
+
 
 ###		For testing
 ###	wait_ffmpeg()
@@ -1241,9 +1338,6 @@ if __name__ == '__main__':
 
 	write_pid_file()
 
-	setup_gpio( GPIO.HIGH )
-
-	messager("INFO: Mono version: {}" .format( mono_version() ) )
 
 	try:
 		main()
@@ -1251,8 +1345,9 @@ if __name__ == '__main__':
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# Progress indicator Ending
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		print ""
-		messager("  Good bye from " + this_script)
+		log_string( "\n" )
+###		print ""
+		logger("  Good bye from " + this_script)
 
 
 
