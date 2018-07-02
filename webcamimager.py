@@ -1,6 +1,11 @@
 #!/usr/bin/python -u
 #@@@ ... Restart using...
-#   kill -9 `cat webcamimager.PID` ; nohup /usr/bin/python -u /home/pi/webcamimager.py >> /home/pi/webcamimager.log 2>&1 &
+# NOTE: There are still come things based on argv[0] (this_script); log, PID, image_data_file...
+#   kill -9 `cat /home/pi/N/webcamimager.PID`
+#   cd /home/pi/N ; nohup /usr/bin/python -u ./webcamimager.py /home/pi/N/North N.jpg N_thumb.jpg North
+#
+#   kill -9 `cat /home/pi/S/webcamimager.PID`
+#   cd /home/pi/S ; nohup /usr/bin/python -u ./webcamimager.py /home/pi/S/South S.jpg S_thumb.jpg South
 #
 # To set the reference date back...
 #     printf "20180523214508\nsnapshot-2018-05-23-21-45-08.jpg\n" > webcamimager__.dat
@@ -82,6 +87,7 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20180702 RAD General cleanup...
 # 20180626 RAD Getting to run this as a service.  Changed all active calls from messager()
 #              to logger(). Some work on parameter parsing.
 # 20180626 RAD Again convert failed to create the thumbnail from an incomplete jpg. It
@@ -189,48 +195,17 @@ relay_GPIO = 17
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
-### ......................................................................................................................................... work_dir = "South"
-### ......................................................................................................................................... main_image = "S.jpg"
-### ......................................................................................................................................... thumbnail_image = "S_thumb.jpg"
-### ......................................................................................................................................... remote_dir = "South"
-
-	#
 work_dir = ""
 main_image = ""
 thumbnail_image = ""
 remote_dir = ""
-	#
-	#    if len(sys.argv) >= 2 :
-	#    	work_dir = sys.argv[1]
-	#    else :
-	#    	work_dir = "South"
-	#
-	#    if len(sys.argv) >= 3 :
-	#    	main_image = sys.argv[2]
-	#    else :
-	#	main_image = "S.jpg"
-	#
-	#    if len(sys.argv) >= 4 :
-	#    	thumbnail_image = sys.argv[3]
-	#    else :
-	#    	thumbnail_image = "S_thumb.jpg"
-	#
-	#    if len(sys.argv) >= 5 :
-	#    	remote_dir = sys.argv[4]
-	#    else :
-	#    	remote_dir = "South"
-	#
-
-
 
 # startingpoint = sys.argv[1] if len(sys.argv) >= 2 else 'blah'
 
-
-
-
-
 # ========================================================================================
-
+this_script = sys.argv[0]
+image_data_file = re.sub('\.py', '__.dat', this_script)
+logger_file = re.sub('\.py', '.log', this_script)
 
 # Real mtime will always be larger
 last_image_dir_mtime = 0.0
@@ -239,17 +214,11 @@ ftp_login = ""
 ftp_password = ""
 current_filename = ""
 
-this_script = sys.argv[0]
 last_image_name = ""
-image_data_file = re.sub('\.py', '__.dat', this_script)
 last_timestamp = 0
 last_filename = ""
 catching_up = False
 sleep_for = 5
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-logger_file = sys.argv[0]
-logger_file = re.sub('\.py', '.log', logger_file)
 
 # strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
 strftime_FMT = "%Y/%m/%d %H:%M:%S"
@@ -272,32 +241,33 @@ def main():
 	global ftp_password
 	global work_dir, main_image, thumbnail_image, remote_dir
 
+	# Could do this where globals are declared, but logger() isn't yet available...
 	if len(sys.argv) >= 2 :
 		work_dir = sys.argv[1]
 		logger( "INFO: arg 1 = \"{}\" (work_dir)".format(work_dir) )
 	else :
-		logger( "INFO: work_dir= \"{}\"".format(work_dir) )
+		logger( "INFO: work_dir (default) = \"{}\"".format(work_dir) )
 		work_dir = "South"
 
 	if len(sys.argv) >= 3 :
 		main_image = sys.argv[2]
 		logger( "INFO: arg 2 = \"{}\" (main_image)".format(main_image) )
 	else :
-		logger( "INFO: main_image= \"{}\"".format(main_image) )
+		logger( "INFO: main_image (default) = \"{}\"".format(main_image) )
 		main_image = "S.jpg"
 
 	if len(sys.argv) >= 4 :
 		thumbnail_image = sys.argv[3]
 		logger( "INFO: arg 3 = \"{}\" (thumbnail_image)".format(thumbnail_image) )
 	else :
-		logger( "INFO: thumbnail_image= \"{}\"".format(thumbnail_image) )
+		logger( "INFO: thumbnail_image (default) = \"{}\"".format(thumbnail_image) )
 		thumbnail_image = "S_thumb.jpg"
 
 	if len(sys.argv) >= 5 :
 		remote_dir = sys.argv[4]
 		logger( "INFO: arg 4 = \"{}\" (remote_dir)".format(remote_dir) )
 	else :
-		logger( "INFO: remote_dir= \"{}\"".format(remote_dir) )
+		logger( "INFO: remote_dir (default) = \"{}\"".format(remote_dir) )
 		remote_dir = "South"
 
 	setup_gpio( GPIO.HIGH )
@@ -388,25 +358,8 @@ def midnight_process(date_string) :
 	# Example: 20180523 - - - (looks like a number, but a string here.)
 	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
 
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	#  Tinkered with a few ideas for tar.
-	#  Could not get --directory to work as I expected from the man page.
-	#  I am also a little concerned about using a wildcard with the tar command.
-	#  Seems like it might be safer to build a table of files, and the -T option
-	#   (as I have been doing on the hosted server).  daily_image_list() builds it.
-	#
-	#   tar -c -zf South/arc_2018/arc-2018-06-01.tgz -T South/arc_2018/index-2018-06-01.txt
-	#   tar tzvf South/arc_2018/arc-2018-06-01.tgz | less
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-
 	yyyy = re.sub(r'(....).*', r'\1', date_string)
 	arc_dir = work_dir + '/arc_' + yyyy
-########################################################################################################################
-########################################################################################################################
-########################################################################################################################
-#DELETE#	image_index = arc_dir + '/index-' + date_string + ".txt"
 	tar_file = arc_dir + "/arc-" + date_string + ".tgz"
 
 	if not os.path.exists( arc_dir ) :
@@ -427,49 +380,7 @@ def midnight_process(date_string) :
 
 
 
-
-
-########################################################################################################################
-########################################################################################################################
-########################################################################################################################
-
 	ffmpeg_failed = generate_video(date_string)
-
-########################################################################################################################
-########################################################################################################################
-########################################################################################################################
-#	mp4_file = arc_dir + "/" + date_stamp + ".mp4"
-#	# https://stackoverflow.com/questions/82831/how-to-check-whether-a-file-exists?rq=1
-#	if os.path.isfile( mp4_file ) :
-#		messager( "WARNING: {} already exists and will be deleted.".format ( mp4_file ) )
-#		unlink( mp4_file )
-#
-#	messager( "DEBUG: Creating mp4 file" + mp4_file )
-#
-#	cat_cmd = r"cat {}/snapshot-{}*.jpg".format( work_dir, date_string )
-#	messager( "DEBUG: cat_cmd = \"{}\"".format( cat_cmd ) )
-#
-#	ffmpeg_opts = "-f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 "
-#	messager( "DEBUG: ffmpeg_opts = \"{}\"".format( ffmpeg_opts ) )
-#
-#	ffmpeg_cmd = cat_cmd + r" | ffmpeg " + ffmpeg_opts + mp4_file
-#	messager( "DEBUG: ffmpeg_cmd = \"{}\"".format( ffmpeg_cmd ) )
-#
-#	messager( "DEBUG: Creating mp4 using cmd: " + ffmpeg_cmd )
-#	try:
-#		subprocess.check_output(ffmpeg_cmd , shell=True)
-#		ffmpeg_failed = False
-#	except :
-####	except CalledProcessError, EHandle:
-#		messager( "ERROR: Unexpected ERROR in ffmpeg: {}".format( sys.exc_info()[0] ) )
-#		ffmpeg_failed = True
-#
-#	if ffmpeg_failed :
-#		messager( "WARNING: ffmpeg failed." )
-########################################################################################################################
-########################################################################################################################
-########################################################################################################################
-
 
 
 
@@ -557,7 +468,6 @@ def tar_dailies(date_string) :
 	# global only technically needed if we write to variable
 	tar_size = -1
 	tar_failed = True
-
 
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -964,6 +874,7 @@ def check_stable_size( filename ) :
 #
 # ----------------------------------------------------------------------------------------
 def daylight_image_list( date_string, working_dir ) :
+	# Oddly, North and South cameras would want different thresholds
 	threshold = 13500
 
 	yyyy = re.sub(r'(....).*', r'\1', date_string)
@@ -1290,44 +1201,12 @@ def wait_ffmpeg() :
 # ----------------------------------------------------------------------------------------
 if __name__ == '__main__':
 	global work_dir, main_image, thumbnail_image, remote_dir
+	#### This might be useful...
 	#### if sys.argv[1] = "stop"
 	log_string( "\n\n\n\n" )
 #	print "\n\n\n\n"
 	messager("INFO: Starting " + this_script + "  PID=" + str(getpid()))
 	logger("INFO: Starting " + this_script + "  PID=" + str(getpid()))
-
-###	work_dir = sys.argv[1] if len(sys.argv) >= 2 else "South"
-###	main_image = sys.argv[2] if len(sys.argv) >= 3 else "S.jpg"
-###	thumbnail_image = sys.argv[3] if len(sys.argv) >= 4 else "S_thumb.jpg"
-###	remote_dir = sys.argv[4] if len(sys.argv) >= 5 else "South"
-
-#	if len(sys.argv) >= 2 :
-#		work_dir = sys.argv[1]
-#		logger( "INFO: arg 1 = \"{}\" (work_dir)".format(work_dir) )
-#	else :
-#		logger( "INFO: work_dir= \"{}\"".format(work_dir) )
-#		work_dir = "South"
-#
-#	if len(sys.argv) >= 3 :
-#		main_image = sys.argv[2]
-#		logger( "INFO: arg 1 = \"{}\" (main_image)".format(main_image) )
-#	else :
-#		logger( "INFO: main_image= \"{}\"".format(main_image) )
-#		main_image = "S.jpg"
-#
-#	if len(sys.argv) >= 4 :
-#		thumbnail_image = sys.argv[3]
-#		logger( "INFO: arg 1 = \"{}\" (thumbnail_image)".format(thumbnail_image) )
-#	else :
-#		logger( "INFO: thumbnail_image= \"{}\"".format(thumbnail_image) )
-#		thumbnail_image = "S_thumb.jpg"
-#
-#	if len(sys.argv) >= 5 :
-#		remote_dir = sys.argv[4]
-#		logger( "INFO: arg 1 = \"{}\" (remote_dir)".format(remote_dir) )
-#	else :
-#		logger( "INFO: remote_dir= \"{}\"".format(remote_dir) )
-#		remote_dir = "South"
 
 
 ###		For testing
@@ -1341,6 +1220,12 @@ if __name__ == '__main__':
 
 	try:
 		main()
+
+	# --------------------------------------------------------------------------------
+	# Probably should handle external signals.  I manually use kill -9 (SIGKILL)
+	#   https://www.cyberciti.biz/faq/unix-kill-command-examples/
+	# Not sure what systemctl uses...
+	# --------------------------------------------------------------------------------
 	except KeyboardInterrupt:
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# Progress indicator Ending
