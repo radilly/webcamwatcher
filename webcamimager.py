@@ -16,6 +16,21 @@
 # Start with ...
 #   nohup /usr/bin/python -u /home/pi/webcamimager.py >> /home/pi/webcamimager.log 2>&1 &
 #
+#    * NOTE:
+#       next_image_file() could bypass some of the processing of each snapshot if
+#       catching_up == True.  We DO want to handle the midnight rollover, however
+#       there may not be much value in making a copy of the snapshot with the generic
+#       name, creating the thumbnail, and then pushing both to the web server...
+#       At least not on every iteration.  The sleep time while catching up is now 0.5.
+#   Log Example:
+#   .
+#   2018/07/03 13:26:00 DEBUG: file # 272 of 287 (Catching up)
+#   2018/07/03 13:26:00 DEBUG: Copy /home/pi/S/South/snapshot-2018-07-03-08-59-30.jpg as S.jpg
+#   2018/07/03 13:26:02 DEBUG: Create thumbnail and upload to South
+#   .
+#   2018/07/03 13:26:04 DEBUG: file # 273 of 287 (Catching up)
+#   2018/07/03 13:26:04 DEBUG: Copy /home/pi/S/South/snapshot-2018-07-03-09-01-30.jpg as S.jpg
+#
 # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 #    * NOTE: When I started this up on the North camera on Pi 03 I had to tweak / create
 #            / install a few things to get going...
@@ -87,6 +102,8 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20180702 RAD Made a stab at uploading mp4 files to the web server.  Could be broken
+#              to year folders ... like arc_2018 ... but it may not be an issue...
 # 20180702 RAD General cleanup...
 # 20180626 RAD Getting to run this as a service.  Changed all active calls from messager()
 #              to logger(). Some work on parameter parsing.
@@ -222,11 +239,7 @@ sleep_for = 5
 
 # strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
 strftime_FMT = "%Y/%m/%d %H:%M:%S"
-
-data = []
-data = { 'watcher_pid' : getpid() }
-data['camera_down'] = 0
-
+wserver = "dillys.org"
 
 
 # ========================================================================================
@@ -286,7 +299,7 @@ def main():
 		next_image_file()
 
 		if catching_up :
-			duration = 2
+			duration = 0.5
 		else :
 			duration = sleep_for
 #DEBUG#		messager( "DEBUG: Sleep {} sec.".format(duration) )
@@ -384,6 +397,12 @@ def midnight_process(date_string) :
 
 
 
+#@@@
+	if not ffmpeg_failed :
+		mp4_file = arc_dir + "/" + date_stamp + ".mp4"
+		push_to_server( mp4_file, remote_dir, wserver )
+
+
 	if tar_size <= 5000000 :
 		logger( "WARNING: Tar is too small to justify deleting jpg files." )
 
@@ -412,7 +431,7 @@ def midnight_process(date_string) :
 def generate_video(date_string) :
 	global work_dir
 
-	ffmpeg_failed = True
+	ffmpeg_status = True
 
 	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
 	yyyy = re.sub(r'(....).*', r'\1', date_string)
@@ -443,19 +462,19 @@ def generate_video(date_string) :
 	logger( "DEBUG: Creating mp4 using cmd: " + ffmpeg_cmd )
 	try:
 		convert = subprocess.check_output(ffmpeg_cmd , shell=True)
-		ffmpeg_failed = False
+		ffmpeg_status = False
 	except :
 ###	except CalledProcessError, EHandle:
 		logger( "ERROR: Unexpected ERROR in ffmpeg: {}".format( sys.exc_info()[0] ) )
-		ffmpeg_failed = True
+		ffmpeg_status = True
 
 	if len(convert) > 0 :
 		logger( "DEBUG: convert returned data: \"" + convert + "\"" )
 
-	if ffmpeg_failed :
+	if ffmpeg_status :
 		logger( "WARNING: ffmpeg failed." )
 
-	return ffmpeg_failed
+	return ffmpeg_status
 
 
 # ----------------------------------------------------------------------------------------
@@ -714,6 +733,12 @@ def next_image_file() :
 			log_string( "\n" )
 			logger( "DEBUG: file # {} of {} (Catching up)".format( line, file_list_len ) )
 			catching_up = True
+		else :
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# Progress indicator Ending
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+			log_string( "||\n" )
+###			print "||"
 
 		# ------------------------------------------------------------------------
 		#  This is a strange failure mode of the web cam...    06/02/2018
@@ -732,13 +757,11 @@ def next_image_file() :
 		#  .....||
 		#  2018/06/20 10:58:35 DEBUG: Copy ......-58-32.jpg as S.jpg
 		# ------------------------------------------------------------------------
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		# Progress indicator Ending
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		log_string( "||\n" )
-###		print "||"
 
-		jpg_size = check_stable_size( source_file )
+		if catching_up :
+			jpg_size = stat( source_file ).st_size
+		else :
+			jpg_size = check_stable_size( source_file )
 
 		if jpg_size < 500 :
 			log_string( "\n" )
@@ -785,7 +808,7 @@ def next_image_file() :
 		logger( "DEBUG: Copy {} as {}".format( source_file, main_image ) )
 
 		shutil.copy2( source_file, target_file )
-		push_to_server( target_file, remote_dir )
+		push_to_server( target_file, remote_dir, wserver )
 
 		thumbnail_file = work_dir + '/' + thumbnail_image
 
@@ -808,7 +831,7 @@ def next_image_file() :
 		if len(convert) > 0 :
 			logger( "DEBUG: convert returned data: \"" + convert + "\"" )
 
-		push_to_server( thumbnail_file, remote_dir )
+		push_to_server( thumbnail_file, remote_dir, wserver )
 
 		store_file_data( next_timestamp, file_list[line] )
 		last_timestamp = next_timestamp
@@ -846,7 +869,7 @@ def next_image_file() :
 #
 #   2018/06/14 16:37:09 DEBUG: convert returned data: "convert: Premature end of JPEG file
 #      `South/S.jpg' @ warning/jpeg.c/JPEGWarningHandler/352.
-#@@@
+#
 # ----------------------------------------------------------------------------------------
 def check_stable_size( filename ) :
 
@@ -927,7 +950,7 @@ def daylight_image_list( date_string, working_dir ) :
 
 # ----------------------------------------------------------------------------------------
 #  Build a list of the days files (used as input to tar).
-#@@@
+#
 # ----------------------------------------------------------------------------------------
 def daily_image_list( date_string, working_dir ) :
 
@@ -1015,7 +1038,7 @@ def get_stored_filename() :
 #  https://pythonspot.com/en/ftp-client-in-python/
 #  https://docs.python.org/2/library/ftplib.html
 # ----------------------------------------------------------------------------------------
-def push_to_server(local_file, remote_path) :
+def push_to_server(local_file, remote_path, server) :
 	global ftp_login
 	global ftp_password
 
@@ -1041,8 +1064,8 @@ def push_to_server(local_file, remote_path) :
 	# --------------------------------------------------------------------------------
 	for iii in range(5) :
 		try :
-#DEBUG#			messager( "DEBUG: FTP connect to {}".format( "dillys.org" ) )
-			ftp = FTP('dillys.org')
+#DEBUG#			messager( "DEBUG: FTP connect to {}".format( server ) )
+			ftp = FTP( server )
 			ftp.login( ftp_login, ftp_password )
 #DEBUG#			messager( "DEBUG: FTP remote cd to {}".format( remote_path ) )
 			ftp.cwd( remote_path )
@@ -1055,11 +1078,11 @@ def push_to_server(local_file, remote_path) :
 			return
 		except socket.error, e :
 			iii += 1
-			logger( "FTP Socket Error %d: %s" % (e.args[0], e.args[1]) )
-			for jjj in range(0, len(e.args) - 1) :
+			logger( "FTP Socket Error {}: {}".format( e.args[0], e.args[1]) )
+			for jjj in range(0, len(e.args)) :
 				logger( "    {}",format( e.args[jjj] ) )
 			# Increase the sleep time with each iteration
-			sleep(iii)
+			sleep( iii * 3 )
 ###		except :
 ###			messager( "ERROR: Unexpected ERROR in FTP: {}".format( sys.exc_info()[0] ) )
 ###			iii += 1
@@ -1148,7 +1171,7 @@ def write_pid_file():
 #
 # ----------------------------------------------------------------------------------------
 def mono_version():
-	global data
+###	global data
 
 	try :
 		response = subprocess.check_output(["/usr/bin/mono", "-V"])
@@ -1159,7 +1182,7 @@ def mono_version():
 		logger( "WARNING: From mono version check: {}".format( sys.exc_info()[0] ) )
 		version = "Not found"
 
-	data['mono_version'] = version
+###	data['mono_version'] = version
 	return version
 
 
@@ -1167,7 +1190,7 @@ def mono_version():
 # ----------------------------------------------------------------------------------------
 #  Wait for ffmpeg (to complete)
 #
-#@@@
+#
 # ----------------------------------------------------------------------------------------
 def wait_ffmpeg() :
 	delay_secs = 3
@@ -1260,7 +1283,7 @@ if __name__ == '__main__':
 #  https://pythonspot.com/en/ftp-client-in-python/
 #  https://docs.python.org/2/library/ftplib.html
 # ----------------------------------------------------------------------------------------
-#@@@
+#
 # Variant of push_to_server(local_file, remote_path) :
 def push_to_test(source_file, remote_path) :
 #      source_file = work_dir + '/' + file_list[line]
