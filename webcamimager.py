@@ -391,16 +391,21 @@ def midnight_process(date_string) :
 	else :
 		tar_failed = False
 
-
-
 	ffmpeg_failed = generate_video(date_string)
+
+	if not ffmpeg_failed :
+		mp4_file = arc_dir + "/" + date_stamp + ".mp4"
+		push_to_server( mp4_file, remote_dir, wserver )
 
 
 
 #@@@
-	if not ffmpeg_failed :
-		mp4_file = arc_dir + "/" + date_stamp + ".mp4"
-		push_to_server( mp4_file, remote_dir, wserver )
+	daylight_image_list( date_string, work_dir )
+
+	tnf = daily_thumbnail( date_string, work_dir )
+	if len(tnf) > 0 :
+		push_to_server( tnf, remote_dir, wserver )
+
 
 
 	if tar_size <= 5000000 :
@@ -883,21 +888,85 @@ def check_stable_size( filename ) :
 		logger( "DEBUG: check_stable_size wait #{}.  {} bytes.".format(iii+1, file_size) )
 		sleep( 1 )
 
-	return  last_size
+	return last_size
+
+
+
+# ----------------------------------------------------------------------------------------
+#  Find image from the morning to make a thumbnail of to represent the daily video.
+#
+#  date_string example = "2018-07-04" - i.e. the date part of a snapshot file.
+# ----------------------------------------------------------------------------------------
+def daily_thumbnail( date_string, working_dir ) :
+	morning_image = ""
+	thumbnail_file = ""
+
+	yyyy = re.sub(r'(....).*', r'\1', date_string)
+	arc_dir = working_dir + '/arc_' + yyyy
+
+	file_list = listdir( working_dir )
+	file_list_len = len( file_list )
+	file_list.sort()
+
+	look_for = "snapshot-" + date_string
+	logger( "DEBUG: look_for = {}.".format( look_for ) )
+
+	found = 0
+
+	for iii in range(0, file_list_len ) :
+###		logger( "DEBUG: file[{}] = {}.".format( iii, file_list[iii] ) )
+		if look_for in file_list[iii] :
+#@@@
+			#   snapshot-2018-07-04-13-16-34.jpg
+			#                       ^^
+			hh = re.sub(r'.*snapshot-....-..-..-(..).*', r'\1', file_list[iii] )
+###			logger( "DEBUG: hh = {}.".format( hh ) )
+
+			if int(hh) > 7 :
+				logger( "DEBUG: For thumbnail file[{}] = {}.".format( iii, file_list[iii] ) )
+				morning_image = working_dir + '/' + file_list[iii] 
+				break
+
+	if len(morning_image) > 0 :
+
+		# Example: 20180523 - - - (looks like a number, but a string here.)
+		date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
+
+		thumbnail_file = arc_dir + '/' + date_stamp + "-thumb.jpg"
+
+		convert = ""
+#DEBUG#		messager( "DEBUG: Create thumbnail {} and upload to {}".format(thumbnail_file, remote_dir ) )
+		logger( "DEBUG: Create thumbnail and upload to {}".format( remote_dir ) )
+		convert_cmd = ['/usr/bin/convert',
+				morning_image,
+				'-resize', '20%',
+				thumbnail_file ]
+		logger( "DEBUG: convert cmd = \"{}\"".format( convert_cmd ) )
+
+		try :
+			convert = subprocess.check_output( convert_cmd, stderr=subprocess.STDOUT )
+		except:
+			logger( "ERROR: Unexpected ERROR in convert: {}".format( sys.exc_info()[0] ) )
+
+	return thumbnail_file
+
 
 
 
 # ----------------------------------------------------------------------------------------
 #  Build a list of the dark image files - the nighttime images.
-#  These are images we want to delect if we want to generate an mp4 which just
+#  These are images we want to delete if we want to generate an mp4 which just
 #  covers first light to dusk using ffmpeg, which is more interesting than nighttime.
 #
 #
 #  Could build an array with array.append() - but for not output a file...
 #
+#  date_string example = "2018-07-04" - i.e. the date part of a snapshot file.
 # ----------------------------------------------------------------------------------------
 def daylight_image_list( date_string, working_dir ) :
-	# Oddly, North and South cameras would want different thresholds
+	# Oddly, North and South cameras would want different thresholds ideally
+	#   Could look at the files sizes up until 3 or 4, take and average or something,
+	#   add some percentage (depending on the variance), and use that for threshold.
 	threshold = 13500
 
 	yyyy = re.sub(r'(....).*', r'\1', date_string)
@@ -922,7 +991,7 @@ def daylight_image_list( date_string, working_dir ) :
 			logger( "DEBUG: file {} is {} bytes.".format( file_list[iii], file_size ) )
 			if file_size > threshold :
 				break
-			FH.write( working_dir + "/" + file_list[iii] + "\n" )
+			FH.write( "rm " + working_dir + "/" + file_list[iii] + "\n" )
 			found += 1
 
 
@@ -934,7 +1003,7 @@ def daylight_image_list( date_string, working_dir ) :
 			logger( "DEBUG: file {} is {} bytes.".format( file_list[iii], file_size ) )
 			if file_size > threshold :
 				break
-			FH.write( working_dir + "/" + file_list[iii] + "\n" )
+			FH.write( "rm " + working_dir + "/" + file_list[iii] + "\n" )
 			found += 1
 
 	FH.close
