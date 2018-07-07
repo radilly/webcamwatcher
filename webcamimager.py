@@ -373,6 +373,7 @@ def midnight_process(date_string) :
 
 	yyyy = re.sub(r'(....).*', r'\1', date_string)
 	arc_dir = work_dir + '/arc_' + yyyy
+	mp4_file = arc_dir + "/" + date_stamp + ".mp4"
 	tar_file = arc_dir + "/arc-" + date_string + ".tgz"
 
 	if not os.path.exists( arc_dir ) :
@@ -391,10 +392,9 @@ def midnight_process(date_string) :
 	else :
 		tar_failed = False
 
-	ffmpeg_failed = generate_video(date_string)
+	ffmpeg_failed = generate_video( date_string, mp4_file )
 
 	if not ffmpeg_failed :
-		mp4_file = arc_dir + "/" + date_stamp + ".mp4"
 		push_to_server( mp4_file, remote_dir, wserver )
 
 
@@ -433,7 +433,7 @@ def midnight_process(date_string) :
 #
 #  Example argument:   2018-05-23
 # ----------------------------------------------------------------------------------------
-def generate_video(date_string) :
+def generate_video(date_string, mp4_out) :
 	global work_dir
 
 	ffmpeg_status = True
@@ -441,16 +441,12 @@ def generate_video(date_string) :
 	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
 	yyyy = re.sub(r'(....).*', r'\1', date_string)
 
-	arc_dir = work_dir + '/arc_' + yyyy
-
-	mp4_file = arc_dir + "/" + date_stamp + ".mp4"
-
 	# https://stackoverflow.com/questions/82831/how-to-check-whether-a-file-exists?rq=1
-	if os.path.isfile( mp4_file ) :
-		logger( "WARNING: {} already exists and will be deleted.".format ( mp4_file ) )
-		unlink( mp4_file )
+	if os.path.isfile( mp4_out ) :
+		logger( "WARNING: {} already exists and will be deleted.".format ( mp4_out ) )
+		unlink( mp4_out )
 
-	logger( "DEBUG: Creating mp4 file" + mp4_file )
+	logger( "DEBUG: Creating mp4 file" + mp4_out )
 
 	cat_cmd = r"cat {}/snapshot-{}*.jpg".format( work_dir, date_string )
 	logger( "DEBUG: cat_cmd = \"{}\"".format( cat_cmd ) )
@@ -458,7 +454,7 @@ def generate_video(date_string) :
 	ffmpeg_opts = "-f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 "
 	logger( "DEBUG: ffmpeg_opts = \"{}\"".format( ffmpeg_opts ) )
 
-	ffmpeg_cmd = cat_cmd + r" | ffmpeg " + ffmpeg_opts + mp4_file
+	ffmpeg_cmd = cat_cmd + r" | ffmpeg " + ffmpeg_opts + mp4_out
 	logger( "DEBUG: ffmpeg_cmd = \"{}\"".format( ffmpeg_cmd ) )
 
 	logger( "DEBUG: calling = wait_ffmpeg()" )
@@ -893,7 +889,8 @@ def check_stable_size( filename ) :
 
 
 # ----------------------------------------------------------------------------------------
-#  Find image from the morning to make a thumbnail of to represent the daily video.
+#  Find image from the morning and make a thumbnail of it to represent the daily video.
+#  Looks for the first image with hour > 7, i.e. around the 8 o'clock hour.
 #
 #  date_string example = "2018-07-04" - i.e. the date part of a snapshot file.
 # ----------------------------------------------------------------------------------------
@@ -909,21 +906,20 @@ def daily_thumbnail( date_string, working_dir ) :
 	file_list.sort()
 
 	look_for = "snapshot-" + date_string
-	logger( "DEBUG: look_for = {}.".format( look_for ) )
+###	logger( "DEBUG: look_for = {}.".format( look_for ) )
 
 	found = 0
 
 	for iii in range(0, file_list_len ) :
 ###		logger( "DEBUG: file[{}] = {}.".format( iii, file_list[iii] ) )
 		if look_for in file_list[iii] :
-#@@@
 			#   snapshot-2018-07-04-13-16-34.jpg
 			#                       ^^
 			hh = re.sub(r'.*snapshot-....-..-..-(..).*', r'\1', file_list[iii] )
 ###			logger( "DEBUG: hh = {}.".format( hh ) )
 
 			if int(hh) > 7 :
-				logger( "DEBUG: For thumbnail file[{}] = {}.".format( iii, file_list[iii] ) )
+###				logger( "DEBUG: For thumbnail file[{}] = {}.".format( iii, file_list[iii] ) )
 				morning_image = working_dir + '/' + file_list[iii] 
 				break
 
@@ -935,8 +931,7 @@ def daily_thumbnail( date_string, working_dir ) :
 		thumbnail_file = arc_dir + '/' + date_stamp + "-thumb.jpg"
 
 		convert = ""
-#DEBUG#		messager( "DEBUG: Create thumbnail {} and upload to {}".format(thumbnail_file, remote_dir ) )
-		logger( "DEBUG: Create thumbnail and upload to {}".format( remote_dir ) )
+		logger( "DEBUG: Create thumbnail {}".format( date_stamp + "-thumb.jpg" ) )
 		convert_cmd = ['/usr/bin/convert',
 				morning_image,
 				'-resize', '20%',
@@ -954,6 +949,8 @@ def daily_thumbnail( date_string, working_dir ) :
 
 
 # ----------------------------------------------------------------------------------------
+# NOTE: Under development.  Eventually just delete the files, and build another mp4.
+#
 #  Build a list of the dark image files - the nighttime images.
 #  These are images we want to delete if we want to generate an mp4 which just
 #  covers first light to dusk using ffmpeg, which is more interesting than nighttime.
@@ -992,6 +989,7 @@ def daylight_image_list( date_string, working_dir ) :
 			if file_size > threshold :
 				break
 			FH.write( "rm " + working_dir + "/" + file_list[iii] + "\n" )
+###			unlink( working_dir + "/" + file_list[iii] )
 			found += 1
 
 
@@ -1004,6 +1002,7 @@ def daylight_image_list( date_string, working_dir ) :
 			if file_size > threshold :
 				break
 			FH.write( "rm " + working_dir + "/" + file_list[iii] + "\n" )
+###			unlink( working_dir + "/" + file_list[iii] )
 			found += 1
 
 	FH.close
@@ -1301,7 +1300,14 @@ if __name__ == '__main__':
 	logger("INFO: Starting " + this_script + "  PID=" + str(getpid()))
 
 
-###		For testing
+###		For testing @@@
+###	global ftp_login
+###	global ftp_password
+###	tnf = daily_thumbnail( "2018-07-04", "/home/pi/N/North" )
+###	if len(tnf) > 0 :
+###		fetch_FTP_credentials( ".ftp.credentials" )
+###		push_to_server( tnf, "North", wserver )
+###	exit()
 ###	wait_ffmpeg()
 ###	exit()
 ###	daylight_image_list( "2018-06-22", "/home/pi/South" )
