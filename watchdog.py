@@ -36,6 +36,9 @@
 # ========================================================================================
 #              NOTE: Don't necessarily need "Cumulus MX Exception thrown (see above)"
 #                    messages.  Added end message 01/08/2018.
+# 20180707 RAD Cleaned up the webcam checking code, here and on the virtual web
+#              server.  camera_down() is somewhat cleaned up, though at present
+#              it is pretty hard-wired for the North cam.
 # 20180606 RAD Weather Underground uploads continue to throw errors.
 #              It's gotten really bad, so bad that my log can be hard to read
 #              as the stuff that results from the WU exceptions dominates during
@@ -150,6 +153,12 @@ mxdiags_dir =           BASE_DIR + "/MXdiags"
 
 logger_file = sys.argv[0]
 logger_file = re.sub('\.py', '.log', logger_file)
+
+WS_Updates_URL = 'http://dillys.org/wx/WS_Updates.txt'
+realtime_URL = 'http://dillys.org/wx/realtime.txt'
+image_age_URL = 'http://dillys.org/wx/North/N_age.txt'
+# N_Since_Updated_URL = 'http://dillys.org/wx/N_Since_Updated.txt'
+#    Replaced by above
 
 proc_stat_busy = -1		# Sentinal value
 proc_stat_idle = -1
@@ -770,7 +779,7 @@ def ws_data_stopped():
 		else:
 			elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  ws_data_last_secs 
 			# Short message while this status continues
-			messager( "WARNING:  data_stopped ... " + str(elapsed) + " sec" )
+			messager( "WARNING:  CumulusMX reports data_stopped ... " + str(elapsed) + " sec" )
 	else:
 		ws_data_last_secs = 0
 	data['ws_data_stopped'] = data_status
@@ -792,7 +801,7 @@ def server_stalled():
 	#   free|945512|271656|673856|6796|55352|127056|89248|856264|102396|0|102396
 	# --------------------------------------------------------------------------------
 	try:
-		response = urlopen('http://dillys.org/wx/WS_Updates.txt')
+		response = urlopen( WS_Updates_URL )
 		content = response.read()
 #@@@#
 	except URLError as e :
@@ -862,7 +871,7 @@ def last_realtime():
 	#  09/10/17 12:03:11 73.0 92 70.6 3.1 4.5 270 ...
 	#  ---------------------------------------------------------------------
 	try :
-		response = urlopen('http://dillys.org/wx/realtime.txt')
+		response = urlopen( realtime_URL )
 		content = response.read()
 	except :
 		print "Unexpected ERROR in last_realtime:", sys.exc_info()[0]
@@ -1118,8 +1127,8 @@ def WX_RF_Restored(cur_line, lineList):
 			countOKs += 1
 			if countOKs > 1 :
 				restored = 1
-				messager( "DEBUG:  Sensor contact appears to have been restored after " + str(elapsed) + " sec  (code 116)")
-				log_event("", "DEBUG:  Sensor contact <B>appears</B> to have been restored. Out for " + str(elapsed) + " sec", 116 )
+				messager( "DEBUG:  Sensor RF contact appears to have been restored after " + str(elapsed) + " sec  (code 116)")
+				log_event("", "DEBUG:  Sensor RF contact <B>appears</B> to have been restored. Out for " + str(elapsed) + " sec", 116 )
 				break
 		else :
 			messager( "DEBUG:  Sensor RF status indeterminate.")
@@ -1294,13 +1303,13 @@ def rf_dropped() :
 				WX_RF_Restored(iii, lineList)
 				saved_contact_lost = int( datetime.datetime.utcnow().strftime("%s") )
 				# Long message the first time we see this...
-				messager( "WARNING:  Sensor contact lost; ignoring outdoor data.  " + \
+				messager( "WARNING:  Sensor RF contact lost; ignoring outdoor data.  " + \
 					"Press \"V\" button on WS console   (code 115)" )
-				log_event("", "Sensor contact lost; ignoring outdoor data.", 115 )
+				log_event("", "Sensor RF contact lost; ignoring outdoor data.", 115 )
 			else:
 				elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  saved_contact_lost 
 				# Shorter message while this status continues
-				messager( "WARNING:  Sensor contact lost; ... " + str(elapsed) + " sec" )
+				messager( "WARNING:  Sensor RF contact lost; ... " + str(elapsed) + " sec" )
 
 			return_value = 1
 			break
@@ -1403,8 +1412,8 @@ def rf_dropped() :
 				# --------------------------------------------------------
 				if saved_contact_lost > 2 :
 					elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  saved_contact_lost 
-					log_event("", "Sensor contact RESTORED; receiving telemetry again. " + str(elapsed) + " sec", 116 )
-					messager( "INFO:  Sensor contact RESTORED; ... lost for " + str(elapsed) + " sec   (code 116)" )
+					log_event("", "Sensor RF contact RESTORED; receiving telemetry again. " + str(elapsed) + " sec", 116 )
+					messager( "INFO:  Sensor RF contact RESTORED; ... lost for " + str(elapsed) + " sec   (code 116)" )
 				saved_contact_lost = -1
 				if len( saved_exception_tstamp ) > 3 :
 					messager( "INFO: \"WU Response: OK: success\"; clearing pending exception flag.   (code 112)" )
@@ -1532,79 +1541,44 @@ def rf_dropped() :
 
 
 # ----------------------------------------------------------------------------------------
-#  Check web cam status.
+#  Check webcam status by fetching a control file from the hosted web-server.
+#  The file just contains a number - the number of seconds between the time of
+#  last writing the generically-named full-size image file, e.g. N.jpg by FTP,
+#  an the current time.  Since cron_10_min.sh runs every 5 minutes
 #
-#  After power-cycling the web cam, it could take up to 5 minutes for the next
-#  image update.  But more importantly, the dillys.org webserver cron job only
-#  runs every 5 minutes... but empirically, up to 10 minutes - accounting for
-#  each 5 minutes....?
+#   Can verify with: curl http://dillys.org/wx/North/N_age.txt
 #
-# NOTE: I have similar code running as a service as of this writing, which
-#       drives a relay which interrupts the power to the web cam -
-#       a power-cycle.  Eventually, that functionality will go here...
+#    Copied from "webcamwatch.py" and modified for here...
+#
+#  NOTE: Question:  Is pcyc_holdoff_time really required?  It adds complexity...
 #
 # ----------------------------------------------------------------------------------------
 def camera_down():
 	global data
 	global pcyc_holdoff_time
-
-	#___# # <<<<<<<<<<<<<<<<<<<< COMMENTED OUT THE RELAY STUFF
+	is_down = 1
 
 	try:
-		response = urlopen('http://dillys.org/wx/N_Since_Updated.txt')
-		content = response.read()
-		# ------------------------------------------------------------------
-		# The file contains at least a trailing newline ... I've not looked
-		#   "545   1504095902   12:25:02_UTC "
-		#
-		# systemd seems to complain about urlopen failing in restart...
-		#     Maybe content = "0 0 00:00:00_UTC" if urlopen fails??
-		# ------------------------------------------------------------------
-	except :
-		print "Unexpected ERROR in camera_down:", sys.exc_info()[0]
-		content = "0 0 00:00:00_UTC "
-		messager( "DEBUG: content = \"" + content + "\" in camera_down()" )
+		response = urlopen( image_age_URL )
+		age = response.read()
+	except:
+		age = "0"
+		logger("WARNING: Assumed image age: {}".format( age ) )
 
-	words = re.split(' +', content)
-	##DEBUG## ___print words[0], words[2]
+	age = int( age.rstrip() )
 
 	# --------------------------------------------------------------------------------
-	#										##
-	#										##
-	#     Traceback (most recent call last):					##
-	#       File "/mnt/root/home/pi/watchdog.py", line 672, in <module>		##
-	#         write_pid_file()							##
-	#       File "/mnt/root/home/pi/watchdog.py", line 125, in main			##
-	#         rf_dropped(), last_realtime(), proc_load(), camera_down() ) + \	##
-	#       File "/mnt/root/home/pi/watchdog.py", line 643, in camera_down		##
-	#     										##
-	#     ValueError: invalid literal for int() with base 10: ''			##
-	#										##
-	#										##
+	#
 	# --------------------------------------------------------------------------------
-
-	##### interval = int(result.group(1))
-	try:
-		interval = int(words[0])
-	except :
-		interval = -99999
-		messager( "DEBUG: camera_down(): interval looked invalid, \"" + words[0] + "\"" )
-
-
-	if interval > 3000:
-		#___# power_cycle()
+	if age > 600 :
+		logger("WARNING: Old image age: {}".format( age ) )
+		## power_cycle()
 
 		# ------------------------------------------------------------------------
-		#
-		#   2017/10/04 13:05:12 GMT 3166 13:05:02_UTC power cycled
-		#   2017/10/04 13:05:12 GMT,  0,  0,  0,  24,   0.00,  1,  93332,  9%,  0,  0%,  43.5,  43.470,   110.2,
-		#   free|945512|296608|648904|6768|77532|125744|93332|852180|102396|0|102396
-		#
-		#   2017/10/04 13:15:25 GMT 3465 13:10:01_UTC power cycled
-		#   2017/10/04 13:15:25 GMT,  0,  0,  0,  24,   0.17,  1,  92956,  9%,  0,  0%,  42.9,  42.932,   109.3,
-		#   free|945512|296760|648752|6768|78044|125760|92956|852556|102396|0|102396
+		#  NOTE: This pcyc_holdoff_time business may not be needed.
+		#  Seems to me we only want to avoid power-cycling the webcam repetesly.
+		#  We're not doint that from here at the moment...
 		# ------------------------------------------------------------------------
-
 		if pcyc_holdoff_time > 0 :
 			if int(time.strftime("%s")) > pcyc_holdoff_time :
 				# holdoff has expired
@@ -1613,25 +1587,18 @@ def camera_down():
 				######	log_event("", " waiting on webcam image update.", 104 )
 		else:
 			pcyc_holdoff_time = int(time.strftime("%s")) + 600
-			logger(words[0] + " " + words[2] + " power cycled")
+			logger("DEBUG: power cycle needed.")
 			log_event("", " Webcam image update stalled.", 103 )
 
-		# ------------------------------------------------------------------------
-		# Give the cam time to reset, and the webserver crontab to fire.
-		# The camera comes up pretty quickly, but it seems to resynch to
-		# the 5-minute interval, and the server crontab only fires every
-		# 5 minutes (unsyncronized as a practical matter).  So 10 min max.
-		# ------------------------------------------------------------------------
-
-		#___# sleep(sleep_on_recycle)
-		data['camera_down'] = 1
-		return 1
 	else:
+		is_down = 0
 		if data['camera_down'] == 1 :
 			log_event("", " Webcam image updating!.", 105 )
 		pcyc_holdoff_time = 0
-		data['camera_down'] = 0
-		return 0
+
+
+	data['camera_down'] = is_down
+	return is_down
 
 
 # ----------------------------------------------------------------------------------------
@@ -1641,14 +1608,15 @@ def camera_down():
 # ----------------------------------------------------------------------------------------
 def cmx_svc_runtime():
 	global data
+	lines = [ "   Active: active (running) since DOWN; DOWN", " Main PID: DOWN (mono)" ]
 
 	try :
 		output = subprocess.check_output(["/bin/systemctl", "status", "cumulusmx"])
 		lines = re.split('\n', output)
 	except :
 		messager( "ERROR: From systemctl status: {}".format( sys.exc_info()[0] ) )
-		lines[0] = "   Active: active (running) since DOWN; DOWN"
-		lines[1] = " Main PID: DOWN (mono)"
+####		lines[0] = "   Active: active (running) since DOWN; DOWN"
+####		lines[1] = " Main PID: DOWN (mono)"
 
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	#   Active: active (running) since Sat 2018-06-23 10:10:30 EDT; 4s ago
@@ -1666,6 +1634,7 @@ def cmx_svc_runtime():
 			start_time = re.sub(';.*', '', start_time)
 			duration = re.sub('.*; ', '', lines[iii])
 			duration = re.sub(' ago', '', duration)
+			duration = re.sub('min', ' min', duration)
 
 
 
@@ -1695,13 +1664,14 @@ def cmx_svc_runtime():
 def webcamwatch_down():
 	global data
 	ret_val = 1
+	lines = [ "   Active: active (running) since DOWN; DOWN", "", "" ]
 
 	try :
 		output = subprocess.check_output(["/bin/systemctl", "status", "wxwatchdog"])
 		lines = re.split('\n', output)
 	except :
-		messager( "ERROR: From systemctl status: {}".format( sys.exc_info()[0] ) )
-		lines[0] = "   Active: active (running) since DOWN; DOWN"
+####		messager( "ERROR: From systemctl status: {}".format( sys.exc_info()[0] ) )
+		lines[2] = ""
 
 
 	for iii in range(0, len(lines)):

@@ -16,6 +16,9 @@
 # reducing the output.
 #
 # ========================================================================================
+# 20180707 RAD Cleaned up the webcam checking code, here and on the virtual web
+#              server.  camera_down() is somewhat cleaned up, though at present
+#              it is pretty hard-wired for the North cam.
 # 20180118 RAD Added "global restart_file" to setup().  "sudo journalctl -u wxwatchdog"
 #              was needed to see "IOError: [Errno 2] No such file or directory: ''",
 #              that filename wasn't being setup. This in turn caused the service
@@ -38,7 +41,11 @@
 #              are not dual-purpose pins, and who knows what we'll need later.
 # ========================================================================================
 
-import urllib
+# import urllib
+# https://docs.python.org/2/howto/urllib2.html
+# https://docs.python.org/2/library/urllib2.html
+from urllib2 import urlopen, URLError, HTTPError
+
 import re
 import datetime
 import time
@@ -48,12 +55,14 @@ import sys
 from os import getpid
 
 webcam_channel = 21
-sleep_for = 300
-sleep_on_recycle = 600 - sleep_for
-log_stride = 6
+sleep_for = 120
+sleep_on_recycle = 300 ; # Leave time for the server side to pick it up...
+log_stride = 2
 log_file = ""
 restart_file = ""
-iii = 0
+check_counter = 0
+
+image_age_URL = 'http://dillys.org/wx/North/N_age.txt'
 
 # ----------------------------------------------------------------------------------------
 # See https://www.sunfounder.com/modules/input-module/relay/2-channel-dc-5v-relay-module-with-optocoupler-low-level-trigger-expansion-board-for-arduino-uno-r3-mega-2560-1280-dsp-arm-pic-avr-stm32-raspberry-pi.html
@@ -121,6 +130,15 @@ def logger(message):
 	FH.close
 
 # ----------------------------------------------------------------------------------------
+# This prints just a symbol or two - for a progress indicator.
+#
+# ----------------------------------------------------------------------------------------
+def log_string(text):
+	FH = open(log_file, "a")
+	FH.write( text )
+	FH.close
+
+# ----------------------------------------------------------------------------------------
 def log_restart(message):
 	global restart_file
 	timestamp = datetime.datetime.utcnow().strftime("%Y%m%d %H:%M:%S %z")
@@ -145,8 +163,17 @@ def write_pid_file():
 	FH.close
 
 # ----------------------------------------------------------------------------------------
-#  Check web cam status.
+#  Check webcam status by fetching a control file from the hosted web-server.
+#  The file just contains a number - the number of seconds between the time of
+#  last writing the generically-named full-size image file, e.g. N.jpg by FTP,
+#  an the current time.  Since cron_10_min.sh runs every 5 minutes
 #
+#   Can verify with: curl http://dillys.org/wx/North/N_age.txt
+#
+#  20180705 - Since moving most of the web cam image processing to the Pi, cron_10_min.sh
+#  was seriously chopped down.  I also deleted a lof of the control files, including the
+#  one this routine was looking at.  Oopps.  Looking at this routine, I decided it was
+#  too complicated.
 #
 #  20180415 - Camera didn't stop, but was uploading some garbage periodically.
 #  This file gets an epoch timestamp written to it when we've seen a number of 0-length
@@ -155,11 +182,14 @@ def write_pid_file():
 #
 # ----------------------------------------------------------------------------------------
 def camera_down():
-	global iii
-	NOW_SECS = int(time.time())
+	global check_counter
+
 	try:
-		response = urllib.urlopen('http://dillys.org/wx/N_Since_Updated.txt')
-		content = response.read()
+
+#DEBUG#		logger("DEBUG: reading: \"{}\"".format( image_age_URL ) )
+		response = urlopen( image_age_URL )
+		age = response.read()
+#DEBUG#		logger("DEBUG: image age read from web: \"{}\"".format( age ) )
 		# ------------------------------------------------------------------
 		# The file contains at least a trailing newline ... I've not looked
 		#   "545   1504095902   12:25:02_UTC "
@@ -168,43 +198,25 @@ def camera_down():
 		#     Maybe content = "0 0 00:00:00_UTC" if urlopen fails??
 		# ------------------------------------------------------------------
 	except:
-		content = "0 0 00:00:00_UTC "
-		print "DEBUG: content = \"" + content + "\""
+		age = "0"
+		logger("WARNING: Assumed image age: {}".format( age ) )
 
-	words = re.split(' +', content)
+	age = int( age.rstrip() )
 	##DEBUG## ___print words[0], words[2]
 
 	# Periodically put a record into the log for reference.
-	if 0 == (iii % log_stride) :
-		# logger("INFO: interval: " + words[0] + "  timestamp: " + words[2] + "  DEBUG: iii=" + str(iii) )
-		logger("INFO: interval: " + words[0] + "  timestamp: " + words[2] )
+	if 0 == (check_counter % log_stride) :
+		logger("INFO: image age: {}".format( age ) )
 
-	iii += 1
+	check_counter += 1
 
-	##### interval = int(result.group(1))
-	interval = int(words[0])
-	# 20171106 - Adjusted the web cam clock for DST which tripped the old
-	#            limit of 3000 secs.  4200 allows for 1 hour + 10 minutes
-	#            or approximately 2 additional uploads.
 	# ================================================================================
 	#
-	#  It might be desirable to break up the sleep_on_recycle or something
-	#  so that we do more logging when the camera is not updating. This is
-	#  a log fragment from when the script was failing on restart.
-	#
-	#     20180116 15:10:00 INFO: interval: 316  timestamp: 15:05:02_UTC
-	#     20180116 16:10:03 INFO: interval: 314  timestamp: 16:10:01_UTC
-	#     20180116 17:10:05 INFO: interval: 3615  timestamp: 17:05:02_UTC
-	#     20180116 17:20:26 Starting /mnt/root/home/pi/webcamwatch.py  PID=11850
-	#     20180116 17:20:26 INFO: interval: 4514  timestamp: 17:20:01_UTC
-	#     20180116 17:20:47 Starting /mnt/root/home/pi/webcamwatch.py  PID=11857
-	#     20180116 17:20:47 INFO: interval: 4514  timestamp: 17:20:01_UTC
-	#
 	# ================================================================================
-	if interval > 4200:
+	if age > 600 :
+		logger("WARNING: image age: {}".format( age ) )
 		power_cycle()
-		logger("WARNING: interval: " + words[0] + "  timestamp: " + words[2])
-		log_restart( "webcam power-cycled, interval: " + words[0] )
+		log_restart( "webcam power-cycled, interval: {}".format( age ) )
 		# Give the cam time to reset, and the webserver crontab to fire.
 		# The camera comes up pretty quickly, but it seems to resynch to
 		# the 5-minute interval, and the server crontab only fires every
@@ -216,8 +228,13 @@ def camera_down():
 
 
 # ----------------------------------------------------------------------------------------
+#
+#
+#
+# ----------------------------------------------------------------------------------------
 def main():
 	##DEBUG## ___print "Starting " + sys.argv[0] + "\n"
+	log_string( "\n\n\n\n" )
 	logger("Starting " + sys.argv[0] +  "  PID=" + str(getpid()))
 	messager("Starting " + sys.argv[0] +  "  PID=" + str(getpid()))
 	write_pid_file()
