@@ -102,6 +102,11 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20180707 RAD Wrote remove_night_images() based on daylight_image_list().  The name
+#              change reflects the new function.  Called from midnight_process().
+#              Could move a chunk of this around remove_night_images() to a separate
+#              subroutine.
+#   NOTE: Remove daylight_image_list_____________________________________________()
 # 20180702 RAD Made a stab at uploading mp4 files to the web server.  Could be broken
 #              to year folders ... like arc_2018 ... but it may not be an issue...
 # 20180702 RAD General cleanup...
@@ -373,7 +378,7 @@ def midnight_process(date_string) :
 
 	yyyy = re.sub(r'(....).*', r'\1', date_string)
 	arc_dir = work_dir + '/arc_' + yyyy
-	mp4_file = arc_dir + "/" + date_stamp + ".mp4"
+	mp4_file = "{}/{}.mp4".format( arc_dir, date_stamp )
 	tar_file = arc_dir + "/arc-" + date_string + ".tgz"
 
 	if not os.path.exists( arc_dir ) :
@@ -400,11 +405,20 @@ def midnight_process(date_string) :
 
 
 #@@@
-	daylight_image_list( date_string, work_dir )
+	if remove_night_images( date_string, work_dir ) < 1 :
+		logger( "WARNING: Could not find images for date \"{}\"".format( date_string ) )
 
 	tnf = daily_thumbnail( date_string, work_dir )
 	if len(tnf) > 0 :
 		push_to_server( tnf, remote_dir, wserver )
+
+
+
+	mp4_file_daylight = "{}/{}_daylight.mp4".format( arc_dir, date_stamp )
+	ffmpeg_failed = generate_video( date_string, mp4_file_daylight )
+
+	if not ffmpeg_failed :
+		push_to_server( mp4_file_daylight, remote_dir, wserver )
 
 
 
@@ -951,6 +965,74 @@ def daily_thumbnail( date_string, working_dir ) :
 # ----------------------------------------------------------------------------------------
 # NOTE: Under development.  Eventually just delete the files, and build another mp4.
 #
+#
+# NOTE: What I'd like to do, ideally, is vary the length of the video based on the date.
+#       In the Summer we have around 15 hours of daylight here, in Winter about 9.
+#       First light is maybe 30 minutes before.  I might try to approximate this.
+#       Python Astral, https://astral.readthedocs.io/en/latest/ can calulate accurately
+#       but I really just want to lop off the "boring" black frames at either end of the
+#       day.
+#
+# Also see:
+#     https://www.timeanddate.com/astronomy/astronomical-twilight.html
+#     http://aa.usno.navy.mil/data/docs/RS_OneYear.php
+#     http://aa.usno.navy.mil/cgi-bin/aa_rstablew.pl?ID=AA&year=2018&task=0&state=PA&place=Canonsburg
+#     https://michelanders.blogspot.com/2010/12/calulating-sunrise-and-sunset-in-python.html
+#     https://stackoverflow.com/questions/19615350/calculate-sunrise-and-sunset-times-for-a-given-gps-coordinate-within-postgresql
+#
+#
+#    Daylight saving time 2018 in Pennsylvania began at 2:00 AM on
+#    Sunday, March 11
+#    and ends at 2:00 AM on
+#    Sunday, November 4
+#    All times are in Eastern Time.
+#
+#
+#
+#
+#  date_string example = "2018-07-04" - i.e. the date part of a snapshot file.
+#  working_dir example = "/home/pi/N/North"
+# ----------------------------------------------------------------------------------------
+def remove_night_images( date_string, working_dir ) :
+
+	yyyy = re.sub(r'(....).*', r'\1', date_string)
+	arc_dir = working_dir + '/arc_' + yyyy
+
+	file_list = listdir( working_dir )
+	file_list.sort()
+	file_list_len = len( file_list )
+
+#REMOVE	image_index = arc_dir + '/index_to_remove-' + date_string + ".txt"
+#REMOVE	FH = open(image_index, "w")
+
+	look_for = "snapshot-" + date_string
+	logger( "DEBUG: look_for = {}.".format( look_for ) )
+
+	kept = 0
+	deleted = 0
+
+	for iii in range(0, file_list_len ) :
+		if look_for in file_list[iii] :
+			# file snapshot-2018-07-05-21-04-50.jpg is 12542 bytes.
+			hhmm = int( re.sub( r'.*snapshot-2...-..-..-(..)-(..).*', r'\1\2', file_list[iii] ) )
+			if hhmm < 500 :
+				unlink( working_dir + "/" + file_list[iii] )
+				deleted += 1
+			elif hhmm > 2200 :
+				unlink( working_dir + "/" + file_list[iii] )
+				deleted += 1
+			else :
+				kept += 1
+
+	found = kept + deleted
+	logger( "DEBUG: remove_night_images kept {} and deleted {} of ()".format( kept, deleted, found ) )
+	return found
+
+
+
+# ----------------------------------------------------------------------------------------
+# NOTE: Under development.  Eventually just delete the files, and build another mp4.
+#
 #  Build a list of the dark image files - the nighttime images.
 #  These are images we want to delete if we want to generate an mp4 which just
 #  covers first light to dusk using ffmpeg, which is more interesting than nighttime.
@@ -960,7 +1042,7 @@ def daily_thumbnail( date_string, working_dir ) :
 #
 #  date_string example = "2018-07-04" - i.e. the date part of a snapshot file.
 # ----------------------------------------------------------------------------------------
-def daylight_image_list( date_string, working_dir ) :
+def daylight_image_list_____________________________________________( date_string, working_dir ) :
 	# Oddly, North and South cameras would want different thresholds ideally
 	#   Could look at the files sizes up until 3 or 4, take and average or something,
 	#   add some percentage (depending on the variance), and use that for threshold.
@@ -1130,7 +1212,7 @@ def push_to_server(local_file, remote_path, server) :
 	#
 	# See https://stackoverflow.com/questions/567622/is-there-a-pythonic-way-to-try-something-up-to-a-maximum-number-of-times
 	# --------------------------------------------------------------------------------
-	for iii in range(5) :
+	for iii in range(8) :
 		try :
 #DEBUG#			messager( "DEBUG: FTP connect to {}".format( server ) )
 			ftp = FTP( server )
@@ -1312,6 +1394,9 @@ if __name__ == '__main__':
 ###	exit()
 ###	daylight_image_list( "2018-06-22", "/home/pi/South" )
 ###	exit()
+###	test_remove_night_images()
+###	exit()
+
 
 	write_pid_file()
 
@@ -1336,6 +1421,53 @@ if __name__ == '__main__':
 
 
 # ----------------------------------------------------------------------------------------
+###	exit()
+
+def test_remove_night_images() :
+	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
+
+	if len(sys.argv) < 3 :
+		print "Too few arguments"
+		exit()
+
+	print "{} arguments".format(len(sys.argv))
+
+	date_string = sys.argv[2]
+
+	NS = sys.argv[1]
+	if "N" in NS :
+		mp4_file = "/home/pi/N/North/arc_2018/{}_daylight.mp4".format( re.sub(r'-', r'', date_string) )
+		remote_dir = "North"
+		work_dir = "/home/pi/N/North"
+	elif "S" in NS :
+		mp4_file = "/home/pi/S/South/arc_2018/{}_daylight.mp4".format( re.sub(r'-', r'', date_string) )
+		remote_dir = "South"
+		work_dir = "/home/pi/S/South"
+	else :
+		print "Arg #1 is bad.  Use N or S"
+		exit()
+
+	if daylight_image_list( date_string, work_dir ) < 1 :
+		print "Could not find images for date \"{}\"".format( date_string )
+		exit()
+
+	tnf = daily_thumbnail( date_string, work_dir )
+	if len(tnf) > 0 :
+		push_to_server( tnf, remote_dir, wserver )
+
+	ffmpeg_failed = generate_video( date_string, mp4_file )
+	if not ffmpeg_failed :
+		push_to_server( mp4_file, remote_dir, wserver )
+
+	try:
+		subprocess.check_output("rm " + work_dir + "/snapshot-" + date_string + r"*.jpg", shell=True)
+	except :
+		logger( "ERROR: Unexpected ERROR in rm: {}".format( sys.exc_info()[0] ) )
+
+	exit()
+########################################################################################
+########################################################################################
+########################################################################################
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
