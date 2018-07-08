@@ -549,6 +549,7 @@ def tar_dailies(date_string) :
 		try:
 			subprocess.check_call(tar_cmd, shell=True)
 			tar_failed = False
+			unlink( image_index )
 		except :
 			logger( "ERROR: Unexpected ERROR in tar: {}".format( sys.exc_info()[0] ) )
 
