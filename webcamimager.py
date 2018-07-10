@@ -9,6 +9,8 @@
 #
 # To set the reference date back...
 #     printf "20180523214508\nsnapshot-2018-05-23-21-45-08.jpg\n" > webcamimager__.dat
+# OR ...
+#     date +"%Y%m%d%k%M%S" > N/webcamimager__.dat ; date +"snapshot-%Y-%m-%d-%k-%M-%S.jpg" >> N/webcamimager__.dat
 #
 # Stop with ...
 #   kill -9 `cat webcamimager.PID`
@@ -102,6 +104,9 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20180710 RAD Cleaned up push_to_test() and moved the routine and the call to it into
+#              the live code.  The call to it is commented out.  Also, if you use it,
+#              you'll need to set up FTP server, id and password in the def.
 # 20180707 RAD Wrote remove_night_images() based on daylight_image_list().  The name
 #              change reflects the new function.  Called from midnight_process().
 #              Could move a chunk of this around remove_night_images() to a separate
@@ -754,7 +759,6 @@ def next_image_file() :
 		# Progress indicator Ending
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 			log_string( "||\n" )
-###			print "||"
 
 		# ------------------------------------------------------------------------
 		#  This is a strange failure mode of the web cam...    06/02/2018
@@ -779,13 +783,22 @@ def next_image_file() :
 		else :
 			jpg_size = check_stable_size( source_file )
 
+
+		# ------------------------------------------------------------------------
+		# This is used when I need to test a software change on a second Pi for
+		# processing webcam images.  Yesterday I used this when I was building
+		# a larger SD card for 2 purposes:
+		# * To (briefly) test that this script would run (all prereqs met)
+		# * To accumulate the full days images to support midnight processing
+		# ------------------------------------------------------------------------
+		# push_to_test(source_file, work_dir)
+		# logger( "DEBUG: FTP'ing {} to Pi 03 {}".format( source_file, work_dir ) )
+
+
 		if jpg_size < 500 :
 			log_string( "\n" )
-###			print ""
 			power_cycle( 5 )
 			logger( "WARNING: Skipping image file {} size = {}".format( source_file, jpg_size ) )
-			#  These lines can be used as a shell script...
-###			print "rm {}/{}".format( work_dir, file_list[line] )
 
 			try:
 				subprocess.check_output("rm {}/{}".format( work_dir, file_list[line] ), shell=True)
@@ -868,8 +881,6 @@ def next_image_file() :
 
 		# First '.' right after processing is done...
 		log_string('.')
-###		sys.stdout.write('.')
-###		sys.stdout.flush()
 		last_filename = current_filename
 
 
@@ -1028,75 +1039,6 @@ def remove_night_images( date_string, working_dir ) :
 	found = kept + deleted
 	logger( "DEBUG: remove_night_images kept {} and deleted {} of ()".format( kept, deleted, found ) )
 	return found
-
-
-
-# ----------------------------------------------------------------------------------------
-# NOTE: Under development.  Eventually just delete the files, and build another mp4.
-#
-#  Build a list of the dark image files - the nighttime images.
-#  These are images we want to delete if we want to generate an mp4 which just
-#  covers first light to dusk using ffmpeg, which is more interesting than nighttime.
-#
-#
-#  Could build an array with array.append() - but for not output a file...
-#
-#  date_string example = "2018-07-04" - i.e. the date part of a snapshot file.
-# ----------------------------------------------------------------------------------------
-def daylight_image_list_____________________________________________( date_string, working_dir ) :
-	# Oddly, North and South cameras would want different thresholds ideally
-	#   Could look at the files sizes up until 3 or 4, take and average or something,
-	#   add some percentage (depending on the variance), and use that for threshold.
-	threshold = 13500
-
-	yyyy = re.sub(r'(....).*', r'\1', date_string)
-	arc_dir = working_dir + '/arc_' + yyyy
-
-	file_list = listdir( working_dir )
-	file_list_len = len( file_list )
-	file_list.sort()
-
-	image_index = arc_dir + '/index_to_remove-' + date_string + ".txt"
-	FH = open(image_index, "w")
-
-	look_for = "snapshot-" + date_string
-	logger( "DEBUG: look_for = {}.".format( look_for ) )
-
-	found = 0
-
-	for iii in range(0, file_list_len ) :
-		logger( "DEBUG: file[{}] = {}.".format( iii, file_list[iii] ) )
-		if look_for in file_list[iii] :
-			file_size = stat( working_dir + '/' + file_list[iii] ).st_size
-			logger( "DEBUG: file {} is {} bytes.".format( file_list[iii], file_size ) )
-			if file_size > threshold :
-				break
-			FH.write( "rm " + working_dir + "/" + file_list[iii] + "\n" )
-###			unlink( working_dir + "/" + file_list[iii] )
-			found += 1
-
-
-
-	for iii in range(file_list_len - 1, -1, -1):
-		logger( "DEBUG: file[{}] = {}.".format( iii, file_list[iii] ) )
-		if look_for in file_list[iii] :
-			file_size = stat( working_dir + '/' + file_list[iii] ).st_size
-			logger( "DEBUG: file {} is {} bytes.".format( file_list[iii], file_size ) )
-			if file_size > threshold :
-				break
-			FH.write( "rm " + working_dir + "/" + file_list[iii] + "\n" )
-###			unlink( working_dir + "/" + file_list[iii] )
-			found += 1
-
-	FH.close
-
-	logger( "DEBUG: {} items found for index file.".format( found ) )
-
-	return found
-
-
-
-
 
 
 # ----------------------------------------------------------------------------------------
@@ -1368,6 +1310,45 @@ def wait_ffmpeg() :
 			return
 
 
+
+# ----------------------------------------------------------------------------------------
+# TEST Support
+#
+# 
+# ----------------------------------------------------------------------------------------
+def push_to_test(source_file, remote_path) :
+#      source_file = work_dir + '/' + file_list[line]
+	server = "192.168.1.152"
+	login = "pi"
+	password = "password"
+
+	if re.search('/', source_file) :
+		local_file_bare = re.sub(r'.*/', r'', source_file)
+
+	# --------------------------------------------------------------------------------
+	#
+	# See https://stackoverflow.com/questions/567622/is-there-a-pythonic-way-to-try-something-up-to-a-maximum-number-of-times
+	# --------------------------------------------------------------------------------
+	for iii in range(5) :
+		try :
+			ftp = FTP( server )
+			ftp.login( login, password )
+			ftp.cwd( remote_path )
+			ftp.storbinary('STOR ' +  local_file_bare, open(source_file, 'rb'))
+			ftp.quit()
+			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+			# Yes, that's a return that's not at the funtion end
+			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+			return
+		except socket.error, e :
+			iii += 1
+			print "FTP Socket Error %d: %s" % (e.args[0], e.args[1])
+			for jjj in range(0, len(e.args) - 1) :
+				print "    {}",format( e.args[jjj] )
+			# Increase the sleep time with each iteration
+			sleep(iii)
+	return
+
 # ----------------------------------------------------------------------------------------
 # The function main contains a "do forever..." (and is called in a try block here)
 #
@@ -1378,7 +1359,6 @@ if __name__ == '__main__':
 	#### This might be useful...
 	#### if sys.argv[1] = "stop"
 	log_string( "\n\n\n\n" )
-#	print "\n\n\n\n"
 	messager("INFO: Starting " + this_script + "  PID=" + str(getpid()))
 	logger("INFO: Starting " + this_script + "  PID=" + str(getpid()))
 
@@ -1415,7 +1395,6 @@ if __name__ == '__main__':
 		# Progress indicator Ending
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		log_string( "\n" )
-###		print ""
 		logger("  Good bye from " + this_script)
 
 
@@ -1469,63 +1448,6 @@ def test_remove_night_images() :
 ########################################################################################
 ########################################################################################
 ########################################################################################
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-#      push_to_test(source_file, "TEST")
-#      messager( "DEBUG: FTP'ing {} to Pi 03 TEST".format( source_file ) )
-
-# ----------------------------------------------------------------------------------------
-#  This pushes the specified file to the (hosted) web server via FTP.
-#
-#
-#  FTP User: camdilly
-#  FTP PWD: /home/content/b/o/b/bobdilly/html/WX
-#
-#  https://pythonspot.com/en/ftp-client-in-python/
-#  https://docs.python.org/2/library/ftplib.html
-# ----------------------------------------------------------------------------------------
-#
-# Variant of push_to_server(local_file, remote_path) :
-def push_to_test(source_file, remote_path) :
-#      source_file = work_dir + '/' + file_list[line]
-       global ftp_login
-       global ftp_password
-
-       if re.search('/', source_file) :
-               local_file_bare = re.sub(r'.*/', r'', source_file)
-
-       # --------------------------------------------------------------------------------
-       #
-       # See https://stackoverflow.com/questions/567622/is-there-a-pythonic-way-to-try-something-up-to-a-maximum-number-of-times
-       # --------------------------------------------------------------------------------
-       for iii in range(5) :
-               try :
-                       ftp = FTP('192.168.1.152')
-                       ftp.login( 'pi', 'raspberry' )
-                       ftp.cwd( remote_path )
-                       ftp.storbinary('STOR ' +  local_file_bare, open(source_file, 'rb'))
-                       ftp.quit()
-                       # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-                       # Yes, that's a return that's not at the funtion end
-                       # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-                       return
-               except socket.error, e :
-                       iii += 1
-                       print "FTP Socket Error %d: %s" % (e.args[0], e.args[1])
-                       for jjj in range(0, len(e.args) - 1) :
-                               print "    {}",format( e.args[jjj] )
-                       # Increase the sleep time with each iteration
-                       sleep(iii)
-       return
-
-# ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
