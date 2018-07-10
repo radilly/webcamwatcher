@@ -1,6 +1,6 @@
 #!/usr/bin/python -u
 #@@@ ... Restart using...
-# NOTE: There are still come things based on argv[0] (this_script); log, PID, image_data_file...
+# NOTE: There are still some things based on argv[0] (this_script); log, PID, image_data_file...
 #   kill -9 `cat /home/pi/N/webcamimager.PID`
 #   cd /home/pi/N ; nohup /usr/bin/python -u ./webcamimager.py /home/pi/N/North N.jpg N_thumb.jpg North
 #
@@ -18,6 +18,11 @@
 # Start with ...
 #   nohup /usr/bin/python -u /home/pi/webcamimager.py >> /home/pi/webcamimager.log 2>&1 &
 #
+# ----------------------------------------------------------------------------------------
+#   NOTE: This should be able to be run as a service. (systemctl)
+# ----------------------------------------------------------------------------------------
+#    * NOTE: Should look more carefully of the use of subprocess
+# ----------------------------------------------------------------------------------------
 #    * NOTE:
 #       next_image_file() could bypass some of the processing of each snapshot if
 #       catching_up == True.  We DO want to handle the midnight rollover, however
@@ -33,7 +38,7 @@
 #   2018/07/03 13:26:04 DEBUG: file # 273 of 287 (Catching up)
 #   2018/07/03 13:26:04 DEBUG: Copy /home/pi/S/South/snapshot-2018-07-03-09-01-30.jpg as S.jpg
 #
-# vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+# ========================================================================================
 #    * NOTE: When I started this up on the North camera on Pi 03 I had to tweak / create
 #            / install a few things to get going...
 #       sudo apt-get install proftpd      - - - - to allow webcam to upload....
@@ -41,16 +46,7 @@
 #       sudo apt-get install ffmpeg       - - - - This is a fairly big package....
 #       vi .ftp.credentials
 #
-# Need to use today's date or midnight_process() fails somewhere...
-#  150  printf "20180523214508\nsnapshot-2018-05-23-21-45-08.jpg\n" > webcamimager__.dat
-#  171  printf "20180616000001\nsnapshot-2018-06-16-00-00-01.jpg\n" > webcamimager__.dat
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-#
-# vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-#    * NOTE: Should look more carefully of the use of subprocess
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-#
-# vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+# ----------------------------------------------------------------------------------------
 #
 #   Images as jpg files are uploaded to a folder via ftp from the webcam.  Files
 #   are name with date and time (local to the camera) in the form
@@ -74,15 +70,10 @@
 #      * Create a web page to access video   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< To be done
 #      * Upload the mp4 file and web page to the server   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< To be done
 #
-#   NOTE: This should be able to be run as a service. (systemctl)
-#
-#   NOTE: These packages are needed:
-#             sudo apt-get install proftpd
-#             sudo apt-get install graphicsmagick-imagemagick-compat
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 #
 #   Considered using something to watch for directory changes.  Not sure it's
-#   worth the complexity.  I think stating the direcory is inexpensive while
+#   worth the complexity.  I think stat-ing the direcory is inexpensive while
 #   polling.  Nevertheless, here are some references:
 #
 #   https://blog.philippklaus.de/2011/08/watching-directories-for-changes-using-python_-_an-overview
@@ -94,13 +85,26 @@
 #   https://pypi.org/project/python-watcher/
 #   https://pypi.org/project/watcher/
 #   https://pypi.org/project/fs-watcher/
-#
 #   https://github.com/johnwesonga/directory-watcher/blob/master/dirwatcher.py
-#
 #   http://www.docmoto.com/support/advanced-topics/creating-a-folder-monitor-using-python/
 #
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# ========================================================================================
+# ========================================================================================
 #
+#  EXTERNALIZING LOCAL SETTINGS:
+#
+#  exec()
+#  https://docs.python.org/2.0/ref/exec.html
+#
+#  Best way to retrieve variable values from a text file - Python - Json
+#  https://stackoverflow.com/questions/924700/best-way-to-retrieve-variable-values-from-a-text-file-python-json
+#
+#  https://en.wikipedia.org/wiki/YAML#Comparison_with_JSON
+#  https://stackoverflow.com/questions/8525765/load-parameters-from-a-file-in-python
+#  https://docs.python.org/2/library/json.html#module-json
+#  https://docs.python.org/2/library/configparser.html
+#
+# ========================================================================================
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
@@ -111,7 +115,6 @@
 #              change reflects the new function.  Called from midnight_process().
 #              Could move a chunk of this around remove_night_images() to a separate
 #              subroutine.
-#   NOTE: Remove daylight_image_list_____________________________________________()
 # 20180702 RAD Made a stab at uploading mp4 files to the web server.  Could be broken
 #              to year folders ... like arc_2018 ... but it may not be an issue...
 # 20180702 RAD General cleanup...
@@ -135,23 +138,6 @@
 # 20180531 RAD Added gloabl catching_up, which detects when the list of files to
 #              process exceeds a certain threshold (3 at this point), and reduces
 #              the sleep duration during that condition.
-# ========================================================================================
-# ========================================================================================
-# ========================================================================================
-#
-#  EXTERNALIZING LOCAL SETTINGS:
-#
-#  exec()
-#  https://docs.python.org/2.0/ref/exec.html
-#
-#  Best way to retrieve variable values from a text file - Python - Json
-#  https://stackoverflow.com/questions/924700/best-way-to-retrieve-variable-values-from-a-text-file-python-json
-#
-#  https://en.wikipedia.org/wiki/YAML#Comparison_with_JSON
-#  https://stackoverflow.com/questions/8525765/load-parameters-from-a-file-in-python
-#  https://docs.python.org/2/library/json.html#module-json
-#  https://docs.python.org/2/library/configparser.html
-#
 # ========================================================================================
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -202,10 +188,21 @@ import re
 import socket
 import calendar
 
-
-
 import RPi.GPIO as GPIO
-relay_GPIO = 17
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#  NOTE: The relay GPIO port should be externalized.  NOW HARD-WIRED FOR South camera.
+#
+#  NOTE: For the SunFounder Relay Module, there's sort of a double negative at work.
+#     It is active low, so by default you might think GPIO.LOW.
+#
+#     But ... We are using the NC contacts of the relay so that, with the module
+#     unpowered, the webcam gets power.  Power-cycling means energizing the relay
+#     briefly by driving the input pin low.
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+relay_GPIO = 23
+relay2_GPIO = 24
+webcam_ON = GPIO.HIGH
+webcam_OFF = GPIO.LOW
 
 # ========================================================================================
 # ========================================================================================
@@ -221,15 +218,14 @@ relay_GPIO = 17
 #  But I hesitate to give up the flexibility just in case...
 # ========================================================================================
 # ========================================================================================
+# startingpoint = sys.argv[1] if len(sys.argv) >= 2 else 'blah'
 # ========================================================================================
 work_dir = ""
 main_image = ""
 thumbnail_image = ""
 remote_dir = ""
 
-# startingpoint = sys.argv[1] if len(sys.argv) >= 2 else 'blah'
 
-# ========================================================================================
 this_script = sys.argv[0]
 image_data_file = re.sub('\.py', '__.dat', this_script)
 logger_file = re.sub('\.py', '.log', this_script)
@@ -293,7 +289,7 @@ def main():
 		logger( "INFO: remote_dir (default) = \"{}\"".format(remote_dir) )
 		remote_dir = "South"
 
-	setup_gpio( GPIO.HIGH )
+	setup_gpio()
 
 	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
 	nvers = mono_version()
@@ -320,50 +316,42 @@ def main():
 
 
 # ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# Clean up any GPIO configs - typically on exit.
-#
-# ----------------------------------------------------------------------------------------
-def destroy():
-	##DEBUG## ___print "\nShutting down..."
-	logger("Shutting down...\n")
-	GPIO.output(relay_GPIO, GPIO.HIGH)
-	GPIO.cleanup()
-
-# ----------------------------------------------------------------------------------------
 # Set up the GPIO.
 # Caller can specify the initial state.
 #
+# NOTE: For the SunFounder module, if we don't set the 2nd GPIO high it seems to
+#       "float", so the LED for relay 2 comes on dimly.  This is a little "cleaner."
 # ----------------------------------------------------------------------------------------
-def setup_gpio( initial_state ):
+def setup_gpio():
 	GPIO.setwarnings(False)
-	#  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 	GPIO.setmode(GPIO.BCM)
-	## GPIO.setup(relay_GPIO, GPIO.OUT, initial=GPIO.HIGH)
-	GPIO.setup(relay_GPIO, GPIO.OUT, initial=initial_state)
+	GPIO.setup(relay_GPIO, GPIO.OUT, initial=webcam_ON)
+	GPIO.setup(relay2_GPIO, GPIO.OUT, initial=webcam_ON)
 
 # ----------------------------------------------------------------------------------------
 # Cycle the power on the relay / GPIO.
 # The off time can be specified.  Here in secs.
 #
+# From a quick test, the (South) RSX-3211 webam seems to take around 32 secs to reboot.
 # ----------------------------------------------------------------------------------------
 def power_cycle( interval ):
-	### sleep(1)
-
 	logger( '...open relay contacts.')
-	GPIO.output(relay_GPIO, GPIO.LOW)
+	GPIO.output(relay_GPIO, webcam_OFF)
 
 	sleep( interval )
 
 	logger('...close relay contacts.')
-	GPIO.output(relay_GPIO, GPIO.HIGH)
+	GPIO.output(relay_GPIO, webcam_ON)
 
-
+# ----------------------------------------------------------------------------------------
+# Clean up any GPIO configs - typically on exit.
+#
+# ----------------------------------------------------------------------------------------
+def destroy_gpio():
+	##DEBUG## ___print "\nShutting down..."
+	logger("Shutting down...\n")
+	GPIO.output(relay_GPIO, webcam_ON)
+	GPIO.cleanup()
 
 
 # ----------------------------------------------------------------------------------------
@@ -1397,12 +1385,14 @@ if __name__ == '__main__':
 		log_string( "\n" )
 		logger("  Good bye from " + this_script)
 
-
+	exit()
 
 
 # ----------------------------------------------------------------------------------------
-###	exit()
-
+#  This started as a test.  Turned out with some embellishment, to be helpful in
+#  going back in history to create a _daylight version of the video.  For the moment
+#  this remains here are the end of the file just in case.
+# ----------------------------------------------------------------------------------------
 def test_remove_night_images() :
 	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
 
