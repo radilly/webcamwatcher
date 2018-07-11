@@ -1,6 +1,6 @@
 #!/usr/bin/python -u
 #@@@ ... Restart using...
-# NOTE: There are still come things based on argv[0] (this_script); log, PID, image_data_file...
+# NOTE: There are still some things based on argv[0] (this_script); log, PID, image_data_file...
 #   kill -9 `cat /home/pi/N/webcamimager.PID`
 #   cd /home/pi/N ; nohup /usr/bin/python -u ./webcamimager.py /home/pi/N/North N.jpg N_thumb.jpg North
 #
@@ -9,6 +9,8 @@
 #
 # To set the reference date back...
 #     printf "20180523214508\nsnapshot-2018-05-23-21-45-08.jpg\n" > webcamimager__.dat
+# OR ...
+#     date +"%Y%m%d%k%M%S" > N/webcamimager__.dat ; date +"snapshot-%Y-%m-%d-%k-%M-%S.jpg" >> N/webcamimager__.dat
 #
 # Stop with ...
 #   kill -9 `cat webcamimager.PID`
@@ -16,6 +18,11 @@
 # Start with ...
 #   nohup /usr/bin/python -u /home/pi/webcamimager.py >> /home/pi/webcamimager.log 2>&1 &
 #
+# ----------------------------------------------------------------------------------------
+#   NOTE: This should be able to be run as a service. (systemctl)
+# ----------------------------------------------------------------------------------------
+#    * NOTE: Should look more carefully of the use of subprocess
+# ----------------------------------------------------------------------------------------
 #    * NOTE:
 #       next_image_file() could bypass some of the processing of each snapshot if
 #       catching_up == True.  We DO want to handle the midnight rollover, however
@@ -31,7 +38,7 @@
 #   2018/07/03 13:26:04 DEBUG: file # 273 of 287 (Catching up)
 #   2018/07/03 13:26:04 DEBUG: Copy /home/pi/S/South/snapshot-2018-07-03-09-01-30.jpg as S.jpg
 #
-# vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+# ========================================================================================
 #    * NOTE: When I started this up on the North camera on Pi 03 I had to tweak / create
 #            / install a few things to get going...
 #       sudo apt-get install proftpd      - - - - to allow webcam to upload....
@@ -39,16 +46,7 @@
 #       sudo apt-get install ffmpeg       - - - - This is a fairly big package....
 #       vi .ftp.credentials
 #
-# Need to use today's date or midnight_process() fails somewhere...
-#  150  printf "20180523214508\nsnapshot-2018-05-23-21-45-08.jpg\n" > webcamimager__.dat
-#  171  printf "20180616000001\nsnapshot-2018-06-16-00-00-01.jpg\n" > webcamimager__.dat
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-#
-# vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-#    * NOTE: Should look more carefully of the use of subprocess
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-#
-# vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+# ----------------------------------------------------------------------------------------
 #
 #   Images as jpg files are uploaded to a folder via ftp from the webcam.  Files
 #   are name with date and time (local to the camera) in the form
@@ -72,15 +70,10 @@
 #      * Create a web page to access video   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< To be done
 #      * Upload the mp4 file and web page to the server   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< To be done
 #
-#   NOTE: This should be able to be run as a service. (systemctl)
-#
-#   NOTE: These packages are needed:
-#             sudo apt-get install proftpd
-#             sudo apt-get install graphicsmagick-imagemagick-compat
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 #
 #   Considered using something to watch for directory changes.  Not sure it's
-#   worth the complexity.  I think stating the direcory is inexpensive while
+#   worth the complexity.  I think stat-ing the direcory is inexpensive while
 #   polling.  Nevertheless, here are some references:
 #
 #   https://blog.philippklaus.de/2011/08/watching-directories-for-changes-using-python_-_an-overview
@@ -92,21 +85,36 @@
 #   https://pypi.org/project/python-watcher/
 #   https://pypi.org/project/watcher/
 #   https://pypi.org/project/fs-watcher/
-#
 #   https://github.com/johnwesonga/directory-watcher/blob/master/dirwatcher.py
-#
 #   http://www.docmoto.com/support/advanced-topics/creating-a-folder-monitor-using-python/
 #
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# ========================================================================================
+# ========================================================================================
+#
+#  EXTERNALIZING LOCAL SETTINGS:
+#
+#  exec()
+#  https://docs.python.org/2.0/ref/exec.html
+#
+#  Best way to retrieve variable values from a text file - Python - Json
+#  https://stackoverflow.com/questions/924700/best-way-to-retrieve-variable-values-from-a-text-file-python-json
+#
+#  https://en.wikipedia.org/wiki/YAML#Comparison_with_JSON
+#  https://stackoverflow.com/questions/8525765/load-parameters-from-a-file-in-python
+#  https://docs.python.org/2/library/json.html#module-json
+#  https://docs.python.org/2/library/configparser.html
 #
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# ========================================================================================
+# 20180710 RAD Cleaned up push_to_test() and moved the routine and the call to it into
+#              the live code.  The call to it is commented out.  Also, if you use it,
+#              you'll need to set up FTP server, id and password in the def.
 # 20180707 RAD Wrote remove_night_images() based on daylight_image_list().  The name
 #              change reflects the new function.  Called from midnight_process().
 #              Could move a chunk of this around remove_night_images() to a separate
 #              subroutine.
-#   NOTE: Remove daylight_image_list_____________________________________________()
 # 20180702 RAD Made a stab at uploading mp4 files to the web server.  Could be broken
 #              to year folders ... like arc_2018 ... but it may not be an issue...
 # 20180702 RAD General cleanup...
@@ -130,23 +138,6 @@
 # 20180531 RAD Added gloabl catching_up, which detects when the list of files to
 #              process exceeds a certain threshold (3 at this point), and reduces
 #              the sleep duration during that condition.
-# ========================================================================================
-# ========================================================================================
-# ========================================================================================
-#
-#  EXTERNALIZING LOCAL SETTINGS:
-#
-#  exec()
-#  https://docs.python.org/2.0/ref/exec.html
-#
-#  Best way to retrieve variable values from a text file - Python - Json
-#  https://stackoverflow.com/questions/924700/best-way-to-retrieve-variable-values-from-a-text-file-python-json
-#
-#  https://en.wikipedia.org/wiki/YAML#Comparison_with_JSON
-#  https://stackoverflow.com/questions/8525765/load-parameters-from-a-file-in-python
-#  https://docs.python.org/2/library/json.html#module-json
-#  https://docs.python.org/2/library/configparser.html
-#
 # ========================================================================================
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -197,10 +188,21 @@ import re
 import socket
 import calendar
 
-
-
 import RPi.GPIO as GPIO
-relay_GPIO = 17
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#  NOTE: The relay GPIO port should be externalized.  NOW HARD-WIRED FOR South camera.
+#
+#  NOTE: For the SunFounder Relay Module, there's sort of a double negative at work.
+#     It is active low, so by default you might think GPIO.LOW.
+#
+#     But ... We are using the NC contacts of the relay so that, with the module
+#     unpowered, the webcam gets power.  Power-cycling means energizing the relay
+#     briefly by driving the input pin low.
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+relay_GPIO = 23
+relay2_GPIO = 24
+webcam_ON = GPIO.HIGH
+webcam_OFF = GPIO.LOW
 
 # ========================================================================================
 # ========================================================================================
@@ -216,15 +218,14 @@ relay_GPIO = 17
 #  But I hesitate to give up the flexibility just in case...
 # ========================================================================================
 # ========================================================================================
+# startingpoint = sys.argv[1] if len(sys.argv) >= 2 else 'blah'
 # ========================================================================================
 work_dir = ""
 main_image = ""
 thumbnail_image = ""
 remote_dir = ""
 
-# startingpoint = sys.argv[1] if len(sys.argv) >= 2 else 'blah'
 
-# ========================================================================================
 this_script = sys.argv[0]
 image_data_file = re.sub('\.py', '__.dat', this_script)
 logger_file = re.sub('\.py', '.log', this_script)
@@ -288,7 +289,7 @@ def main():
 		logger( "INFO: remote_dir (default) = \"{}\"".format(remote_dir) )
 		remote_dir = "South"
 
-	setup_gpio( GPIO.HIGH )
+	setup_gpio()
 
 	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
 	nvers = mono_version()
@@ -315,50 +316,42 @@ def main():
 
 
 # ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# Clean up any GPIO configs - typically on exit.
-#
-# ----------------------------------------------------------------------------------------
-def destroy():
-	##DEBUG## ___print "\nShutting down..."
-	logger("Shutting down...\n")
-	GPIO.output(relay_GPIO, GPIO.HIGH)
-	GPIO.cleanup()
-
-# ----------------------------------------------------------------------------------------
 # Set up the GPIO.
 # Caller can specify the initial state.
 #
+# NOTE: For the SunFounder module, if we don't set the 2nd GPIO high it seems to
+#       "float", so the LED for relay 2 comes on dimly.  This is a little "cleaner."
 # ----------------------------------------------------------------------------------------
-def setup_gpio( initial_state ):
+def setup_gpio():
 	GPIO.setwarnings(False)
-	#  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 	GPIO.setmode(GPIO.BCM)
-	## GPIO.setup(relay_GPIO, GPIO.OUT, initial=GPIO.HIGH)
-	GPIO.setup(relay_GPIO, GPIO.OUT, initial=initial_state)
+	GPIO.setup(relay_GPIO, GPIO.OUT, initial=webcam_ON)
+	GPIO.setup(relay2_GPIO, GPIO.OUT, initial=webcam_ON)
 
 # ----------------------------------------------------------------------------------------
 # Cycle the power on the relay / GPIO.
 # The off time can be specified.  Here in secs.
 #
+# From a quick test, the (South) RSX-3211 webam seems to take around 32 secs to reboot.
 # ----------------------------------------------------------------------------------------
 def power_cycle( interval ):
-	### sleep(1)
-
 	logger( '...open relay contacts.')
-	GPIO.output(relay_GPIO, GPIO.LOW)
+	GPIO.output(relay_GPIO, webcam_OFF)
 
 	sleep( interval )
 
 	logger('...close relay contacts.')
-	GPIO.output(relay_GPIO, GPIO.HIGH)
+	GPIO.output(relay_GPIO, webcam_ON)
 
-
+# ----------------------------------------------------------------------------------------
+# Clean up any GPIO configs - typically on exit.
+#
+# ----------------------------------------------------------------------------------------
+def destroy_gpio():
+	##DEBUG## ___print "\nShutting down..."
+	logger("Shutting down...\n")
+	GPIO.output(relay_GPIO, webcam_ON)
+	GPIO.cleanup()
 
 
 # ----------------------------------------------------------------------------------------
@@ -549,6 +542,7 @@ def tar_dailies(date_string) :
 		try:
 			subprocess.check_call(tar_cmd, shell=True)
 			tar_failed = False
+			unlink( image_index )
 		except :
 			logger( "ERROR: Unexpected ERROR in tar: {}".format( sys.exc_info()[0] ) )
 
@@ -753,7 +747,6 @@ def next_image_file() :
 		# Progress indicator Ending
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 			log_string( "||\n" )
-###			print "||"
 
 		# ------------------------------------------------------------------------
 		#  This is a strange failure mode of the web cam...    06/02/2018
@@ -778,13 +771,22 @@ def next_image_file() :
 		else :
 			jpg_size = check_stable_size( source_file )
 
+
+		# ------------------------------------------------------------------------
+		# This is used when I need to test a software change on a second Pi for
+		# processing webcam images.  Yesterday I used this when I was building
+		# a larger SD card for 2 purposes:
+		# * To (briefly) test that this script would run (all prereqs met)
+		# * To accumulate the full days images to support midnight processing
+		# ------------------------------------------------------------------------
+		# push_to_test(source_file, work_dir)
+		# logger( "DEBUG: FTP'ing {} to Pi 03 {}".format( source_file, work_dir ) )
+
+
 		if jpg_size < 500 :
 			log_string( "\n" )
-###			print ""
 			power_cycle( 5 )
 			logger( "WARNING: Skipping image file {} size = {}".format( source_file, jpg_size ) )
-			#  These lines can be used as a shell script...
-###			print "rm {}/{}".format( work_dir, file_list[line] )
 
 			try:
 				subprocess.check_output("rm {}/{}".format( work_dir, file_list[line] ), shell=True)
@@ -867,8 +869,6 @@ def next_image_file() :
 
 		# First '.' right after processing is done...
 		log_string('.')
-###		sys.stdout.write('.')
-###		sys.stdout.flush()
 		last_filename = current_filename
 
 
@@ -1027,75 +1027,6 @@ def remove_night_images( date_string, working_dir ) :
 	found = kept + deleted
 	logger( "DEBUG: remove_night_images kept {} and deleted {} of ()".format( kept, deleted, found ) )
 	return found
-
-
-
-# ----------------------------------------------------------------------------------------
-# NOTE: Under development.  Eventually just delete the files, and build another mp4.
-#
-#  Build a list of the dark image files - the nighttime images.
-#  These are images we want to delete if we want to generate an mp4 which just
-#  covers first light to dusk using ffmpeg, which is more interesting than nighttime.
-#
-#
-#  Could build an array with array.append() - but for not output a file...
-#
-#  date_string example = "2018-07-04" - i.e. the date part of a snapshot file.
-# ----------------------------------------------------------------------------------------
-def daylight_image_list_____________________________________________( date_string, working_dir ) :
-	# Oddly, North and South cameras would want different thresholds ideally
-	#   Could look at the files sizes up until 3 or 4, take and average or something,
-	#   add some percentage (depending on the variance), and use that for threshold.
-	threshold = 13500
-
-	yyyy = re.sub(r'(....).*', r'\1', date_string)
-	arc_dir = working_dir + '/arc_' + yyyy
-
-	file_list = listdir( working_dir )
-	file_list_len = len( file_list )
-	file_list.sort()
-
-	image_index = arc_dir + '/index_to_remove-' + date_string + ".txt"
-	FH = open(image_index, "w")
-
-	look_for = "snapshot-" + date_string
-	logger( "DEBUG: look_for = {}.".format( look_for ) )
-
-	found = 0
-
-	for iii in range(0, file_list_len ) :
-		logger( "DEBUG: file[{}] = {}.".format( iii, file_list[iii] ) )
-		if look_for in file_list[iii] :
-			file_size = stat( working_dir + '/' + file_list[iii] ).st_size
-			logger( "DEBUG: file {} is {} bytes.".format( file_list[iii], file_size ) )
-			if file_size > threshold :
-				break
-			FH.write( "rm " + working_dir + "/" + file_list[iii] + "\n" )
-###			unlink( working_dir + "/" + file_list[iii] )
-			found += 1
-
-
-
-	for iii in range(file_list_len - 1, -1, -1):
-		logger( "DEBUG: file[{}] = {}.".format( iii, file_list[iii] ) )
-		if look_for in file_list[iii] :
-			file_size = stat( working_dir + '/' + file_list[iii] ).st_size
-			logger( "DEBUG: file {} is {} bytes.".format( file_list[iii], file_size ) )
-			if file_size > threshold :
-				break
-			FH.write( "rm " + working_dir + "/" + file_list[iii] + "\n" )
-###			unlink( working_dir + "/" + file_list[iii] )
-			found += 1
-
-	FH.close
-
-	logger( "DEBUG: {} items found for index file.".format( found ) )
-
-	return found
-
-
-
-
 
 
 # ----------------------------------------------------------------------------------------
@@ -1367,6 +1298,45 @@ def wait_ffmpeg() :
 			return
 
 
+
+# ----------------------------------------------------------------------------------------
+# TEST Support
+#
+# 
+# ----------------------------------------------------------------------------------------
+def push_to_test(source_file, remote_path) :
+#      source_file = work_dir + '/' + file_list[line]
+	server = "192.168.1.152"
+	login = "pi"
+	password = "password"
+
+	if re.search('/', source_file) :
+		local_file_bare = re.sub(r'.*/', r'', source_file)
+
+	# --------------------------------------------------------------------------------
+	#
+	# See https://stackoverflow.com/questions/567622/is-there-a-pythonic-way-to-try-something-up-to-a-maximum-number-of-times
+	# --------------------------------------------------------------------------------
+	for iii in range(5) :
+		try :
+			ftp = FTP( server )
+			ftp.login( login, password )
+			ftp.cwd( remote_path )
+			ftp.storbinary('STOR ' +  local_file_bare, open(source_file, 'rb'))
+			ftp.quit()
+			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+			# Yes, that's a return that's not at the funtion end
+			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+			return
+		except socket.error, e :
+			iii += 1
+			print "FTP Socket Error %d: %s" % (e.args[0], e.args[1])
+			for jjj in range(0, len(e.args) - 1) :
+				print "    {}",format( e.args[jjj] )
+			# Increase the sleep time with each iteration
+			sleep(iii)
+	return
+
 # ----------------------------------------------------------------------------------------
 # The function main contains a "do forever..." (and is called in a try block here)
 #
@@ -1377,7 +1347,6 @@ if __name__ == '__main__':
 	#### This might be useful...
 	#### if sys.argv[1] = "stop"
 	log_string( "\n\n\n\n" )
-#	print "\n\n\n\n"
 	messager("INFO: Starting " + this_script + "  PID=" + str(getpid()))
 	logger("INFO: Starting " + this_script + "  PID=" + str(getpid()))
 
@@ -1414,15 +1383,16 @@ if __name__ == '__main__':
 		# Progress indicator Ending
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		log_string( "\n" )
-###		print ""
 		logger("  Good bye from " + this_script)
 
-
+	exit()
 
 
 # ----------------------------------------------------------------------------------------
-###	exit()
-
+#  This started as a test.  Turned out with some embellishment, to be helpful in
+#  going back in history to create a _daylight version of the video.  For the moment
+#  this remains here are the end of the file just in case.
+# ----------------------------------------------------------------------------------------
 def test_remove_night_images() :
 	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
 
@@ -1468,63 +1438,6 @@ def test_remove_night_images() :
 ########################################################################################
 ########################################################################################
 ########################################################################################
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-#      push_to_test(source_file, "TEST")
-#      messager( "DEBUG: FTP'ing {} to Pi 03 TEST".format( source_file ) )
-
-# ----------------------------------------------------------------------------------------
-#  This pushes the specified file to the (hosted) web server via FTP.
-#
-#
-#  FTP User: camdilly
-#  FTP PWD: /home/content/b/o/b/bobdilly/html/WX
-#
-#  https://pythonspot.com/en/ftp-client-in-python/
-#  https://docs.python.org/2/library/ftplib.html
-# ----------------------------------------------------------------------------------------
-#
-# Variant of push_to_server(local_file, remote_path) :
-def push_to_test(source_file, remote_path) :
-#      source_file = work_dir + '/' + file_list[line]
-       global ftp_login
-       global ftp_password
-
-       if re.search('/', source_file) :
-               local_file_bare = re.sub(r'.*/', r'', source_file)
-
-       # --------------------------------------------------------------------------------
-       #
-       # See https://stackoverflow.com/questions/567622/is-there-a-pythonic-way-to-try-something-up-to-a-maximum-number-of-times
-       # --------------------------------------------------------------------------------
-       for iii in range(5) :
-               try :
-                       ftp = FTP('192.168.1.152')
-                       ftp.login( 'pi', 'raspberry' )
-                       ftp.cwd( remote_path )
-                       ftp.storbinary('STOR ' +  local_file_bare, open(source_file, 'rb'))
-                       ftp.quit()
-                       # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-                       # Yes, that's a return that's not at the funtion end
-                       # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-                       return
-               except socket.error, e :
-                       iii += 1
-                       print "FTP Socket Error %d: %s" % (e.args[0], e.args[1])
-                       for jjj in range(0, len(e.args) - 1) :
-                               print "    {}",format( e.args[jjj] )
-                       # Increase the sleep time with each iteration
-                       sleep(iii)
-       return
-
-# ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
