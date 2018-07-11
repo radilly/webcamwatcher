@@ -1576,13 +1576,13 @@ def camera_down():
 
 		# ------------------------------------------------------------------------
 		#  NOTE: This pcyc_holdoff_time business may not be needed.
-		#  Seems to me we only want to avoid power-cycling the webcam repetesly.
-		#  We're not doint that from here at the moment...
+		#  Seems to me we only want to avoid power-cycling the webcam repeatedly
+		#  We are not doing that from here at the moment...
 		# ------------------------------------------------------------------------
 		if pcyc_holdoff_time > 0 :
 			if int(time.strftime("%s")) > pcyc_holdoff_time :
 				# holdoff has expired
-				logger(words[0] + " " + words[2] + " waiting on webcam image update.")
+				logger("WARNING: Waiting on webcam image update at web server.")
 				###### if data['camera_down'] == 0 :
 				######	log_event("", " waiting on webcam image update.", 104 )
 		else:
