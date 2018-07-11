@@ -22,22 +22,6 @@
 #   NOTE: This should be able to be run as a service. (systemctl)
 # ----------------------------------------------------------------------------------------
 #    * NOTE: Should look more carefully of the use of subprocess
-# ----------------------------------------------------------------------------------------
-#    * NOTE:
-#       next_image_file() could bypass some of the processing of each snapshot if
-#       catching_up == True.  We DO want to handle the midnight rollover, however
-#       there may not be much value in making a copy of the snapshot with the generic
-#       name, creating the thumbnail, and then pushing both to the web server...
-#       At least not on every iteration.  The sleep time while catching up is now 0.5.
-#   Log Example:
-#   .
-#   2018/07/03 13:26:00 DEBUG: file # 272 of 287 (Catching up)
-#   2018/07/03 13:26:00 DEBUG: Copy /home/pi/S/South/snapshot-2018-07-03-08-59-30.jpg as S.jpg
-#   2018/07/03 13:26:02 DEBUG: Create thumbnail and upload to South
-#   .
-#   2018/07/03 13:26:04 DEBUG: file # 273 of 287 (Catching up)
-#   2018/07/03 13:26:04 DEBUG: Copy /home/pi/S/South/snapshot-2018-07-03-09-01-30.jpg as S.jpg
-#
 # ========================================================================================
 #    * NOTE: When I started this up on the North camera on Pi 03 I had to tweak / create
 #            / install a few things to get going...
@@ -108,6 +92,9 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20180711 RAD Modified next_image_file() to bypass much of the processing of each snapshot
+#              when catching_up == True.  We DO want to handle the midnight rollover.
+#              We could, but don't, push images to the webserver every X images...
 # 20180710 RAD Cleaned up push_to_test() and moved the routine and the call to it into
 #              the live code.  The call to it is commented out.  Also, if you use it,
 #              you'll need to set up FTP server, id and password in the def.
@@ -708,6 +695,14 @@ def next_image_file() :
 			# snapshot-2018-05-23-16-57-04.jpg
 			tok = re.split('-', re.sub('\.jpg', '', file_list[line]) )
 
+			if int(tok[1]) < 2000 :
+				old_file = work_dir + '/' + file_list[line]
+				logger( "WARNING: old file {}".format( old_file ) )
+				# May happen wen webcam power-cycles, but NTP hasn't synched yet...
+				# -rw-r--r-- 1 pi pi 44070 Jul 11 06:19 N/North/snapshot-1969-12-31-19-02-00.jpg
+				# Because of the timezone, this is before the start of the Unix epoch!!!
+				unlink( old_file )
+
 			digit_string = tok[1]
 			for iii in range(2, 7) :
 				digit_string = digit_string + tok[iii]
@@ -724,7 +719,7 @@ def next_image_file() :
 
 	# --------------------------------------------------------------------------------
 	#  Ended loop above for 1 of 2 reasons:
-	#    We found a new, unprocedded file (same if as breaks out of loop above)
+	#    We found a new, unprocessed file (same if as breaks out of loop above)
 	#  ... or
 	#    We ran through the snapshot files and did not find one with a newer
 	#       timestamp in the name.
@@ -741,6 +736,7 @@ def next_image_file() :
 		if (file_list_len - line) > 3 :
 			log_string( "\n" )
 			logger( "DEBUG: file # {} of {} (Catching up)".format( line, file_list_len ) )
+			logger( "DEBUG: skipping file {} processing".format( file_list[line] ) )
 			catching_up = True
 		else :
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -822,33 +818,38 @@ def next_image_file() :
 
 
 
-		logger( "DEBUG: Copy {} as {}".format( source_file, main_image ) )
 
-		shutil.copy2( source_file, target_file )
-		push_to_server( target_file, remote_dir, wserver )
+		if not catching_up :
+			logger( "DEBUG: Copy {} as {}".format( source_file, main_image ) )
+			shutil.copy2( source_file, target_file )
+			push_to_server( target_file, remote_dir, wserver )
 
-		thumbnail_file = work_dir + '/' + thumbnail_image
+			thumbnail_file = work_dir + '/' + thumbnail_image
 
-		convert = ""
+			convert = ""
 #DEBUG#		messager( "DEBUG: Create thumbnail {} and upload to {}".format(thumbnail_file, remote_dir ) )
-		logger( "DEBUG: Create thumbnail and upload to {}".format( remote_dir ) )
-		convert_cmd = ['/usr/bin/convert',
-				work_dir + '/' + main_image,
-				'-resize', '30%',
-				thumbnail_file ]
-		try :
-			convert = subprocess.check_output( convert_cmd, stderr=subprocess.STDOUT )
+			logger( "DEBUG: Create thumbnail and upload to {}".format( remote_dir ) )
+			convert_cmd = ['/usr/bin/convert',
+					work_dir + '/' + main_image,
+					'-resize', '30%',
+					thumbnail_file ]
+			try :
+				convert = subprocess.check_output( convert_cmd, stderr=subprocess.STDOUT )
+				subprocess.check_output( ['/usr/bin/touch', work_dir] )
+			except:
+				logger( "ERROR: Unexpected ERROR in convert: {}".format( sys.exc_info()[0] ) )
+
+			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+			# Generally nothing, unless -verbose is used...
+			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+			if len(convert) > 0 :
+				logger( "DEBUG: convert returned data: \"" + convert + "\"" )
+
+			push_to_server( thumbnail_file, remote_dir, wserver )
+		else :
+			# Necessary to keep "processing"
 			subprocess.check_output( ['/usr/bin/touch', work_dir] )
-		except:
-			logger( "ERROR: Unexpected ERROR in convert: {}".format( sys.exc_info()[0] ) )
 
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		# Generally nothing, unless -verbose is used...
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		if len(convert) > 0 :
-			logger( "DEBUG: convert returned data: \"" + convert + "\"" )
-
-		push_to_server( thumbnail_file, remote_dir, wserver )
 
 		store_file_data( next_timestamp, file_list[line] )
 		last_timestamp = next_timestamp
