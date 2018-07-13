@@ -92,6 +92,9 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# xxx
+# 20180713 RAD Added some messaging for systemctl.  Changed the name of tar (.tgz) files
+#              to start with the YYYYMMDD date like all the other midnight files.
 # 20180711 RAD Modified next_image_file() to bypass much of the processing of each snapshot
 #              when catching_up == True.  We DO want to handle the midnight rollover.
 #              We could, but don't, push images to the webserver every X images...
@@ -251,6 +254,7 @@ def main():
 	if len(sys.argv) >= 2 :
 		work_dir = sys.argv[1]
 		logger( "INFO: arg 1 = \"{}\" (work_dir)".format(work_dir) )
+		messager( "INFO: arg 1 = \"{}\" (work_dir)".format(work_dir) )
 	else :
 		logger( "INFO: work_dir (default) = \"{}\"".format(work_dir) )
 		work_dir = "South"
@@ -258,6 +262,7 @@ def main():
 	if len(sys.argv) >= 3 :
 		main_image = sys.argv[2]
 		logger( "INFO: arg 2 = \"{}\" (main_image)".format(main_image) )
+		messager( "INFO: arg 2 = \"{}\" (main_image)".format(main_image) )
 	else :
 		logger( "INFO: main_image (default) = \"{}\"".format(main_image) )
 		main_image = "S.jpg"
@@ -265,6 +270,7 @@ def main():
 	if len(sys.argv) >= 4 :
 		thumbnail_image = sys.argv[3]
 		logger( "INFO: arg 3 = \"{}\" (thumbnail_image)".format(thumbnail_image) )
+		messager( "INFO: arg 3 = \"{}\" (thumbnail_image)".format(thumbnail_image) )
 	else :
 		logger( "INFO: thumbnail_image (default) = \"{}\"".format(thumbnail_image) )
 		thumbnail_image = "S_thumb.jpg"
@@ -272,6 +278,7 @@ def main():
 	if len(sys.argv) >= 5 :
 		remote_dir = sys.argv[4]
 		logger( "INFO: arg 4 = \"{}\" (remote_dir)".format(remote_dir) )
+		messager( "INFO: arg 4 = \"{}\" (remote_dir)".format(remote_dir) )
 	else :
 		logger( "INFO: remote_dir (default) = \"{}\"".format(remote_dir) )
 		remote_dir = "South"
@@ -360,6 +367,8 @@ def midnight_process(date_string) :
 	arc_dir = work_dir + '/arc_' + yyyy
 	mp4_file = "{}/{}.mp4".format( arc_dir, date_stamp )
 	tar_file = arc_dir + "/arc-" + date_string + ".tgz"
+# xxx
+	tar_file = arc_dir + "/" + date_stamp + "_arc.tgz"
 
 	if not os.path.exists( arc_dir ) :
 		logger( "INFO: Created {}.  HAPPY NEW YEAR.".format( arc_dir) )
@@ -500,6 +509,8 @@ def tar_dailies(date_string) :
 	arc_dir = work_dir + '/arc_' + yyyy
 	image_index = arc_dir + '/index-' + date_string + ".txt"
 	tar_file = arc_dir + "/arc-" + date_string + ".tgz"
+# xxx
+	tar_file = arc_dir + "/" + date_stamp + "_arc.tgz"
 
 
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -1344,7 +1355,7 @@ def push_to_test(source_file, remote_path) :
 # This handles the startup and shutdown of the script.
 # ----------------------------------------------------------------------------------------
 if __name__ == '__main__':
-	global work_dir, main_image, thumbnail_image, remote_dir
+######################################################################################################	global work_dir, main_image, thumbnail_image, remote_dir
 	#### This might be useful...
 	#### if sys.argv[1] = "stop"
 	log_string( "\n\n\n\n" )
