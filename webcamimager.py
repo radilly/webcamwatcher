@@ -1,5 +1,5 @@
 #!/usr/bin/python -u
-#@@@ ... Restart using...
+# @@@ ... Restart using...
 # NOTE: There are still some things based on argv[0] (this_script); log, PID, image_data_file...
 #   kill -9 `cat /home/pi/N/webcamimager.PID`
 #   cd /home/pi/N ; nohup /usr/bin/python -u ./webcamimager.py /home/pi/N/North N.jpg N_thumb.jpg North
@@ -39,10 +39,6 @@
 #        snapshot-2018-05-23-16-57-04.jpg
 #        snapshot-2018-05-23-16-59-04.jpg
 #        snapshot-2018-05-23-17-01-04.jpg
-#
-#        snapshot-2018-05-24-21-49-41.jpg
-#        snapshot-2018-05-24-21-54-41.jpg
-#        snapshot-2018-05-24-21-59-41.jpg
 #
 #   This script will poll for new files.
 #   It can keep track of the last processed file using a stored timestamp from
@@ -92,7 +88,12 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
-# xxx
+#
+# 20180714 RAD Added read_config() which reads a config file and sets some global
+#              variables.  Instead of 4 parameters, we now have just one - the name
+#              of the config file. Logging and messaging now uses local time (not
+#              UTC). Added camera_down() but it isn't called yet.  Needs to get called
+#              when we're logging dots .......
 # 20180713 RAD Added some messaging for systemctl.  Changed the name of tar (.tgz) files
 #              to start with the YYYYMMDD date like all the other midnight files.
 # 20180711 RAD Modified next_image_file() to bypass much of the processing of each snapshot
@@ -150,6 +151,8 @@ import subprocess
 # check_output
 # check_call
 
+import ConfigParser
+
 # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 import datetime
 from time import sleep
@@ -189,8 +192,9 @@ import RPi.GPIO as GPIO
 #     unpowered, the webcam gets power.  Power-cycling means energizing the relay
 #     briefly by driving the input pin low.
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-relay_GPIO = 23
-relay2_GPIO = 24
+# relay_GPIO = 23
+relay_GPIO = ""
+relay2_GPIO = ""
 webcam_ON = GPIO.HIGH
 webcam_OFF = GPIO.LOW
 
@@ -214,7 +218,7 @@ work_dir = ""
 main_image = ""
 thumbnail_image = ""
 remote_dir = ""
-
+image_age_URL = ""
 
 this_script = sys.argv[0]
 image_data_file = re.sub('\.py', '__.dat', this_script)
@@ -234,9 +238,9 @@ catching_up = False
 sleep_for = 5
 
 # strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
+# Could not get %Z to work. "empty string if the the object is naive" ... which now() is...
 strftime_FMT = "%Y/%m/%d %H:%M:%S"
 wserver = "dillys.org"
-
 
 # ========================================================================================
 # ----------------------------------------------------------------------------------------
@@ -246,54 +250,42 @@ wserver = "dillys.org"
 # ----------------------------------------------------------------------------------------
 # ========================================================================================
 def main():
-	global ftp_login
-	global ftp_password
-	global work_dir, main_image, thumbnail_image, remote_dir
+#	global ftp_login, ftp_password
+#	global work_dir, main_image, thumbnail_image, remote_dir
+#	global relay_GPIO, relay2_GPIO, webcam_ON, webcam_OFF
 
-	# Could do this where globals are declared, but logger() isn't yet available...
 	if len(sys.argv) >= 2 :
-		work_dir = sys.argv[1]
-		logger( "INFO: arg 1 = \"{}\" (work_dir)".format(work_dir) )
-		messager( "INFO: arg 1 = \"{}\" (work_dir)".format(work_dir) )
+		config_file = sys.argv[1]
 	else :
-		logger( "INFO: work_dir (default) = \"{}\"".format(work_dir) )
-		work_dir = "South"
+		log_and_message( "ERROR: cfg file is a required first argument." )
+		exit()
 
-	if len(sys.argv) >= 3 :
-		main_image = sys.argv[2]
-		logger( "INFO: arg 2 = \"{}\" (main_image)".format(main_image) )
-		messager( "INFO: arg 2 = \"{}\" (main_image)".format(main_image) )
-	else :
-		logger( "INFO: main_image (default) = \"{}\"".format(main_image) )
-		main_image = "S.jpg"
+	if not os.path.isfile( config_file ) :
+		log_and_message( "ERROR: cfg file \"{}\" not found.".format( config_file ) )
+		exit()
 
-	if len(sys.argv) >= 4 :
-		thumbnail_image = sys.argv[3]
-		logger( "INFO: arg 3 = \"{}\" (thumbnail_image)".format(thumbnail_image) )
-		messager( "INFO: arg 3 = \"{}\" (thumbnail_image)".format(thumbnail_image) )
-	else :
-		logger( "INFO: thumbnail_image (default) = \"{}\"".format(thumbnail_image) )
-		thumbnail_image = "S_thumb.jpg"
+	log_and_message( "INFO: reading \"{}\"".format( config_file ) )
+	read_config( config_file )
 
-	if len(sys.argv) >= 5 :
-		remote_dir = sys.argv[4]
-		logger( "INFO: arg 4 = \"{}\" (remote_dir)".format(remote_dir) )
-		messager( "INFO: arg 4 = \"{}\" (remote_dir)".format(remote_dir) )
-	else :
-		logger( "INFO: remote_dir (default) = \"{}\"".format(remote_dir) )
-		remote_dir = "South"
+	log_and_message( "INFO: work_dir = \"{}\"".format(work_dir) )
+	log_and_message( "INFO: main_image = \"{}\"".format(main_image) )
+	log_and_message( "INFO: thumbnail_image = \"{}\"".format(thumbnail_image) )
+	log_and_message( "INFO: remote_dir = \"{}\"".format(remote_dir) )
+	log_and_message( "INFO: relay_GPIO = \"{}\"".format( relay_GPIO ) )
+	log_and_message( "INFO: image_age_URL = \"{}\"".format( image_age_URL ) )
+	print "."
 
 	setup_gpio()
 
-	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
+	# Handled by read_config()
+	# fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
+
 	nvers = mono_version()
-	messager("INFO: Mono version: {}" .format( nvers ) )
-	logger("INFO: Mono version: {}" .format( nvers ) )
+	log_and_message("INFO: Mono version: {}" .format( nvers ) )
 
 	python_version = "v " + str(sys.version)
 	python_version = re.sub(r'\n', r', ', python_version )
-	messager( "INFO: Python version: {}".format( python_version ) )
-	logger( "INFO: Python version: {}".format( python_version ) )
+	log_and_message( "INFO: Python version: {}".format( python_version ) )
 
 	while True:
 		next_image_file()
@@ -306,6 +298,93 @@ def main():
 		sleep(duration)
 
 	exit()
+
+
+
+# ----------------------------------------------------------------------------------------
+# Read the config file, and set global variables based on it.
+#
+#
+# ----------------------------------------------------------------------------------------
+def read_config( config_file ) :
+	global work_dir, main_image, thumbnail_image, remote_dir
+	global ftp_login, ftp_password
+	global relay_GPIO, relay2_GPIO, webcam_ON, webcam_OFF
+
+# @@@
+	config = ConfigParser.RawConfigParser()
+	config.optionxform = str
+	config.read( config_file )
+	#print config.getboolean('Settings','bla') # Manual Way to acess them
+
+	parameter=dict(config.items("webcamimager"))
+	for p in parameter:
+		parameter[p]=parameter[p].split("#",1)[0].strip() # To get rid of inline comments
+###		print p
+###		print parameter[p]
+
+	globals().update(parameter)  #Make them availible globally
+
+
+###	print "."
+###	messager( "INFO: work_dir = \"{}\"".format(work_dir) )
+###	messager( "INFO: main_image = \"{}\"".format(main_image) )
+###	messager( "INFO: thumbnail_image = \"{}\"".format(thumbnail_image) )
+###	messager( "INFO: remote_dir = \"{}\"".format(remote_dir) )
+###	print "."
+###	messager( "INFO: relay_GPIO = \"{}\"".format( relay_GPIO ) )
+###	print "."
+
+
+
+	if not os.path.exists( work_dir ) :
+		log_and_message( "ERROR: work_dir, \"{}\" not found.".format( work_dir ) )
+		exit()
+
+	if not re.match('.+\.jpg$', main_image, flags=re.I) :
+		log_and_message( "ERROR: main_image, \"{}\" not ending in .jpg.".format( main_image ) )
+		exit()
+
+	if not re.match('.+\.jpg$', thumbnail_image, flags=re.I) :
+		log_and_message( "ERROR: thumbnail_image, \"{}\" not ending in .jpg.".format( main_image ) )
+		exit()
+
+
+	if not os.path.isfile( work_dir + "/.ftp.credentials" ) :
+		log_and_message( "ERROR: work_dir, \"{}\" suspect.  {} not found.".format( work_dir + "/.ftp.credentials" ) )
+		exit()
+
+
+	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
+
+	try :
+		ftp = FTP( wserver )
+	except :
+		log_and_message( "ERROR: Unexpected ERROR in FTP: {}".format( sys.exc_info()[0] ) )
+
+	try :
+		ftp.login( ftp_login, ftp_password )
+	except :
+		log_and_message( "ERROR: Unexpected ERROR in FTP login: {}".format( sys.exc_info()[0] ) )
+
+	try :
+		ftp.cwd( remote_dir )
+	except :
+		log_and_message( "ERROR: Unexpected ERROR in FTP cwd: {}".format( sys.exc_info()[0] ) )
+		log_and_message( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
+
+	try :
+		ftp.quit()
+	except :
+		log_and_message( "ERROR: Unexpected ERROR in FTP quit: {}".format( sys.exc_info()[0] ) )
+		log_and_message( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
+		exit()
+
+	if len(relay_GPIO) > 0 :
+		relay_GPIO = int( relay_GPIO )
+
+	if len(relay2_GPIO) > 0 :
+		relay2_GPIO = int( relay2_GPIO )
 
 
 
@@ -393,7 +472,7 @@ def midnight_process(date_string) :
 
 
 
-#@@@
+# @@@
 	if remove_night_images( date_string, work_dir ) < 1 :
 		logger( "WARNING: Could not find images for date \"{}\"".format( date_string ) )
 
@@ -464,6 +543,7 @@ def generate_video(date_string, mp4_out) :
 	wait_ffmpeg()
 
 	logger( "DEBUG: Creating mp4 using cmd: " + ffmpeg_cmd )
+	convert = ""
 	try:
 		convert = subprocess.check_output(ffmpeg_cmd , shell=True)
 		ffmpeg_status = False
@@ -506,6 +586,7 @@ def tar_dailies(date_string) :
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
 	yyyy = re.sub(r'(....).*', r'\1', date_string)
+	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
 	arc_dir = work_dir + '/arc_' + yyyy
 	image_index = arc_dir + '/index-' + date_string + ".txt"
 	tar_file = arc_dir + "/arc-" + date_string + ".tgz"
@@ -1219,7 +1300,7 @@ def fetch_FTP_credentials( ftp_credentials_file ) :
 #       especially if we want to turn this into a service.
 # ----------------------------------------------------------------------------------------
 def logger(message):
-	timestamp = datetime.datetime.utcnow().strftime(strftime_FMT)
+	timestamp = datetime.datetime.now().strftime(strftime_FMT)
 
 	FH = open(logger_file, "a")
 	FH.write( "{} {}\n".format( timestamp, message) )
@@ -1242,8 +1323,20 @@ def log_string(text):
 #
 # ----------------------------------------------------------------------------------------
 def messager(message):
-	timestamp = datetime.datetime.utcnow().strftime(strftime_FMT)
+	timestamp = datetime.datetime.now().strftime(strftime_FMT)
 	print "{} {}".format( timestamp, message)
+
+# ----------------------------------------------------------------------------------------
+# Print message with a leading timestamp.
+#
+# ----------------------------------------------------------------------------------------
+def log_and_message(message):
+	timestamp = datetime.datetime.now().strftime(strftime_FMT)
+	print "{} {}".format( timestamp, message)
+
+	FH = open(logger_file, "a")
+	FH.write( "{} {}\n".format( timestamp, message) )
+	FH.close
 
 # ----------------------------------------------------------------------------------------
 # Write the PID of this Python script to a .PID file by the name name.
@@ -1312,6 +1405,73 @@ def wait_ffmpeg() :
 
 
 # ----------------------------------------------------------------------------------------
+#  Check webcam status by fetching a control file from the hosted web-server.
+#  The file just contains a number - the number of seconds between the time of
+#  last writing the generically-named full-size image file, e.g. N.jpg by FTP,
+#  an the current time.  Since cron_10_min.sh runs every 5 minutes
+#
+#   Can verify with: curl http://dillys.org/wx/North/N_age.txt
+#
+#  20180705 - Since moving most of the web cam image processing to the Pi, cron_10_min.sh
+#  was seriously chopped down.  I also deleted a lof of the control files, including the
+#  one this routine was looking at.  Oopps.  Looking at this routine, I decided it was
+#  too complicated.
+#
+#  20180415 - Camera didn't stop, but was uploading some garbage periodically.
+#  This file gets an epoch timestamp written to it when we've seen a number of 0-length
+#  or rather short images uploaded from the webcam within a certain period.
+#		response = urllib.urlopen('http://dillys.org/wx/N_cam_reboot_request.txt')
+#
+# ----------------------------------------------------------------------------------------
+def camera_down():
+#	global check_counter
+
+	try:
+
+#DEBUG#		logger("DEBUG: reading: \"{}\"".format( image_age_URL ) )
+		response = urlopen( image_age_URL )
+		age = response.read()
+#DEBUG#		logger("DEBUG: image age read from web: \"{}\"".format( age ) )
+		# ------------------------------------------------------------------
+		# The file contains at least a trailing newline ... I've not looked
+		#   "545   1504095902   12:25:02_UTC "
+		#
+		# systemd seems to complain about urlopen failing in restart...
+		#     Maybe content = "0 0 00:00:00_UTC" if urlopen fails??
+		# ------------------------------------------------------------------
+	except:
+		age = "0"
+		logger("WARNING: Assumed image age: {}".format( age ) )
+
+	age = int( age.rstrip() )
+#	##DEBUG## ___print words[0], words[2]
+#
+#	# Periodically put a record into the log for reference.
+#	if 0 == (check_counter % log_stride) :
+#		logger("INFO: image age: {}".format( age ) )
+#
+#	check_counter += 1
+
+	# ================================================================================
+	#
+	# ================================================================================
+	if age > 420 :
+		logger("WARNING: image age: {}".format( age ) )
+		power_cycle(5)
+#		log_restart( "webcam power-cycled, interval: {}".format( age ) )
+		# Give the cam time to reset, and the webserver crontab to fire.
+		# The camera comes up pretty quickly, but it seems to resynch to
+		# the 5-minute interval, and the server crontab only fires every
+		# 5 minutes (unsyncronized as a practical matter).  So 10 min max.
+		sleep(2)
+#		sleep(sleep_on_recycle)
+		return 1
+	else:
+		return 0
+
+
+
+# ----------------------------------------------------------------------------------------
 # TEST Support
 #
 # 
@@ -1359,9 +1519,7 @@ if __name__ == '__main__':
 	#### This might be useful...
 	#### if sys.argv[1] = "stop"
 	log_string( "\n\n\n\n" )
-	messager("INFO: Starting " + this_script + "  PID=" + str(getpid()))
-	logger("INFO: Starting " + this_script + "  PID=" + str(getpid()))
-
+	log_and_message("INFO: Starting {}   PID={}".format( this_script,getpid() ) )
 
 ###		For testing @@@
 ###	global ftp_login
@@ -1380,7 +1538,6 @@ if __name__ == '__main__':
 
 
 	write_pid_file()
-
 
 	try:
 		main()
