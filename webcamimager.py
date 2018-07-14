@@ -271,8 +271,9 @@ def main():
 	log_and_message( "INFO: main_image = \"{}\"".format(main_image) )
 	log_and_message( "INFO: thumbnail_image = \"{}\"".format(thumbnail_image) )
 	log_and_message( "INFO: remote_dir = \"{}\"".format(remote_dir) )
-	log_and_message( "INFO: relay_GPIO = \"{}\"".format( relay_GPIO ) )
 	log_and_message( "INFO: image_age_URL = \"{}\"".format( image_age_URL ) )
+	log_and_message( "INFO: relay_GPIO = \"{}\"".format( relay_GPIO ) )
+	log_and_message( "INFO: relay2_GPIO = \"{}\"".format( relay2_GPIO ) )
 	print "."
 
 	setup_gpio()

@@ -17,8 +17,11 @@ After=multi-user.target
 # ----------------------------------------------------------------------------
 [Service]
 Type=simple
+User=pi
+Group=pi
 WorkingDirectory=/home/pi/N
-ExecStart=/usr/bin/python -u ./webcamimager.py /home/pi/N/North N.jpg N_thumb.jpg North
+ExecStart=/usr/bin/python -u ./webcamimager.py /home/pi/N/north.cfg
+# ExecStart=/usr/bin/python -u ./webcamimager.py /home/pi/N/North N.jpg N_thumb.jpg North
 
 Restart=always
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
