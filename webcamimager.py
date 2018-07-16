@@ -88,7 +88,9 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
-#
+# 20180714 RAD Added global dot_counter to count dots added to the log while we're
+#              polling for a directory change.  This is where we need to be aware
+#              that an image is overdue.
 # 20180714 RAD Added read_config() which reads a config file and sets some global
 #              variables.  Instead of 4 parameters, we now have just one - the name
 #              of the config file. Logging and messaging now uses local time (not
@@ -175,6 +177,7 @@ from os import listdir, getpid, stat, unlink
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 import os
 from ftplib import FTP
+from urllib2 import urlopen, URLError, HTTPError
 import shutil
 import re
 
@@ -235,6 +238,7 @@ last_image_name = ""
 last_timestamp = 0
 last_filename = ""
 catching_up = False
+dot_counter = 0
 sleep_for = 5
 
 # strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
@@ -305,7 +309,9 @@ def main():
 # ----------------------------------------------------------------------------------------
 # Read the config file, and set global variables based on it.
 #
-#
+# NOTE: While the flexibility to override any global may have some benefits, it's not
+#       clear this shouldn't be limited to specific variables.  We do some verification
+#       of the values, and in fact some of these are required or we fail to run.
 # ----------------------------------------------------------------------------------------
 def read_config( config_file ) :
 	global work_dir, main_image, thumbnail_image, remote_dir
@@ -314,6 +320,7 @@ def read_config( config_file ) :
 
 # @@@
 	config = ConfigParser.RawConfigParser()
+	# This was necessary to avoid folding variable names to all lowercase.
 	config.optionxform = str
 	config.read( config_file )
 	#print config.getboolean('Settings','bla') # Manual Way to acess them
@@ -381,6 +388,19 @@ def read_config( config_file ) :
 		log_and_message( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
 		exit()
 
+	try:
+
+#DEBUG#		logger("DEBUG: reading: \"{}\"".format( image_age_URL ) )
+		response = urlopen( image_age_URL )
+#DEBUG#		logger("DEBUG: image age read from web: \"{}\"".format( age ) )
+	except:
+		log_and_message( "ERROR: Unexpected ERROR in urlopen: {}".format( sys.exc_info()[0] ) )
+		log_and_message( "ERROR: image_age_URL = \"{}\" is likely bad.".format(image_age_URL) )
+
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# We could handle these more generally.  If a value contains digits, convert to
+	# int().  If digits and a '.', use float().
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	if len(relay_GPIO) > 0 :
 		relay_GPIO = int( relay_GPIO )
 
@@ -543,18 +563,18 @@ def generate_video(date_string, mp4_out) :
 	logger( "DEBUG: calling = wait_ffmpeg()" )
 	wait_ffmpeg()
 
-	logger( "DEBUG: Creating mp4 using cmd: " + ffmpeg_cmd )
-	convert = ""
+	log_and_message( "DEBUG: Creating mp4 using cmd: " + ffmpeg_cmd )
+	ffmpeg = ""
 	try:
-		convert = subprocess.check_output(ffmpeg_cmd , shell=True)
+		ffmpeg = subprocess.check_output(ffmpeg_cmd , shell=True)
 		ffmpeg_status = False
 	except :
 ###	except CalledProcessError, EHandle:
-		logger( "ERROR: Unexpected ERROR in ffmpeg: {}".format( sys.exc_info()[0] ) )
+		log_and_message( "ERROR: Unexpected ERROR in ffmpeg: {}".format( sys.exc_info()[0] ) )
 		ffmpeg_status = True
 
-	if len(convert) > 0 :
-		logger( "DEBUG: convert returned data: \"" + convert + "\"" )
+	if len(ffmpeg) > 0 :
+		log_and_message( "DEBUG: ffmpeg returned data: \"" + ffmpeg + "\"" )
 
 	if ffmpeg_status :
 		logger( "WARNING: ffmpeg failed." )
@@ -711,12 +731,20 @@ def next_image_file() :
 	global last_image_dir_mtime
 	global catching_up
 	global current_filename
+	global dot_counter
 
 	# Should only ever happen at startup...
 	if last_timestamp == 0 :
 		last_timestamp = int(get_stored_ts())
 		last_filename = get_stored_filename()
 
+	# --------------------------------------------------------------------------------
+	#  This product of ( dot_counter * sleep_for ) is a rough estimate of the time
+	#  since the last webcam update (and the work folder was modified).  At 2 minute
+	#  updates, this should be around 120 secs, but here we all to skip on image.
+	# --------------------------------------------------------------------------------
+	if ( dot_counter * sleep_for ) > 300 :
+		logger( "WARNING: Webcam might be down. More than {} secs since last update".format( dot_counter * sleep_for ) )
 
 	# --------------------------------------------------------------------------------
 	#  Check the modification time on the image directory.
@@ -743,7 +771,8 @@ def next_image_file() :
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# Progress indicator
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		log_string('.')
+		log_string( '.' )
+		dot_counter += 1
 		last_image_dir_mtime = image_dir_mtime
 		return
 
@@ -827,7 +856,8 @@ def next_image_file() :
 		# shorten the sleep time
 		# ------------------------------------------------------------------------
 		if (file_list_len - line) > 3 :
-			log_string( "\n" )
+			log_string( "  ({})\n".format( dot_counter ) )
+			dot_counter = 0
 			logger( "DEBUG: file # {} of {} (Catching up)".format( line, file_list_len ) )
 			logger( "DEBUG: skipping file {} processing".format( file_list[line] ) )
 			catching_up = True
@@ -835,7 +865,8 @@ def next_image_file() :
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# Progress indicator Ending
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-			log_string( "||\n" )
+			log_string( "||  ({})\n".format( dot_counter ) )
+			dot_counter = 0
 
 		# ------------------------------------------------------------------------
 		#  This is a strange failure mode of the web cam...    06/02/2018
@@ -873,7 +904,8 @@ def next_image_file() :
 
 
 		if jpg_size < 500 :
-			log_string( "\n" )
+			log_string( "    ({})\n".format( dot_counter ) )
+			dot_counter = 0
 			power_cycle( 5 )
 			logger( "WARNING: Skipping image file {} size = {}".format( source_file, jpg_size ) )
 
@@ -891,9 +923,29 @@ def next_image_file() :
 			subprocess.check_output( ['/usr/bin/touch', work_dir] )
 			return
 
+
+
+		# NOTE ###################################################################
+		# NOTE ###################################################################
+		# NOTE ###################################################################
+		# NOTE ###################################################################
+		# NOTE ###################################################################
+		# NOTE ###################################################################
+		# NOTE ###################################################################
 		# ------------------------------------------------------------------------
 		#  This is pretty much untested.  And may cause DST issues...
 		#    though we attempt to use UTC...
+		# ------------------------------------------------------------------------
+		#  This probably needs to go.  I copied camera_down() here from
+		#  webcamwatch.py which goes out to the web server and checks the age
+		#  of the last image uploaded when the cron process fires.  That script
+		#  runs on a pi without the camera actually attached so we need something
+		#  that acquires remote data.  Here we have dot_counter which can do
+		#  the age check locally.  Still, it might be useful at this point to
+		#  make sure the web server is being updated.
+		#
+		#
+		#
 		# ------------------------------------------------------------------------
 		# Returns current UTC time
 		epoch_now = int( time.time() )
@@ -907,6 +959,12 @@ def next_image_file() :
 		if not catching_up and ( epoch_now - epoch_file > 600 ) :
 			power_cycle( 5 )
 
+		# NOTE ###################################################################
+		# NOTE ###################################################################
+		# NOTE ###################################################################
+		# NOTE ###################################################################
+		# NOTE ###################################################################
+		# NOTE ###################################################################
 
 
 
@@ -962,7 +1020,8 @@ def next_image_file() :
 #DEBUG#		messager( "DEBUG: last_filename = {} current_filename = {}".format( last_filename, current_filename ) )
 
 		# First '.' right after processing is done...
-		log_string('.')
+		log_string( '.' )
+		dot_counter += 1
 		last_filename = current_filename
 
 
