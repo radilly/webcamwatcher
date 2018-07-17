@@ -13,6 +13,8 @@
 Description=Webcam Image Processing North
 After=multi-user.target
 
+
+# ----------------------------------------------------------------------------
 # https://www.freedesktop.org/software/systemd/man/systemd.service.html
 # ----------------------------------------------------------------------------
 [Service]
@@ -31,8 +33,14 @@ Restart=always
 # https://unix.stackexchange.com/questions/316114/service-start-request-repeated-too-quickly-refusing-to-start
 # https://unix.stackexchange.com/questions/289629/systemd-restart-always-is-not-honored
 #
-#      RestartSec=20
+RestartSec=60
+# StartLimitIntervalSec=interval, StartLimitBurst=burst
+StartLimitInterval=700
+StartLimitBurst=10
 #  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# https://serverfault.com/questions/736624/systemd-service-automatic-restart-after-startlimitinterval
+#  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 
 [Install]
 RequiredBy=multi-user.target
