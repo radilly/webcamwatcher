@@ -19,7 +19,7 @@
 #   nohup /usr/bin/python -u /home/pi/webcamimager.py >> /home/pi/webcamimager.log 2>&1 &
 #
 # ----------------------------------------------------------------------------------------
-#   NOTE: This should be able to be run as a service. (systemctl)
+#    * NOTE: This should be able to be run as a service. (systemctl)
 # ----------------------------------------------------------------------------------------
 #    * NOTE: Should look more carefully of the use of subprocess
 # ========================================================================================
@@ -29,6 +29,18 @@
 #       sudo apt-get install graphicsmagick-imagemagick-compat
 #       sudo apt-get install ffmpeg       - - - - This is a fairly big package....
 #       vi .ftp.credentials
+#
+# ----------------------------------------------------------------------------------------
+#    * NOTE: Exception handling is weak / inconsistent.  Look at try - except blocks.
+#  Refs:
+#  https://docs.python.org/2.7/tutorial/errors.html
+#  https://docs.python.org/2/library/exceptions.html
+#  https://stackoverflow.com/questions/32613375/python-2-7-exception-handling-syntax
+#    At the moment push_to_server() may be the best swag at it.  The connection to
+#    the GoDaddy-hosted server can be flaky.  Examples:
+#
+# 2018/07/17 02:35:30 DEBUG: Copy /home/pi/N/North/snapshot-2018-07-17-02-35-37.jpg as N.jpg
+# 2018/07/17 02:35:31 FTP Socket Error 113: No route to host
 #
 # ----------------------------------------------------------------------------------------
 #
@@ -88,6 +100,10 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20180717 RAD Looked like push_to_server() didn't make multiple tries to connect to the
+#              hosted webserver.  Failed with "No route to host" and the systemd service
+#              stopped.  I wonder if "except socket.error" was too specific, so I now
+#              trap all.
 # 20180714 RAD Added global dot_counter to count dots added to the log while we're
 #              polling for a directory change.  This is where we need to be aware
 #              that an image is overdue.
@@ -971,7 +987,9 @@ def next_image_file() :
 
 
 		if not catching_up :
-			logger( "DEBUG: Copy {} as {}".format( source_file, main_image ) )
+			logger( "DEBUG: Processing {}".format( source_file ) )
+###			logger( "DEBUG: Copy {} as {}".format( source_file, main_image ) )
+
 			shutil.copy2( source_file, target_file )
 			push_to_server( target_file, remote_dir, wserver )
 
@@ -979,7 +997,7 @@ def next_image_file() :
 
 			convert = ""
 #DEBUG#		messager( "DEBUG: Create thumbnail {} and upload to {}".format(thumbnail_file, remote_dir ) )
-			logger( "DEBUG: Create thumbnail and upload to {}".format( remote_dir ) )
+###			logger( "DEBUG: Create thumbnail and upload to {}".format( remote_dir ) )
 			convert_cmd = ['/usr/bin/convert',
 					work_dir + '/' + main_image,
 					'-resize', '30%',
@@ -1048,7 +1066,8 @@ def check_stable_size( filename ) :
 			break
 
 		last_size = file_size
-		logger( "DEBUG: check_stable_size wait #{}.  {} bytes.".format(iii+1, file_size) )
+		if iii > 1 :
+			logger( "DEBUG: check_stable_size wait #{}.  {} bytes.".format(iii+1, file_size) )
 		sleep( 1 )
 
 	return last_size
@@ -1297,26 +1316,66 @@ def push_to_server(local_file, remote_path, server) :
 	# See https://stackoverflow.com/questions/567622/is-there-a-pythonic-way-to-try-something-up-to-a-maximum-number-of-times
 	# --------------------------------------------------------------------------------
 	for iii in range(8) :
-		try :
-#DEBUG#			messager( "DEBUG: FTP connect to {}".format( server ) )
-			ftp = FTP( server )
-			ftp.login( ftp_login, ftp_password )
-#DEBUG#			messager( "DEBUG: FTP remote cd to {}".format( remote_path ) )
-			ftp.cwd( remote_path )
-#DEBUG#			messager( "DEBUG: FTP STOR {} to  {}".format( local_file_bare, local_file) )
-			ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
-			ftp.quit()
-			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-			# Yes, that's a return that's not at the funtion end
-			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-			return
-		except socket.error, e :
-			iii += 1
-			logger( "FTP Socket Error {}: {}".format( e.args[0], e.args[1]) )
-			for jjj in range(0, len(e.args)) :
-				logger( "    {}",format( e.args[jjj] ) )
-			# Increase the sleep time with each iteration
+		if iii > 1 :
+		# Not on first iteration.  The increase the sleep time with each iteration.
 			sleep( iii * 3 )
+
+
+		try :
+			# ----------------------------------------------------------------
+#DEBUG#			messager( "DEBUG: FTP connect to {}".format( server ) )
+			#
+			# Ref: https://docs.python.org/2/library/ftplib.html
+			# NOTE: The login/user, and password could be given here...
+			#     FTP([host[, user[, passwd[, acct[, timeout]]]]])
+			#
+			# ----------------------------------------------------------------
+			ftp = FTP( server, ftp_login, ftp_password )
+		except Exception as problem :
+			logger( "ERROR: FTP (connect): {}".format( problem ) )
+			continue
+
+
+###		try :
+###			ftp.login( ftp_login, ftp_password )
+
+
+		try :
+#DEBUG#			logger( "DEBUG: FTP remote cd to {}".format( remote_path ) )
+			ftp.cwd( remote_path )
+		except Exception as problem :
+			logger( "ERROR: ftp.cwd {}".format( problem ) )
+			continue
+
+
+		try :
+#DEBUG#			logger( "DEBUG: FTP STOR {} to  {}".format( local_file_bare, local_file) )
+			ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
+		except Exception as problem :
+			logger( "ERROR: ftp.storbinary {}".format( problem ) )
+			continue
+
+
+		ftp.quit()
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# Yes, that's a return that's not at the funtion end
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		return
+
+##### -----------------------------------------------------------------------------
+##### Example output.  Good message, but I had all the ftp commands in the same try
+##### block so I don't know which call actually failed.
+##### 2018/07/17 02:35:31 FTP Socket Error 113: No route to host
+#####
+#####		except socket.error, e :
+#####			iii += 1
+#####			logger( "FTP Socket Error {}: {}".format( e.args[0], e.args[1]) )
+#####			for jjj in range(0, len(e.args)) :
+#####				logger( "    {}",format( e.args[jjj] ) )
+#####			# Increase the sleep time with each iteration
+#####			sleep( iii * 3 )
+##### -----------------------------------------------------------------------------
+
 ###		except :
 ###			messager( "ERROR: Unexpected ERROR in FTP: {}".format( sys.exc_info()[0] ) )
 ###			iii += 1
