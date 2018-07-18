@@ -334,13 +334,15 @@ def read_config( config_file ) :
 	global ftp_login, ftp_password
 	global relay_GPIO, relay2_GPIO, webcam_ON, webcam_OFF
 
-# @@@
+# @@@	# https://docs.python.org/2/library/configparser.html
 	config = ConfigParser.RawConfigParser()
 	# This was necessary to avoid folding variable names to all lowercase.
+	# https://stackoverflow.com/questions/19359556/configparser-reads-capital-keys-and-make-them-lower-case
 	config.optionxform = str
 	config.read( config_file )
 	#print config.getboolean('Settings','bla') # Manual Way to acess them
 
+	# https://stackoverflow.com/questions/924700/best-way-to-retrieve-variable-values-from-a-text-file-python-json
 	parameter=dict(config.items("webcamimager"))
 	for p in parameter:
 		parameter[p]=parameter[p].split("#",1)[0].strip() # To get rid of inline comments
@@ -379,17 +381,18 @@ def read_config( config_file ) :
 		exit()
 
 
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# Check the FTP credentials we read.
+	#
+	#  See push_to_server() which tries this in a loop... To handle GoDaddy outages.
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
 
 	try :
-		ftp = FTP( wserver )
-	except :
-		log_and_message( "ERROR: Unexpected ERROR in FTP: {}".format( sys.exc_info()[0] ) )
-
-	try :
-		ftp.login( ftp_login, ftp_password )
-	except :
-		log_and_message( "ERROR: Unexpected ERROR in FTP login: {}".format( sys.exc_info()[0] ) )
+		ftp = FTP( wserver, ftp_login, ftp_password )
+	except Exception as problem :
+		log_and_message( "ERROR: Unexpected ERROR in FTP connect: {}".format( sys.exc_info()[0] ) )
+		log_and_message( "ERROR: FTP (connect): {}".format( problem ) )
 
 	try :
 		ftp.cwd( remote_dir )
@@ -760,7 +763,9 @@ def next_image_file() :
 	#  updates, this should be around 120 secs, but here we all to skip on image.
 	# --------------------------------------------------------------------------------
 	if ( dot_counter * sleep_for ) > 300 :
-		logger( "WARNING: Webcam might be down. More than {} secs since last update".format( dot_counter * sleep_for ) )
+		if 0 == ( dot_counter % 5 ) :
+			log_string( "  ({})\n".format( dot_counter ) )
+			logger( "WARNING: Webcam might be down. More than {} secs since last update".format( dot_counter * sleep_for ) )
 
 	# --------------------------------------------------------------------------------
 	#  Check the modification time on the image directory.
@@ -833,12 +838,17 @@ def next_image_file() :
 			# snapshot-2018-05-23-16-57-04.jpg
 			tok = re.split('-', re.sub('\.jpg', '', file_list[line]) )
 
+			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+			# May happen when webcam power-cycles, but NTP hasn't synched yet...
+			# -rw-r--r-- 1 pi pi 44070 Jul 11 06:19 N/North/snapshot-1969-12-31-19-02-00.jpg
+			# Because of the timezone, this is before the start of the Unix epoch!!!
+			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 			if int(tok[1]) < 2000 :
-				old_file = work_dir + '/' + file_list[line]
-				logger( "WARNING: old file {}".format( old_file ) )
-				# May happen wen webcam power-cycles, but NTP hasn't synched yet...
-				# -rw-r--r-- 1 pi pi 44070 Jul 11 06:19 N/North/snapshot-1969-12-31-19-02-00.jpg
-				# Because of the timezone, this is before the start of the Unix epoch!!!
+				log_string( "||  ({})\n".format( dot_counter ) )
+				dot_counter = 0
+###				old_file = work_dir + '/' + file_list[line]
+				old_file = file_list[line]
+				logger( "WARNING: Probably webcam reboot: old file! {}".format( old_file ) )
 				unlink( old_file )
 
 			digit_string = tok[1]
@@ -1723,6 +1733,13 @@ def test_remove_night_images() :
 		logger( "ERROR: Unexpected ERROR in rm: {}".format( sys.exc_info()[0] ) )
 
 	exit()
+
+# ========================================================================================
+#    * NOTE: Some Python pages I refer to
+#  Regular Expressions
+#  https://docs.python.org/2/library/re.html
+# ========================================================================================
+
 ########################################################################################
 ########################################################################################
 ########################################################################################
