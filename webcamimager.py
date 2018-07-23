@@ -100,6 +100,9 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20180723 RAD Changed wait from 1 to 2 secs in check_stable_size().  Got a failure,
+#              "convert convert: Corrupt JPEG data: premature end of data segment."
+#              Made the daylight mp4 generation conditional - 24-hour must build first.
 # 20180717 RAD Looked like push_to_server() didn't make multiple tries to connect to the
 #              hosted webserver.  Failed with "No route to host" and the systemd service
 #              stopped.  I wonder if "except socket.error" was too specific, so I now
@@ -489,6 +492,9 @@ def midnight_process(date_string) :
 # xxx
 	tar_file = arc_dir + "/" + date_stamp + "_arc.tgz"
 
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# Create tar file after some checking.
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	if not os.path.exists( arc_dir ) :
 		logger( "INFO: Created {}.  HAPPY NEW YEAR.".format( arc_dir) )
 		os.mkdir( arc_dir, 0755 )
@@ -505,36 +511,49 @@ def midnight_process(date_string) :
 	else :
 		tar_failed = False
 
-	ffmpeg_failed = generate_video( date_string, mp4_file )
 
-	if not ffmpeg_failed :
-		push_to_server( mp4_file, remote_dir, wserver )
-
-
-
-# @@@
-	if remove_night_images( date_string, work_dir ) < 1 :
-		logger( "WARNING: Could not find images for date \"{}\"".format( date_string ) )
-
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# Create thumbnail image for web pages
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	tnf = daily_thumbnail( date_string, work_dir )
 	if len(tnf) > 0 :
 		push_to_server( tnf, remote_dir, wserver )
 
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# Create the full 24-hour video
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	ffmpeg_failed = generate_video( date_string, mp4_file )
 
-
-	mp4_file_daylight = "{}/{}_daylight.mp4".format( arc_dir, date_stamp )
-	ffmpeg_failed = generate_video( date_string, mp4_file_daylight )
-
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# If that succeeded, make the daylight video
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	if not ffmpeg_failed :
-		push_to_server( mp4_file_daylight, remote_dir, wserver )
+		push_to_server( mp4_file, remote_dir, wserver )
+
+		# Last few nights, 3 of 4 video builds seemed to end in seg faults.
+		sleep( 10 )
+
+# @@@
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# To make the daylight image, delete most of the dark overnight images.
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		if remove_night_images( date_string, work_dir ) < 1 :
+			logger( "WARNING: Could not find images for date \"{}\"".format( date_string ) )
+
+		mp4_file_daylight = "{}/{}_daylight.mp4".format( arc_dir, date_stamp )
+		ffmpeg_failed = generate_video( date_string, mp4_file_daylight )
+
+		if not ffmpeg_failed :
+			push_to_server( mp4_file_daylight, remote_dir, wserver )
 
 
-
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# Cleanup the individual snapshot images for the day if things went well above...
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	if tar_size <= 5000000 :
 		logger( "WARNING: Tar is too small to justify deleting jpg files." )
 
-	# Could also check if ffmpeg worked ... but if we have a good tar file ...
-	if tar_size > 5000000 and not ffmpeg_failed and not tar_failed :
+	elif not ffmpeg_failed and not tar_failed :
 		logger( "INFO: Tar is large enough to delete jpg files." )
 
 		try:
@@ -558,7 +577,7 @@ def midnight_process(date_string) :
 def generate_video(date_string, mp4_out) :
 	global work_dir
 
-	ffmpeg_status = True
+	ffmpeg_failed = True
 
 	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
 	yyyy = re.sub(r'(....).*', r'\1', date_string)
@@ -586,19 +605,22 @@ def generate_video(date_string, mp4_out) :
 	ffmpeg = ""
 	try:
 		ffmpeg = subprocess.check_output(ffmpeg_cmd , shell=True)
-		ffmpeg_status = False
-	except :
+		ffmpeg_failed = False
+	except Exception as problem :
+		log_and_message( "ERROR: Unexpected ERROR in ffmpeg: {}".format( problem ) )
+		ffmpeg_failed = True
 ###	except CalledProcessError, EHandle:
-		log_and_message( "ERROR: Unexpected ERROR in ffmpeg: {}".format( sys.exc_info()[0] ) )
-		ffmpeg_status = True
+###	except :
+###		log_and_message( "ERROR: Unexpected ERROR in ffmpeg: {}".format( sys.exc_info()[0] ) )
+###		ffmpeg_failed = True
 
 	if len(ffmpeg) > 0 :
 		log_and_message( "DEBUG: ffmpeg returned data: \"" + ffmpeg + "\"" )
 
-	if ffmpeg_status :
+	if ffmpeg_failed :
 		logger( "WARNING: ffmpeg failed." )
 
-	return ffmpeg_status
+	return ffmpeg_failed
 
 
 # ----------------------------------------------------------------------------------------
@@ -849,7 +871,7 @@ def next_image_file() :
 ###				old_file = work_dir + '/' + file_list[line]
 				old_file = file_list[line]
 				logger( "WARNING: Probably webcam reboot: old file! {}".format( old_file ) )
-				unlink( old_file )
+				unlink( "{}/{}".format(work_dir, old_file ) )
 
 			digit_string = tok[1]
 			for iii in range(2, 7) :
@@ -1076,9 +1098,9 @@ def check_stable_size( filename ) :
 			break
 
 		last_size = file_size
-		if iii > 1 :
+		if iii > 0 :
 			logger( "DEBUG: check_stable_size wait #{}.  {} bytes.".format(iii+1, file_size) )
-		sleep( 1 )
+		sleep( 2 )
 
 	return last_size
 
@@ -1508,7 +1530,7 @@ def mono_version():
 #
 # ----------------------------------------------------------------------------------------
 def wait_ffmpeg() :
-	delay_secs = 3
+	delay_secs = 10
 	# Total wait approximately 3 * 35 = 105 sec (15 sec shy of 2 minutes)
 
 	for iii in range(35) :
@@ -1618,7 +1640,7 @@ def push_to_test(source_file, remote_path) :
 	#
 	# See https://stackoverflow.com/questions/567622/is-there-a-pythonic-way-to-try-something-up-to-a-maximum-number-of-times
 	# --------------------------------------------------------------------------------
-	for iii in range(5) :
+	for iii in range(8) :
 		try :
 			ftp = FTP( server )
 			ftp.login( login, password )
@@ -1633,7 +1655,7 @@ def push_to_test(source_file, remote_path) :
 			iii += 1
 			print "FTP Socket Error %d: %s" % (e.args[0], e.args[1])
 			for jjj in range(0, len(e.args) - 1) :
-				print "    {}",format( e.args[jjj] )
+				print "    {}".format( e.args[jjj] )
 			# Increase the sleep time with each iteration
 			sleep(iii)
 	return
