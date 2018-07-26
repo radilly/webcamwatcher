@@ -1,0 +1,64 @@
+# Service for starting NORTH webcam ftp'ed image handler
+#
+# Installed file: /lib/systemd/system/webcam_*****.service
+#
+# Outline: http://www.diegoacuna.me/how-to-run-a-script-as-a-service-in-raspberry-pi-raspbian-jessie/
+# freedesktop.org
+#  https://www.freedesktop.org/wiki/Software/systemd/
+#  https://www.freedesktop.org/software/systemd/man/systemd.service.html
+#  https://www.freedesktop.org/software/systemd/man/systemd.unit.html
+#  https://www.freedesktop.org/software/systemd/man/systemd.syntax.html
+# ----------------------------------------------------------------------------
+[Unit]
+Description=Webcam Image Processing North
+After=multi-user.target
+
+
+# ----------------------------------------------------------------------------
+# https://www.freedesktop.org/software/systemd/man/systemd.service.html
+# ----------------------------------------------------------------------------
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/N
+ExecStart=/usr/bin/python -u ./webcamimager.py /home/pi/N/north.cfg
+# ExecStart=/usr/bin/python -u ./webcamimager.py /home/pi/N/North N.jpg N_thumb.jpg North
+
+Restart=always
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# May not be strictly needed according to 
+# https://www.freedesktop.org/software/systemd/man/systemd.unit.html#id-1.9
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# https://unix.stackexchange.com/questions/316114/service-start-request-repeated-too-quickly-refusing-to-start
+# https://unix.stackexchange.com/questions/289629/systemd-restart-always-is-not-honored
+#
+RestartSec=60
+# StartLimitIntervalSec=interval, StartLimitBurst=burst
+StartLimitInterval=700
+StartLimitBurst=10
+#  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# https://serverfault.com/questions/736624/systemd-service-automatic-restart-after-startlimitinterval
+#  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+[Install]
+RequiredBy=multi-user.target
+# Without the above, this service wasn't starting on boot up.  Enabling displayed...
+# Created symlink /etc/systemd/system/multi-user.target.requires/webcam_north.service → /lib/systemd/system/webcam_north.service.
+# WantedBy=multi-user.target
+
+# ----------------------------------------------------------------------------
+# Other references:
+#  http://sandaysoft.com/forum/viewtopic.php?f=27&t=16087
+# ----------------------------------------------------------------------------
+##############################################################################
+# Outline of commands...
+#
+#  sudo cp -p webcam_*****.service /lib/systemd/system 
+#  sudo systemctl daemon-reload
+#  sudo systemctl enable webcam_*****
+#  sudo systemctl start webcam_*****
+#  systemctl status webcam_*****
+#  sudo systemctl stop webcam_*****
+##############################################################################

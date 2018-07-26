@@ -1,5 +1,5 @@
 #!/usr/bin/python -u
-#@@@ ... Restart using...
+# @@@ ... Restart using...
 # NOTE: There are still some things based on argv[0] (this_script); log, PID, image_data_file...
 #   kill -9 `cat /home/pi/N/webcamimager.PID`
 #   cd /home/pi/N ; nohup /usr/bin/python -u ./webcamimager.py /home/pi/N/North N.jpg N_thumb.jpg North
@@ -19,25 +19,9 @@
 #   nohup /usr/bin/python -u /home/pi/webcamimager.py >> /home/pi/webcamimager.log 2>&1 &
 #
 # ----------------------------------------------------------------------------------------
-#   NOTE: This should be able to be run as a service. (systemctl)
+#    * NOTE: This should be able to be run as a service. (systemctl)
 # ----------------------------------------------------------------------------------------
 #    * NOTE: Should look more carefully of the use of subprocess
-# ----------------------------------------------------------------------------------------
-#    * NOTE:
-#       next_image_file() could bypass some of the processing of each snapshot if
-#       catching_up == True.  We DO want to handle the midnight rollover, however
-#       there may not be much value in making a copy of the snapshot with the generic
-#       name, creating the thumbnail, and then pushing both to the web server...
-#       At least not on every iteration.  The sleep time while catching up is now 0.5.
-#   Log Example:
-#   .
-#   2018/07/03 13:26:00 DEBUG: file # 272 of 287 (Catching up)
-#   2018/07/03 13:26:00 DEBUG: Copy /home/pi/S/South/snapshot-2018-07-03-08-59-30.jpg as S.jpg
-#   2018/07/03 13:26:02 DEBUG: Create thumbnail and upload to South
-#   .
-#   2018/07/03 13:26:04 DEBUG: file # 273 of 287 (Catching up)
-#   2018/07/03 13:26:04 DEBUG: Copy /home/pi/S/South/snapshot-2018-07-03-09-01-30.jpg as S.jpg
-#
 # ========================================================================================
 #    * NOTE: When I started this up on the North camera on Pi 03 I had to tweak / create
 #            / install a few things to get going...
@@ -45,6 +29,18 @@
 #       sudo apt-get install graphicsmagick-imagemagick-compat
 #       sudo apt-get install ffmpeg       - - - - This is a fairly big package....
 #       vi .ftp.credentials
+#
+# ----------------------------------------------------------------------------------------
+#    * NOTE: Exception handling is weak / inconsistent.  Look at try - except blocks.
+#  Refs:
+#  https://docs.python.org/2.7/tutorial/errors.html
+#  https://docs.python.org/2/library/exceptions.html
+#  https://stackoverflow.com/questions/32613375/python-2-7-exception-handling-syntax
+#    At the moment push_to_server() may be the best swag at it.  The connection to
+#    the GoDaddy-hosted server can be flaky.  Examples:
+#
+# 2018/07/17 02:35:30 DEBUG: Copy /home/pi/N/North/snapshot-2018-07-17-02-35-37.jpg as N.jpg
+# 2018/07/17 02:35:31 FTP Socket Error 113: No route to host
 #
 # ----------------------------------------------------------------------------------------
 #
@@ -55,10 +51,6 @@
 #        snapshot-2018-05-23-16-57-04.jpg
 #        snapshot-2018-05-23-16-59-04.jpg
 #        snapshot-2018-05-23-17-01-04.jpg
-#
-#        snapshot-2018-05-24-21-49-41.jpg
-#        snapshot-2018-05-24-21-54-41.jpg
-#        snapshot-2018-05-24-21-59-41.jpg
 #
 #   This script will poll for new files.
 #   It can keep track of the last processed file using a stored timestamp from
@@ -108,6 +100,26 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20180723 RAD Changed wait from 1 to 2 secs in check_stable_size().  Got a failure,
+#              "convert convert: Corrupt JPEG data: premature end of data segment."
+#              Made the daylight mp4 generation conditional - 24-hour must build first.
+# 20180717 RAD Looked like push_to_server() didn't make multiple tries to connect to the
+#              hosted webserver.  Failed with "No route to host" and the systemd service
+#              stopped.  I wonder if "except socket.error" was too specific, so I now
+#              trap all.
+# 20180714 RAD Added global dot_counter to count dots added to the log while we're
+#              polling for a directory change.  This is where we need to be aware
+#              that an image is overdue.
+# 20180714 RAD Added read_config() which reads a config file and sets some global
+#              variables.  Instead of 4 parameters, we now have just one - the name
+#              of the config file. Logging and messaging now uses local time (not
+#              UTC). Added camera_down() but it isn't called yet.  Needs to get called
+#              when we're logging dots .......
+# 20180713 RAD Added some messaging for systemctl.  Changed the name of tar (.tgz) files
+#              to start with the YYYYMMDD date like all the other midnight files.
+# 20180711 RAD Modified next_image_file() to bypass much of the processing of each snapshot
+#              when catching_up == True.  We DO want to handle the midnight rollover.
+#              We could, but don't, push images to the webserver every X images...
 # 20180710 RAD Cleaned up push_to_test() and moved the routine and the call to it into
 #              the live code.  The call to it is commented out.  Also, if you use it,
 #              you'll need to set up FTP server, id and password in the def.
@@ -160,6 +172,8 @@ import subprocess
 # check_output
 # check_call
 
+import ConfigParser
+
 # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 import datetime
 from time import sleep
@@ -182,6 +196,7 @@ from os import listdir, getpid, stat, unlink
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 import os
 from ftplib import FTP
+from urllib2 import urlopen, URLError, HTTPError
 import shutil
 import re
 
@@ -199,8 +214,9 @@ import RPi.GPIO as GPIO
 #     unpowered, the webcam gets power.  Power-cycling means energizing the relay
 #     briefly by driving the input pin low.
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-relay_GPIO = 23
-relay2_GPIO = 24
+# relay_GPIO = 23
+relay_GPIO = ""
+relay2_GPIO = ""
 webcam_ON = GPIO.HIGH
 webcam_OFF = GPIO.LOW
 
@@ -224,7 +240,7 @@ work_dir = ""
 main_image = ""
 thumbnail_image = ""
 remote_dir = ""
-
+image_age_URL = ""
 
 this_script = sys.argv[0]
 image_data_file = re.sub('\.py', '__.dat', this_script)
@@ -241,12 +257,13 @@ last_image_name = ""
 last_timestamp = 0
 last_filename = ""
 catching_up = False
+dot_counter = 0
 sleep_for = 5
 
 # strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
+# Could not get %Z to work. "empty string if the the object is naive" ... which now() is...
 strftime_FMT = "%Y/%m/%d %H:%M:%S"
 wserver = "dillys.org"
-
 
 # ========================================================================================
 # ----------------------------------------------------------------------------------------
@@ -256,50 +273,43 @@ wserver = "dillys.org"
 # ----------------------------------------------------------------------------------------
 # ========================================================================================
 def main():
-	global ftp_login
-	global ftp_password
-	global work_dir, main_image, thumbnail_image, remote_dir
+#	global ftp_login, ftp_password
+#	global work_dir, main_image, thumbnail_image, remote_dir
+#	global relay_GPIO, relay2_GPIO, webcam_ON, webcam_OFF
 
-	# Could do this where globals are declared, but logger() isn't yet available...
 	if len(sys.argv) >= 2 :
-		work_dir = sys.argv[1]
-		logger( "INFO: arg 1 = \"{}\" (work_dir)".format(work_dir) )
+		config_file = sys.argv[1]
 	else :
-		logger( "INFO: work_dir (default) = \"{}\"".format(work_dir) )
-		work_dir = "South"
+		log_and_message( "ERROR: cfg file is a required first argument." )
+		exit()
 
-	if len(sys.argv) >= 3 :
-		main_image = sys.argv[2]
-		logger( "INFO: arg 2 = \"{}\" (main_image)".format(main_image) )
-	else :
-		logger( "INFO: main_image (default) = \"{}\"".format(main_image) )
-		main_image = "S.jpg"
+	if not os.path.isfile( config_file ) :
+		log_and_message( "ERROR: cfg file \"{}\" not found.".format( config_file ) )
+		exit()
 
-	if len(sys.argv) >= 4 :
-		thumbnail_image = sys.argv[3]
-		logger( "INFO: arg 3 = \"{}\" (thumbnail_image)".format(thumbnail_image) )
-	else :
-		logger( "INFO: thumbnail_image (default) = \"{}\"".format(thumbnail_image) )
-		thumbnail_image = "S_thumb.jpg"
+	log_and_message( "INFO: reading \"{}\"".format( config_file ) )
+	read_config( config_file )
 
-	if len(sys.argv) >= 5 :
-		remote_dir = sys.argv[4]
-		logger( "INFO: arg 4 = \"{}\" (remote_dir)".format(remote_dir) )
-	else :
-		logger( "INFO: remote_dir (default) = \"{}\"".format(remote_dir) )
-		remote_dir = "South"
+	log_and_message( "INFO: work_dir = \"{}\"".format(work_dir) )
+	log_and_message( "INFO: main_image = \"{}\"".format(main_image) )
+	log_and_message( "INFO: thumbnail_image = \"{}\"".format(thumbnail_image) )
+	log_and_message( "INFO: remote_dir = \"{}\"".format(remote_dir) )
+	log_and_message( "INFO: image_age_URL = \"{}\"".format( image_age_URL ) )
+	log_and_message( "INFO: relay_GPIO = \"{}\"".format( relay_GPIO ) )
+	log_and_message( "INFO: relay2_GPIO = \"{}\"".format( relay2_GPIO ) )
+	print "."
 
 	setup_gpio()
 
-	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
+	# Handled by read_config()
+	# fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
+
 	nvers = mono_version()
-	messager("INFO: Mono version: {}" .format( nvers ) )
-	logger("INFO: Mono version: {}" .format( nvers ) )
+	log_and_message("INFO: Mono version: {}" .format( nvers ) )
 
 	python_version = "v " + str(sys.version)
 	python_version = re.sub(r'\n', r', ', python_version )
-	messager( "INFO: Python version: {}".format( python_version ) )
-	logger( "INFO: Python version: {}".format( python_version ) )
+	log_and_message( "INFO: Python version: {}".format( python_version ) )
 
 	while True:
 		next_image_file()
@@ -312,6 +322,112 @@ def main():
 		sleep(duration)
 
 	exit()
+
+
+
+# ----------------------------------------------------------------------------------------
+# Read the config file, and set global variables based on it.
+#
+# NOTE: While the flexibility to override any global may have some benefits, it's not
+#       clear this shouldn't be limited to specific variables.  We do some verification
+#       of the values, and in fact some of these are required or we fail to run.
+# ----------------------------------------------------------------------------------------
+def read_config( config_file ) :
+	global work_dir, main_image, thumbnail_image, remote_dir
+	global ftp_login, ftp_password
+	global relay_GPIO, relay2_GPIO, webcam_ON, webcam_OFF
+
+# @@@	# https://docs.python.org/2/library/configparser.html
+	config = ConfigParser.RawConfigParser()
+	# This was necessary to avoid folding variable names to all lowercase.
+	# https://stackoverflow.com/questions/19359556/configparser-reads-capital-keys-and-make-them-lower-case
+	config.optionxform = str
+	config.read( config_file )
+	#print config.getboolean('Settings','bla') # Manual Way to acess them
+
+	# https://stackoverflow.com/questions/924700/best-way-to-retrieve-variable-values-from-a-text-file-python-json
+	parameter=dict(config.items("webcamimager"))
+	for p in parameter:
+		parameter[p]=parameter[p].split("#",1)[0].strip() # To get rid of inline comments
+###		print p
+###		print parameter[p]
+
+	globals().update(parameter)  #Make them availible globally
+
+
+###	print "."
+###	messager( "INFO: work_dir = \"{}\"".format(work_dir) )
+###	messager( "INFO: main_image = \"{}\"".format(main_image) )
+###	messager( "INFO: thumbnail_image = \"{}\"".format(thumbnail_image) )
+###	messager( "INFO: remote_dir = \"{}\"".format(remote_dir) )
+###	print "."
+###	messager( "INFO: relay_GPIO = \"{}\"".format( relay_GPIO ) )
+###	print "."
+
+
+
+	if not os.path.exists( work_dir ) :
+		log_and_message( "ERROR: work_dir, \"{}\" not found.".format( work_dir ) )
+		exit()
+
+	if not re.match('.+\.jpg$', main_image, flags=re.I) :
+		log_and_message( "ERROR: main_image, \"{}\" not ending in .jpg.".format( main_image ) )
+		exit()
+
+	if not re.match('.+\.jpg$', thumbnail_image, flags=re.I) :
+		log_and_message( "ERROR: thumbnail_image, \"{}\" not ending in .jpg.".format( main_image ) )
+		exit()
+
+
+	if not os.path.isfile( work_dir + "/.ftp.credentials" ) :
+		log_and_message( "ERROR: work_dir, \"{}\" suspect.  {} not found.".format( work_dir + "/.ftp.credentials" ) )
+		exit()
+
+
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# Check the FTP credentials we read.
+	#
+	#  See push_to_server() which tries this in a loop... To handle GoDaddy outages.
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
+
+	try :
+		ftp = FTP( wserver, ftp_login, ftp_password )
+	except Exception as problem :
+		log_and_message( "ERROR: Unexpected ERROR in FTP connect: {}".format( sys.exc_info()[0] ) )
+		log_and_message( "ERROR: FTP (connect): {}".format( problem ) )
+
+	try :
+		ftp.cwd( remote_dir )
+	except :
+		log_and_message( "ERROR: Unexpected ERROR in FTP cwd: {}".format( sys.exc_info()[0] ) )
+		log_and_message( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
+
+	try :
+		ftp.quit()
+	except :
+		log_and_message( "ERROR: Unexpected ERROR in FTP quit: {}".format( sys.exc_info()[0] ) )
+		log_and_message( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
+		exit()
+
+	try:
+
+#DEBUG#		logger("DEBUG: reading: \"{}\"".format( image_age_URL ) )
+		response = urlopen( image_age_URL )
+#DEBUG#		logger("DEBUG: image age read from web: \"{}\"".format( age ) )
+	except:
+		log_and_message( "ERROR: Unexpected ERROR in urlopen: {}".format( sys.exc_info()[0] ) )
+		log_and_message( "ERROR: image_age_URL = \"{}\" is likely bad.".format(image_age_URL) )
+
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# We could handle these more generally.  If a value contains digits, convert to
+	# int().  If digits and a '.', use float().
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	if len(relay_GPIO) > 0 :
+		relay_GPIO = int( relay_GPIO )
+
+	if len(relay2_GPIO) > 0 :
+		relay2_GPIO = int( relay2_GPIO )
 
 
 
@@ -373,7 +489,12 @@ def midnight_process(date_string) :
 	arc_dir = work_dir + '/arc_' + yyyy
 	mp4_file = "{}/{}.mp4".format( arc_dir, date_stamp )
 	tar_file = arc_dir + "/arc-" + date_string + ".tgz"
+# xxx
+	tar_file = arc_dir + "/" + date_stamp + "_arc.tgz"
 
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# Create tar file after some checking.
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	if not os.path.exists( arc_dir ) :
 		logger( "INFO: Created {}.  HAPPY NEW YEAR.".format( arc_dir) )
 		os.mkdir( arc_dir, 0755 )
@@ -390,36 +511,49 @@ def midnight_process(date_string) :
 	else :
 		tar_failed = False
 
-	ffmpeg_failed = generate_video( date_string, mp4_file )
 
-	if not ffmpeg_failed :
-		push_to_server( mp4_file, remote_dir, wserver )
-
-
-
-#@@@
-	if remove_night_images( date_string, work_dir ) < 1 :
-		logger( "WARNING: Could not find images for date \"{}\"".format( date_string ) )
-
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# Create thumbnail image for web pages
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	tnf = daily_thumbnail( date_string, work_dir )
 	if len(tnf) > 0 :
 		push_to_server( tnf, remote_dir, wserver )
 
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# Create the full 24-hour video
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	ffmpeg_failed = generate_video( date_string, mp4_file )
 
-
-	mp4_file_daylight = "{}/{}_daylight.mp4".format( arc_dir, date_stamp )
-	ffmpeg_failed = generate_video( date_string, mp4_file_daylight )
-
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# If that succeeded, make the daylight video
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	if not ffmpeg_failed :
-		push_to_server( mp4_file_daylight, remote_dir, wserver )
+		push_to_server( mp4_file, remote_dir, wserver )
+
+		# Last few nights, 3 of 4 video builds seemed to end in seg faults.
+		sleep( 10 )
+
+# @@@
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# To make the daylight image, delete most of the dark overnight images.
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		if remove_night_images( date_string, work_dir ) < 1 :
+			logger( "WARNING: Could not find images for date \"{}\"".format( date_string ) )
+
+		mp4_file_daylight = "{}/{}_daylight.mp4".format( arc_dir, date_stamp )
+		ffmpeg_failed = generate_video( date_string, mp4_file_daylight )
+
+		if not ffmpeg_failed :
+			push_to_server( mp4_file_daylight, remote_dir, wserver )
 
 
-
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# Cleanup the individual snapshot images for the day if things went well above...
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	if tar_size <= 5000000 :
 		logger( "WARNING: Tar is too small to justify deleting jpg files." )
 
-	# Could also check if ffmpeg worked ... but if we have a good tar file ...
-	if tar_size > 5000000 and not ffmpeg_failed and not tar_failed :
+	elif not ffmpeg_failed and not tar_failed :
 		logger( "INFO: Tar is large enough to delete jpg files." )
 
 		try:
@@ -443,7 +577,7 @@ def midnight_process(date_string) :
 def generate_video(date_string, mp4_out) :
 	global work_dir
 
-	ffmpeg_status = True
+	ffmpeg_failed = True
 
 	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
 	yyyy = re.sub(r'(....).*', r'\1', date_string)
@@ -467,22 +601,26 @@ def generate_video(date_string, mp4_out) :
 	logger( "DEBUG: calling = wait_ffmpeg()" )
 	wait_ffmpeg()
 
-	logger( "DEBUG: Creating mp4 using cmd: " + ffmpeg_cmd )
+	log_and_message( "DEBUG: Creating mp4 using cmd: " + ffmpeg_cmd )
+	ffmpeg = ""
 	try:
-		convert = subprocess.check_output(ffmpeg_cmd , shell=True)
-		ffmpeg_status = False
-	except :
+		ffmpeg = subprocess.check_output(ffmpeg_cmd , shell=True)
+		ffmpeg_failed = False
+	except Exception as problem :
+		log_and_message( "ERROR: Unexpected ERROR in ffmpeg: {}".format( problem ) )
+		ffmpeg_failed = True
 ###	except CalledProcessError, EHandle:
-		logger( "ERROR: Unexpected ERROR in ffmpeg: {}".format( sys.exc_info()[0] ) )
-		ffmpeg_status = True
+###	except :
+###		log_and_message( "ERROR: Unexpected ERROR in ffmpeg: {}".format( sys.exc_info()[0] ) )
+###		ffmpeg_failed = True
 
-	if len(convert) > 0 :
-		logger( "DEBUG: convert returned data: \"" + convert + "\"" )
+	if len(ffmpeg) > 0 :
+		log_and_message( "DEBUG: ffmpeg returned data: \"" + ffmpeg + "\"" )
 
-	if ffmpeg_status :
+	if ffmpeg_failed :
 		logger( "WARNING: ffmpeg failed." )
 
-	return ffmpeg_status
+	return ffmpeg_failed
 
 
 # ----------------------------------------------------------------------------------------
@@ -510,9 +648,12 @@ def tar_dailies(date_string) :
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
 	yyyy = re.sub(r'(....).*', r'\1', date_string)
+	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
 	arc_dir = work_dir + '/arc_' + yyyy
 	image_index = arc_dir + '/index-' + date_string + ".txt"
 	tar_file = arc_dir + "/arc-" + date_string + ".tgz"
+# xxx
+	tar_file = arc_dir + "/" + date_stamp + "_arc.tgz"
 
 
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -631,12 +772,22 @@ def next_image_file() :
 	global last_image_dir_mtime
 	global catching_up
 	global current_filename
+	global dot_counter
 
 	# Should only ever happen at startup...
 	if last_timestamp == 0 :
 		last_timestamp = int(get_stored_ts())
 		last_filename = get_stored_filename()
 
+	# --------------------------------------------------------------------------------
+	#  This product of ( dot_counter * sleep_for ) is a rough estimate of the time
+	#  since the last webcam update (and the work folder was modified).  At 2 minute
+	#  updates, this should be around 120 secs, but here we all to skip on image.
+	# --------------------------------------------------------------------------------
+	if ( dot_counter * sleep_for ) > 300 :
+		if 0 == ( dot_counter % 5 ) :
+			log_string( "  ({})\n".format( dot_counter ) )
+			logger( "WARNING: Webcam might be down. More than {} secs since last update".format( dot_counter * sleep_for ) )
 
 	# --------------------------------------------------------------------------------
 	#  Check the modification time on the image directory.
@@ -663,7 +814,8 @@ def next_image_file() :
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# Progress indicator
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		log_string('.')
+		log_string( '.' )
+		dot_counter += 1
 		last_image_dir_mtime = image_dir_mtime
 		return
 
@@ -708,6 +860,19 @@ def next_image_file() :
 			# snapshot-2018-05-23-16-57-04.jpg
 			tok = re.split('-', re.sub('\.jpg', '', file_list[line]) )
 
+			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+			# May happen when webcam power-cycles, but NTP hasn't synched yet...
+			# -rw-r--r-- 1 pi pi 44070 Jul 11 06:19 N/North/snapshot-1969-12-31-19-02-00.jpg
+			# Because of the timezone, this is before the start of the Unix epoch!!!
+			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+			if int(tok[1]) < 2000 :
+				log_string( "||  ({})\n".format( dot_counter ) )
+				dot_counter = 0
+###				old_file = work_dir + '/' + file_list[line]
+				old_file = file_list[line]
+				logger( "WARNING: Probably webcam reboot: old file! {}".format( old_file ) )
+				unlink( "{}/{}".format(work_dir, old_file ) )
+
 			digit_string = tok[1]
 			for iii in range(2, 7) :
 				digit_string = digit_string + tok[iii]
@@ -724,7 +889,7 @@ def next_image_file() :
 
 	# --------------------------------------------------------------------------------
 	#  Ended loop above for 1 of 2 reasons:
-	#    We found a new, unprocedded file (same if as breaks out of loop above)
+	#    We found a new, unprocessed file (same if as breaks out of loop above)
 	#  ... or
 	#    We ran through the snapshot files and did not find one with a newer
 	#       timestamp in the name.
@@ -739,14 +904,17 @@ def next_image_file() :
 		# shorten the sleep time
 		# ------------------------------------------------------------------------
 		if (file_list_len - line) > 3 :
-			log_string( "\n" )
+			log_string( "  ({})\n".format( dot_counter ) )
+			dot_counter = 0
 			logger( "DEBUG: file # {} of {} (Catching up)".format( line, file_list_len ) )
+			logger( "DEBUG: skipping file {} processing".format( file_list[line] ) )
 			catching_up = True
 		else :
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# Progress indicator Ending
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-			log_string( "||\n" )
+			log_string( "||  ({})\n".format( dot_counter ) )
+			dot_counter = 0
 
 		# ------------------------------------------------------------------------
 		#  This is a strange failure mode of the web cam...    06/02/2018
@@ -784,7 +952,8 @@ def next_image_file() :
 
 
 		if jpg_size < 500 :
-			log_string( "\n" )
+			log_string( "    ({})\n".format( dot_counter ) )
+			dot_counter = 0
 			power_cycle( 5 )
 			logger( "WARNING: Skipping image file {} size = {}".format( source_file, jpg_size ) )
 
@@ -802,9 +971,29 @@ def next_image_file() :
 			subprocess.check_output( ['/usr/bin/touch', work_dir] )
 			return
 
+
+
+		# NOTE ###################################################################
+		# NOTE ###################################################################
+		# NOTE ###################################################################
+		# NOTE ###################################################################
+		# NOTE ###################################################################
+		# NOTE ###################################################################
+		# NOTE ###################################################################
 		# ------------------------------------------------------------------------
 		#  This is pretty much untested.  And may cause DST issues...
 		#    though we attempt to use UTC...
+		# ------------------------------------------------------------------------
+		#  This probably needs to go.  I copied camera_down() here from
+		#  webcamwatch.py which goes out to the web server and checks the age
+		#  of the last image uploaded when the cron process fires.  That script
+		#  runs on a pi without the camera actually attached so we need something
+		#  that acquires remote data.  Here we have dot_counter which can do
+		#  the age check locally.  Still, it might be useful at this point to
+		#  make sure the web server is being updated.
+		#
+		#
+		#
 		# ------------------------------------------------------------------------
 		# Returns current UTC time
 		epoch_now = int( time.time() )
@@ -818,37 +1007,50 @@ def next_image_file() :
 		if not catching_up and ( epoch_now - epoch_file > 600 ) :
 			power_cycle( 5 )
 
+		# NOTE ###################################################################
+		# NOTE ###################################################################
+		# NOTE ###################################################################
+		# NOTE ###################################################################
+		# NOTE ###################################################################
+		# NOTE ###################################################################
 
 
 
 
-		logger( "DEBUG: Copy {} as {}".format( source_file, main_image ) )
 
-		shutil.copy2( source_file, target_file )
-		push_to_server( target_file, remote_dir, wserver )
+		if not catching_up :
+			logger( "DEBUG: Processing {}".format( source_file ) )
+###			logger( "DEBUG: Copy {} as {}".format( source_file, main_image ) )
 
-		thumbnail_file = work_dir + '/' + thumbnail_image
+			shutil.copy2( source_file, target_file )
+			push_to_server( target_file, remote_dir, wserver )
 
-		convert = ""
+			thumbnail_file = work_dir + '/' + thumbnail_image
+
+			convert = ""
 #DEBUG#		messager( "DEBUG: Create thumbnail {} and upload to {}".format(thumbnail_file, remote_dir ) )
-		logger( "DEBUG: Create thumbnail and upload to {}".format( remote_dir ) )
-		convert_cmd = ['/usr/bin/convert',
-				work_dir + '/' + main_image,
-				'-resize', '30%',
-				thumbnail_file ]
-		try :
-			convert = subprocess.check_output( convert_cmd, stderr=subprocess.STDOUT )
+###			logger( "DEBUG: Create thumbnail and upload to {}".format( remote_dir ) )
+			convert_cmd = ['/usr/bin/convert',
+					work_dir + '/' + main_image,
+					'-resize', '30%',
+					thumbnail_file ]
+			try :
+				convert = subprocess.check_output( convert_cmd, stderr=subprocess.STDOUT )
+				subprocess.check_output( ['/usr/bin/touch', work_dir] )
+			except:
+				logger( "ERROR: Unexpected ERROR in convert: {}".format( sys.exc_info()[0] ) )
+
+			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+			# Generally nothing, unless -verbose is used...
+			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+			if len(convert) > 0 :
+				logger( "DEBUG: convert returned data: \"" + convert + "\"" )
+
+			push_to_server( thumbnail_file, remote_dir, wserver )
+		else :
+			# Necessary to keep "processing"
 			subprocess.check_output( ['/usr/bin/touch', work_dir] )
-		except:
-			logger( "ERROR: Unexpected ERROR in convert: {}".format( sys.exc_info()[0] ) )
 
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		# Generally nothing, unless -verbose is used...
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		if len(convert) > 0 :
-			logger( "DEBUG: convert returned data: \"" + convert + "\"" )
-
-		push_to_server( thumbnail_file, remote_dir, wserver )
 
 		store_file_data( next_timestamp, file_list[line] )
 		last_timestamp = next_timestamp
@@ -868,7 +1070,8 @@ def next_image_file() :
 #DEBUG#		messager( "DEBUG: last_filename = {} current_filename = {}".format( last_filename, current_filename ) )
 
 		# First '.' right after processing is done...
-		log_string('.')
+		log_string( '.' )
+		dot_counter += 1
 		last_filename = current_filename
 
 
@@ -895,8 +1098,9 @@ def check_stable_size( filename ) :
 			break
 
 		last_size = file_size
-		logger( "DEBUG: check_stable_size wait #{}.  {} bytes.".format(iii+1, file_size) )
-		sleep( 1 )
+		if iii > 0 :
+			logger( "DEBUG: check_stable_size wait #{}.  {} bytes.".format(iii+1, file_size) )
+		sleep( 2 )
 
 	return last_size
 
@@ -1144,26 +1348,66 @@ def push_to_server(local_file, remote_path, server) :
 	# See https://stackoverflow.com/questions/567622/is-there-a-pythonic-way-to-try-something-up-to-a-maximum-number-of-times
 	# --------------------------------------------------------------------------------
 	for iii in range(8) :
-		try :
-#DEBUG#			messager( "DEBUG: FTP connect to {}".format( server ) )
-			ftp = FTP( server )
-			ftp.login( ftp_login, ftp_password )
-#DEBUG#			messager( "DEBUG: FTP remote cd to {}".format( remote_path ) )
-			ftp.cwd( remote_path )
-#DEBUG#			messager( "DEBUG: FTP STOR {} to  {}".format( local_file_bare, local_file) )
-			ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
-			ftp.quit()
-			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-			# Yes, that's a return that's not at the funtion end
-			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-			return
-		except socket.error, e :
-			iii += 1
-			logger( "FTP Socket Error {}: {}".format( e.args[0], e.args[1]) )
-			for jjj in range(0, len(e.args)) :
-				logger( "    {}",format( e.args[jjj] ) )
-			# Increase the sleep time with each iteration
+		if iii > 1 :
+		# Not on first iteration.  The increase the sleep time with each iteration.
 			sleep( iii * 3 )
+
+
+		try :
+			# ----------------------------------------------------------------
+#DEBUG#			messager( "DEBUG: FTP connect to {}".format( server ) )
+			#
+			# Ref: https://docs.python.org/2/library/ftplib.html
+			# NOTE: The login/user, and password could be given here...
+			#     FTP([host[, user[, passwd[, acct[, timeout]]]]])
+			#
+			# ----------------------------------------------------------------
+			ftp = FTP( server, ftp_login, ftp_password )
+		except Exception as problem :
+			logger( "ERROR: FTP (connect): {}".format( problem ) )
+			continue
+
+
+###		try :
+###			ftp.login( ftp_login, ftp_password )
+
+
+		try :
+#DEBUG#			logger( "DEBUG: FTP remote cd to {}".format( remote_path ) )
+			ftp.cwd( remote_path )
+		except Exception as problem :
+			logger( "ERROR: ftp.cwd {}".format( problem ) )
+			continue
+
+
+		try :
+#DEBUG#			logger( "DEBUG: FTP STOR {} to  {}".format( local_file_bare, local_file) )
+			ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
+		except Exception as problem :
+			logger( "ERROR: ftp.storbinary {}".format( problem ) )
+			continue
+
+
+		ftp.quit()
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# Yes, that's a return that's not at the funtion end
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		return
+
+##### -----------------------------------------------------------------------------
+##### Example output.  Good message, but I had all the ftp commands in the same try
+##### block so I don't know which call actually failed.
+##### 2018/07/17 02:35:31 FTP Socket Error 113: No route to host
+#####
+#####		except socket.error, e :
+#####			iii += 1
+#####			logger( "FTP Socket Error {}: {}".format( e.args[0], e.args[1]) )
+#####			for jjj in range(0, len(e.args)) :
+#####				logger( "    {}",format( e.args[jjj] ) )
+#####			# Increase the sleep time with each iteration
+#####			sleep( iii * 3 )
+##### -----------------------------------------------------------------------------
+
 ###		except :
 ###			messager( "ERROR: Unexpected ERROR in FTP: {}".format( sys.exc_info()[0] ) )
 ###			iii += 1
@@ -1207,7 +1451,7 @@ def fetch_FTP_credentials( ftp_credentials_file ) :
 #       especially if we want to turn this into a service.
 # ----------------------------------------------------------------------------------------
 def logger(message):
-	timestamp = datetime.datetime.utcnow().strftime(strftime_FMT)
+	timestamp = datetime.datetime.now().strftime(strftime_FMT)
 
 	FH = open(logger_file, "a")
 	FH.write( "{} {}\n".format( timestamp, message) )
@@ -1230,8 +1474,20 @@ def log_string(text):
 #
 # ----------------------------------------------------------------------------------------
 def messager(message):
-	timestamp = datetime.datetime.utcnow().strftime(strftime_FMT)
+	timestamp = datetime.datetime.now().strftime(strftime_FMT)
 	print "{} {}".format( timestamp, message)
+
+# ----------------------------------------------------------------------------------------
+# Print message with a leading timestamp.
+#
+# ----------------------------------------------------------------------------------------
+def log_and_message(message):
+	timestamp = datetime.datetime.now().strftime(strftime_FMT)
+	print "{} {}".format( timestamp, message)
+
+	FH = open(logger_file, "a")
+	FH.write( "{} {}\n".format( timestamp, message) )
+	FH.close
 
 # ----------------------------------------------------------------------------------------
 # Write the PID of this Python script to a .PID file by the name name.
@@ -1274,7 +1530,7 @@ def mono_version():
 #
 # ----------------------------------------------------------------------------------------
 def wait_ffmpeg() :
-	delay_secs = 3
+	delay_secs = 10
 	# Total wait approximately 3 * 35 = 105 sec (15 sec shy of 2 minutes)
 
 	for iii in range(35) :
@@ -1300,6 +1556,73 @@ def wait_ffmpeg() :
 
 
 # ----------------------------------------------------------------------------------------
+#  Check webcam status by fetching a control file from the hosted web-server.
+#  The file just contains a number - the number of seconds between the time of
+#  last writing the generically-named full-size image file, e.g. N.jpg by FTP,
+#  an the current time.  Since cron_10_min.sh runs every 5 minutes
+#
+#   Can verify with: curl http://dillys.org/wx/North/N_age.txt
+#
+#  20180705 - Since moving most of the web cam image processing to the Pi, cron_10_min.sh
+#  was seriously chopped down.  I also deleted a lof of the control files, including the
+#  one this routine was looking at.  Oopps.  Looking at this routine, I decided it was
+#  too complicated.
+#
+#  20180415 - Camera didn't stop, but was uploading some garbage periodically.
+#  This file gets an epoch timestamp written to it when we've seen a number of 0-length
+#  or rather short images uploaded from the webcam within a certain period.
+#		response = urllib.urlopen('http://dillys.org/wx/N_cam_reboot_request.txt')
+#
+# ----------------------------------------------------------------------------------------
+def camera_down():
+#	global check_counter
+
+	try:
+
+#DEBUG#		logger("DEBUG: reading: \"{}\"".format( image_age_URL ) )
+		response = urlopen( image_age_URL )
+		age = response.read()
+#DEBUG#		logger("DEBUG: image age read from web: \"{}\"".format( age ) )
+		# ------------------------------------------------------------------
+		# The file contains at least a trailing newline ... I've not looked
+		#   "545   1504095902   12:25:02_UTC "
+		#
+		# systemd seems to complain about urlopen failing in restart...
+		#     Maybe content = "0 0 00:00:00_UTC" if urlopen fails??
+		# ------------------------------------------------------------------
+	except:
+		age = "0"
+		logger("WARNING: Assumed image age: {}".format( age ) )
+
+	age = int( age.rstrip() )
+#	##DEBUG## ___print words[0], words[2]
+#
+#	# Periodically put a record into the log for reference.
+#	if 0 == (check_counter % log_stride) :
+#		logger("INFO: image age: {}".format( age ) )
+#
+#	check_counter += 1
+
+	# ================================================================================
+	#
+	# ================================================================================
+	if age > 420 :
+		logger("WARNING: image age: {}".format( age ) )
+		power_cycle(5)
+#		log_restart( "webcam power-cycled, interval: {}".format( age ) )
+		# Give the cam time to reset, and the webserver crontab to fire.
+		# The camera comes up pretty quickly, but it seems to resynch to
+		# the 5-minute interval, and the server crontab only fires every
+		# 5 minutes (unsyncronized as a practical matter).  So 10 min max.
+		sleep(2)
+#		sleep(sleep_on_recycle)
+		return 1
+	else:
+		return 0
+
+
+
+# ----------------------------------------------------------------------------------------
 # TEST Support
 #
 # 
@@ -1317,7 +1640,7 @@ def push_to_test(source_file, remote_path) :
 	#
 	# See https://stackoverflow.com/questions/567622/is-there-a-pythonic-way-to-try-something-up-to-a-maximum-number-of-times
 	# --------------------------------------------------------------------------------
-	for iii in range(5) :
+	for iii in range(8) :
 		try :
 			ftp = FTP( server )
 			ftp.login( login, password )
@@ -1332,7 +1655,7 @@ def push_to_test(source_file, remote_path) :
 			iii += 1
 			print "FTP Socket Error %d: %s" % (e.args[0], e.args[1])
 			for jjj in range(0, len(e.args) - 1) :
-				print "    {}",format( e.args[jjj] )
+				print "    {}".format( e.args[jjj] )
 			# Increase the sleep time with each iteration
 			sleep(iii)
 	return
@@ -1343,13 +1666,11 @@ def push_to_test(source_file, remote_path) :
 # This handles the startup and shutdown of the script.
 # ----------------------------------------------------------------------------------------
 if __name__ == '__main__':
-	global work_dir, main_image, thumbnail_image, remote_dir
+######################################################################################################	global work_dir, main_image, thumbnail_image, remote_dir
 	#### This might be useful...
 	#### if sys.argv[1] = "stop"
 	log_string( "\n\n\n\n" )
-	messager("INFO: Starting " + this_script + "  PID=" + str(getpid()))
-	logger("INFO: Starting " + this_script + "  PID=" + str(getpid()))
-
+	log_and_message("INFO: Starting {}   PID={}".format( this_script,getpid() ) )
 
 ###		For testing @@@
 ###	global ftp_login
@@ -1368,7 +1689,6 @@ if __name__ == '__main__':
 
 
 	write_pid_file()
-
 
 	try:
 		main()
@@ -1435,6 +1755,13 @@ def test_remove_night_images() :
 		logger( "ERROR: Unexpected ERROR in rm: {}".format( sys.exc_info()[0] ) )
 
 	exit()
+
+# ========================================================================================
+#    * NOTE: Some Python pages I refer to
+#  Regular Expressions
+#  https://docs.python.org/2/library/re.html
+# ========================================================================================
+
 ########################################################################################
 ########################################################################################
 ########################################################################################
