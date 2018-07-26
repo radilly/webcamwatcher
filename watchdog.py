@@ -310,7 +310,7 @@ CSV_format = [
 	"{:5.1f}f",
 	"{:5.1f}f",
 	"{:5.1f}%",
-	"{:16.10f}",
+	"{:9.4f}",
 	"{}",
 	]
 
@@ -381,7 +381,7 @@ def main():
 		mem_usage()
 		webcamwatch_down()
 
-		CSV_rec = datetime.datetime.utcnow().strftime(strftime_FMT) + ","
+		CSV_rec = datetime.datetime.now().strftime(strftime_FMT) + ","
 		Prob_Flag = " ,"
 
 		for jjj in range(0, len(CSV_keys)):
