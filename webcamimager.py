@@ -100,6 +100,9 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20180728 RAD Occurred to me we aren't realling doing anything with the 24-hour mp4s.
+#              The daylight version is far more interesting.  Changed midnight_process()
+#              to skip building the 24-hour image.
 # 20180723 RAD Changed wait from 1 to 2 secs in check_stable_size().  Got a failure,
 #              "convert convert: Corrupt JPEG data: premature end of data segment."
 #              Made the daylight mp4 generation conditional - 24-hour must build first.
@@ -220,22 +223,6 @@ relay2_GPIO = ""
 webcam_ON = GPIO.HIGH
 webcam_OFF = GPIO.LOW
 
-# ========================================================================================
-# ========================================================================================
-# ========================================================================================
-#  This needs to be parameterized if we are to support multiple web cams
-#
-#         work_dir = sys.argv[1]
-#         main_image = sys.argv[2]
-#         thumbnail_image = sys.argv[3]
-#         remote_dir = sys.argv[4]
-#
-#  We *could* derive all of these from "South" - a single parameter.
-#  But I hesitate to give up the flexibility just in case...
-# ========================================================================================
-# ========================================================================================
-# startingpoint = sys.argv[1] if len(sys.argv) >= 2 else 'blah'
-# ========================================================================================
 work_dir = ""
 main_image = ""
 thumbnail_image = ""
@@ -265,6 +252,18 @@ sleep_for = 5
 strftime_FMT = "%Y/%m/%d %H:%M:%S"
 wserver = "dillys.org"
 
+cfg_parameters = [
+	"work_dir",
+	"main_image",
+	"thumbnail_image",
+	"remote_dir",
+	"image_age_URL",
+	"relay_GPIO",
+	"relay2_GPIO",
+	]
+
+
+
 # ========================================================================================
 # ----------------------------------------------------------------------------------------
 #
@@ -273,9 +272,6 @@ wserver = "dillys.org"
 # ----------------------------------------------------------------------------------------
 # ========================================================================================
 def main():
-#	global ftp_login, ftp_password
-#	global work_dir, main_image, thumbnail_image, remote_dir
-#	global relay_GPIO, relay2_GPIO, webcam_ON, webcam_OFF
 
 	if len(sys.argv) >= 2 :
 		config_file = sys.argv[1]
@@ -318,7 +314,6 @@ def main():
 			duration = 0.5
 		else :
 			duration = sleep_for
-#DEBUG#		messager( "DEBUG: Sleep {} sec.".format(duration) )
 		sleep(duration)
 
 	exit()
@@ -331,6 +326,8 @@ def main():
 # NOTE: While the flexibility to override any global may have some benefits, it's not
 #       clear this shouldn't be limited to specific variables.  We do some verification
 #       of the values, and in fact some of these are required or we fail to run.
+#
+#       See cfg_parameters array for checking.
 # ----------------------------------------------------------------------------------------
 def read_config( config_file ) :
 	global work_dir, main_image, thumbnail_image, remote_dir
@@ -464,14 +461,20 @@ def power_cycle( interval ):
 #
 # ----------------------------------------------------------------------------------------
 def destroy_gpio():
-	##DEBUG## ___print "\nShutting down..."
 	logger("Shutting down...\n")
 	GPIO.output(relay_GPIO, webcam_ON)
 	GPIO.cleanup()
 
 
+
 # ----------------------------------------------------------------------------------------
-#  Subsequent calls find the avergae utilization since the previous call.
+#  Handle a set of midnight tasks.
+#  * Check for the arc_<YYYY> directory, and make if if needed.
+#  * Tar up the day's snapshot images.
+#  * Create thumbnail image for web pages.
+#  * Delete many of the 'dark hours' images.
+#  * Create the "daylight" mp4 video, and push to the web server.
+#  * If all went well, remove the day's snapshot images.
 #
 #  Example argument:   2018-05-23
 # ----------------------------------------------------------------------------------------
@@ -487,9 +490,6 @@ def midnight_process(date_string) :
 
 	yyyy = re.sub(r'(....).*', r'\1', date_string)
 	arc_dir = work_dir + '/arc_' + yyyy
-	mp4_file = "{}/{}.mp4".format( arc_dir, date_stamp )
-	tar_file = arc_dir + "/arc-" + date_string + ".tgz"
-# xxx
 	tar_file = arc_dir + "/" + date_stamp + "_arc.tgz"
 
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -520,55 +520,42 @@ def midnight_process(date_string) :
 		push_to_server( tnf, remote_dir, wserver )
 
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	# Create the full 24-hour video
+	# To make the daylight image, delete most of the dark overnight images.
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	ffmpeg_failed = generate_video( date_string, mp4_file )
+	if remove_night_images( date_string, work_dir ) < 1 :
+		logger( "WARNING: Could not find images for date \"{}\"".format( date_string ) )
 
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	# If that succeeded, make the daylight video
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	mp4_file_daylight = "{}/{}_daylight.mp4".format( arc_dir, date_stamp )
+	logger( "DEBUG: Building {}".format( mp4_file_daylight ) )
+	ffmpeg_failed = generate_video( date_string, mp4_file_daylight )
+
 	if not ffmpeg_failed :
-		push_to_server( mp4_file, remote_dir, wserver )
+		push_to_server( mp4_file_daylight, remote_dir, wserver )
 
-		# Last few nights, 3 of 4 video builds seemed to end in seg faults.
-		sleep( 10 )
-
-# @@@
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		# To make the daylight image, delete most of the dark overnight images.
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		if remove_night_images( date_string, work_dir ) < 1 :
-			logger( "WARNING: Could not find images for date \"{}\"".format( date_string ) )
-
-		mp4_file_daylight = "{}/{}_daylight.mp4".format( arc_dir, date_stamp )
-		ffmpeg_failed = generate_video( date_string, mp4_file_daylight )
-
-		if not ffmpeg_failed :
-			push_to_server( mp4_file_daylight, remote_dir, wserver )
 
 
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	# Cleanup the individual snapshot images for the day if things went well above...
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	if tar_size <= 5000000 :
-		logger( "WARNING: Tar is too small to justify deleting jpg files." )
+		logger( "WARNING: Tar is too small to justify deleting jpg files for {}.".format( date_string ) )
 
 	elif not ffmpeg_failed and not tar_failed :
-		logger( "INFO: Tar is large enough to delete jpg files." )
+		logger( "INFO: Tar is large enough to delete jpg files for {}.".format( date_string ) )
 
 		try:
 			subprocess.check_output("rm " + work_dir + "/snapshot-" + date_string + r"*.jpg", shell=True)
 		except :
 			logger( "ERROR: Unexpected ERROR in rm: {}".format( sys.exc_info()[0] ) )
 	else :
-		logger( "WARNING: Tar is too small (or ffmpeg failed) to justify deleting jpg files." )
+		logger( "WARNING: ffmpeg or tar failed; skip deleting jpg files for {}.".format( date_string ) )
 
 
 
 
 
 # ----------------------------------------------------------------------------------------
-#  This handles the generate of an mp4 file
+#  This handles the generation of an mp4 file
 #
 #  Storing 1 image every 2 minutes yields ( 60 / 2 ) * 24 = 720 frames
 #
@@ -623,6 +610,7 @@ def generate_video(date_string, mp4_out) :
 	return ffmpeg_failed
 
 
+
 # ----------------------------------------------------------------------------------------
 #  This handles the tar of a daily set of image snapshots
 #
@@ -651,14 +639,13 @@ def tar_dailies(date_string) :
 	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
 	arc_dir = work_dir + '/arc_' + yyyy
 	image_index = arc_dir + '/index-' + date_string + ".txt"
-	tar_file = arc_dir + "/arc-" + date_string + ".tgz"
-# xxx
 	tar_file = arc_dir + "/" + date_stamp + "_arc.tgz"
 
 
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	#  NOTE: This is a bit draconian ... Need to think through a kinder, gentler approach
+	#        In practice, I've been moving the existing one to /tmp.
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	if os.path.isfile( tar_file ) :
@@ -788,6 +775,10 @@ def next_image_file() :
 		if 0 == ( dot_counter % 5 ) :
 			log_string( "  ({})\n".format( dot_counter ) )
 			logger( "WARNING: Webcam might be down. More than {} secs since last update".format( dot_counter * sleep_for ) )
+			log_and_message( "WARNING: power-cycling webcam" )
+			power_cycle( 5 )
+
+
 
 	# --------------------------------------------------------------------------------
 	#  Check the modification time on the image directory.
@@ -868,7 +859,6 @@ def next_image_file() :
 			if int(tok[1]) < 2000 :
 				log_string( "||  ({})\n".format( dot_counter ) )
 				dot_counter = 0
-###				old_file = work_dir + '/' + file_list[line]
 				old_file = file_list[line]
 				logger( "WARNING: Probably webcam reboot: old file! {}".format( old_file ) )
 				unlink( "{}/{}".format(work_dir, old_file ) )
@@ -918,22 +908,9 @@ def next_image_file() :
 
 		# ------------------------------------------------------------------------
 		#  This is a strange failure mode of the web cam...    06/02/2018
-		#   -rw-r--r--  1 pi pi    11576 Jun  2 01:44 snapshot-2018-06-02-01-44-13.jpg
-		#   -rw-r--r--  1 pi pi    11555 Jun  2 01:49 snapshot-2018-06-02-01-49-13.jpg
-		#   -rw-r--r--  1 pi pi        0 Jun  2 01:54 snapshot-2018-06-02-01-54-13.jpg
 		#   -rw-r--r--  1 pi pi        0 Jun  2 01:59 snapshot-2018-06-02-01-59-13.jpg
 		#
 		# ------------------------------------------------------------------------
-		#  2018/06/20 10:55:57 DEBUG: Create thumbnail and upload to South
-		#  ......................2018/06/20 10:57:54 ...open relay contacts.
-		#  2018/06/20 10:57:59 ...close relay contacts.
-		#
-		#  2018/06/20 10:57:59 WARNING: Skipping image file ......-57-56.jpg size = 0
-		#  rm /home/pi/South/snapshot-2018-06-20-06-57-56.jpg
-		#  .....||
-		#  2018/06/20 10:58:35 DEBUG: Copy ......-58-32.jpg as S.jpg
-		# ------------------------------------------------------------------------
-
 		if catching_up :
 			jpg_size = stat( source_file ).st_size
 		else :
@@ -1020,7 +997,6 @@ def next_image_file() :
 
 		if not catching_up :
 			logger( "DEBUG: Processing {}".format( source_file ) )
-###			logger( "DEBUG: Copy {} as {}".format( source_file, main_image ) )
 
 			shutil.copy2( source_file, target_file )
 			push_to_server( target_file, remote_dir, wserver )
@@ -1028,8 +1004,7 @@ def next_image_file() :
 			thumbnail_file = work_dir + '/' + thumbnail_image
 
 			convert = ""
-#DEBUG#		messager( "DEBUG: Create thumbnail {} and upload to {}".format(thumbnail_file, remote_dir ) )
-###			logger( "DEBUG: Create thumbnail and upload to {}".format( remote_dir ) )
+#DEBUG#			logger( "DEBUG: Create thumbnail {} and upload to {}".format(thumbnail_file, remote_dir ) )
 			convert_cmd = ['/usr/bin/convert',
 					work_dir + '/' + main_image,
 					'-resize', '30%',
@@ -1073,6 +1048,7 @@ def next_image_file() :
 		log_string( '.' )
 		dot_counter += 1
 		last_filename = current_filename
+
 
 
 # ----------------------------------------------------------------------------------------
@@ -1167,9 +1143,10 @@ def daily_thumbnail( date_string, working_dir ) :
 
 
 # ----------------------------------------------------------------------------------------
-# NOTE: Under development.  Eventually just delete the files, and build another mp4.
+#  Remove (most of) the dark night-time snapshots which are generally "uninteresting."
+#  We do this before creating the mp4 video.
 #
-#
+# ----------------------------------------------------------------------------------------
 # NOTE: What I'd like to do, ideally, is vary the length of the video based on the date.
 #       In the Summer we have around 15 hours of daylight here, in Winter about 9.
 #       First light is maybe 30 minutes before.  I might try to approximate this.
@@ -1191,9 +1168,6 @@ def daily_thumbnail( date_string, working_dir ) :
 #    Sunday, November 4
 #    All times are in Eastern Time.
 #
-#
-#
-#
 #  date_string example = "2018-07-04" - i.e. the date part of a snapshot file.
 #  working_dir example = "/home/pi/N/North"
 # ----------------------------------------------------------------------------------------
@@ -1205,9 +1179,6 @@ def remove_night_images( date_string, working_dir ) :
 	file_list = listdir( working_dir )
 	file_list.sort()
 	file_list_len = len( file_list )
-
-#REMOVE	image_index = arc_dir + '/index_to_remove-' + date_string + ".txt"
-#REMOVE	FH = open(image_index, "w")
 
 	look_for = "snapshot-" + date_string
 	logger( "DEBUG: look_for = {}.".format( look_for ) )
@@ -1231,6 +1202,7 @@ def remove_night_images( date_string, working_dir ) :
 	found = kept + deleted
 	logger( "DEBUG: remove_night_images kept {} and deleted {} of ()".format( kept, deleted, found ) )
 	return found
+
 
 
 # ----------------------------------------------------------------------------------------
@@ -1313,6 +1285,8 @@ def get_stored_filename() :
 
 	return filename
 
+
+
 # ----------------------------------------------------------------------------------------
 #  This pushes the specified file to the (hosted) web server via FTP.
 #
@@ -1365,6 +1339,15 @@ def push_to_server(local_file, remote_path, server) :
 			ftp = FTP( server, ftp_login, ftp_password )
 		except Exception as problem :
 			logger( "ERROR: FTP (connect): {}".format( problem ) )
+#
+# @@@ Not sure about this.   Doesn't look like it tried a second time...
+#    ......................||  (22)
+#    2018/07/26 16:32:44 DEBUG: Processing /home/pi/S/South/snapshot-2018-07-26-16-32-37.jpg
+#    ........................||  (24)
+#    2018/07/26 16:34:54 DEBUG: Processing /home/pi/S/South/snapshot-2018-07-26-16-34-37.jpg
+#    2018/07/26 16:35:04 ERROR: FTP (connect): [Errno -3] Temporary failure in name resolution
+#
+			exit()
 			continue
 
 
@@ -1421,6 +1404,8 @@ def push_to_server(local_file, remote_path, server) :
 			# Increase the sleep time with each iteration
 #CHECK#			sleep(iii)
 	return
+
+
 
 
 # ----------------------------------------------------------------------------------------
@@ -1525,13 +1510,14 @@ def mono_version():
 
 
 # ----------------------------------------------------------------------------------------
-#  Wait for ffmpeg (to complete)
+#  Wait for ffmpeg (to complete).
+#  Running two instances of ffmpeg on a Pi concurrently seems to be a problem.
 #
 #
 # ----------------------------------------------------------------------------------------
 def wait_ffmpeg() :
 	delay_secs = 10
-	# Total wait approximately 3 * 35 = 105 sec (15 sec shy of 2 minutes)
+	# Total wait approximately delay_secs * range() below.
 
 	for iii in range(35) :
 #		messager( "DEBUG: iteration {}".format( iii ) )
