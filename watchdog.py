@@ -150,6 +150,7 @@ ambient_temp_file =     BASE_DIR + "/web/ambient_tempT.txttmp"
 status_page =           BASE_DIR + "/web/status.html"
 events_page =           BASE_DIR + "/web/events.html"
 mxdiags_dir =           BASE_DIR + "/MXdiags"
+status_dir =            "/mnt/root/home/pi/status"
 
 logger_file = sys.argv[0]
 logger_file = re.sub('\.py', '.log', logger_file)
@@ -557,8 +558,14 @@ def log_event(ID, description, code):
 
 	FH = open(events_page , "a")
 	FH.write( format_str.format( ID, description, bgcolor, code) )
-
 	FH.close
+
+	status_file = "{}/{}.txt".format( status_dir, time.time() )
+	FH = open(status_file, "w+")
+	FH.write( format_str.format( ID, description, bgcolor, code) )
+	FH.close
+
+
 
 # ----------------------------------------------------------------------------------------
 # This generates a Raspberry Pi Status page, which Cumulus MX ftp's to the server.

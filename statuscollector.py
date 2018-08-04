@@ -1,25 +1,16 @@
 #!/usr/bin/python -u
 # @@@ ... Restart using...
-# NOTE: There are still some things based on argv[0] (this_script); log, PID, image_data_file...
-#   kill -9 `cat /home/pi/N/webcamimager.PID`
-#   cd /home/pi/N ; nohup /usr/bin/python -u ./webcamimager.py /home/pi/N/North N.jpg N_thumb.jpg North
 #
-#   kill -9 `cat /home/pi/S/webcamimager.PID`
-#   cd /home/pi/S ; nohup /usr/bin/python -u ./webcamimager.py /home/pi/S/South S.jpg S_thumb.jpg South
+#   kill -9 `cat ./statuscollector.PID`
 #
-# To set the reference date back...
-#     printf "20180523214508\nsnapshot-2018-05-23-21-45-08.jpg\n" > webcamimager__.dat
-# OR ...
-#     date +"%Y%m%d%k%M%S" > N/webcamimager__.dat ; date +"snapshot-%Y-%m-%d-%k-%M-%S.jpg" >> N/webcamimager__.dat
-#
-# Stop with ...
-#   kill -9 `cat webcamimager.PID`
-#
-# Start with ...
-#   nohup /usr/bin/python -u /home/pi/webcamimager.py >> /home/pi/webcamimager.log 2>&1 &
+#   nohup /usr/bin/python -u ./statuscollector.py /mnt/root/home/pi/status &
 #
 # ----------------------------------------------------------------------------------------
-#    * NOTE: Exception handling is weak / inconsistent.  Look at try - except blocks.
+#  * NOTE: Need to limit the size of the page, and create a "previous" page if pruning...
+#  * NOTE: Need forward and backward links.
+#
+# ----------------------------------------------------------------------------------------
+#  * NOTE: Exception handling is weak / inconsistent.  Look at try - except blocks.
 #  Refs:
 #  https://docs.python.org/2.7/tutorial/errors.html
 #  https://docs.python.org/2/library/exceptions.html
@@ -68,13 +59,10 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
-# 20180723 RAD Changed wait from 1 to 2 secs in check_stable_size().  Got a failure,
-#              "convert convert: Corrupt JPEG data: premature end of data segment."
-#              Made the daylight mp4 generation conditional - 24-hour must build first.
-# 20180717 RAD Looked like push_to_server() didn't make multiple tries to connect to the
-#              hosted webserver.  Failed with "No route to host" and the systemd service
-#              stopped.  I wonder if "except socket.error" was too specific, so I now
-#              trap all.
+# 20180723 RAD Hacked up webcamimager to get a start on this idea.  I have in mind to
+#              collect event messages / records in a directory that can be periodically
+#              stitched into a web page.  Records could be written into the directory
+#              by various processes, and on different systems using FTP.
 # ========================================================================================
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -132,8 +120,9 @@ import RPi.GPIO as GPIO
 
 
 
-
+# Holds the records used to build the web page.
 msgqueue = {}
+prev_page = ""
 
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -171,6 +160,8 @@ webcam_OFF = GPIO.LOW
 work_dir = ""
 main_image = ""
 thumbnail_image = ""
+remote_dir = "/home/content/b/o/b/bobdilly/html/WX"
+remote_dir = "/var/chroot/home/content/92/3185192/wx"
 remote_dir = ""
 image_age_URL = ""
 
@@ -190,7 +181,7 @@ last_timestamp = 0
 last_filename = ""
 catching_up = False
 dot_counter = 0
-sleep_for = 5
+sleep_for = 10
 
 # strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
 # Could not get %Z to work. "empty string if the the object is naive" ... which now() is...
@@ -224,6 +215,9 @@ def main():
 
 
 
+	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
+
+
 
 	nvers = mono_version()
 	log_and_message("INFO: Mono version: {}" .format( nvers ) )
@@ -237,6 +231,117 @@ def main():
 		sleep(sleep_for)
 
 	exit()
+
+
+
+# ----------------------------------------------------------------------------------------
+#  Write out an events page (html table)
+#
+#
+# ----------------------------------------------------------------------------------------
+def build_events_page( msgqueue, page, prev ) :
+	global work_dir
+	global last_image_dir_mtime
+
+	timestamp = datetime.datetime.now().strftime(strftime_FMT)
+
+	FH = open( page, "w")
+
+	FH.write( "<HEAD><TITLE>\n" )
+	FH.write( "Raspberry Pi / Cumulus MX Events\n" )
+	FH.write( "</TITLE></HEAD><BODY BGCOLOR=\"#555555\" TEXT=\"#FFFFFF\" LINK=\"#FFFF00\" VLINK=\"#FFBB00\" ALINK=\"#FFAAFF\"><H1 ALIGN=center>\n" )
+	FH.write( "Raspberry Pi / Cumulus MX Events\n" )
+	FH.write( "</H1>\n" )
+	FH.write( "\n" )
+	FH.write( "\n" )
+#	FH.write( "<p><a href=\"NOTES.html\">My Notes</a>\n" )
+#	FH.write( "\t&nbsp; &nbsp; &nbsp; - &nbsp; &nbsp; &nbsp;\n" )
+#	FH.write( "\t<a href=\"events.html\">Pi Events</a>\n" )
+#	FH.write( "\t&nbsp; &nbsp; &nbsp; - &nbsp; &nbsp; &nbsp;\n" )
+#	FH.write( "\t<a href=\"status.html\">Pi Status</a>\n" )
+#	FH.write( "\n" )
+#	FH.write( "\n" )
+#	FH.write( "<P><A HREF=\"events_20180630_22.html\"> Previous Log </A>\n" )
+#	FH.write( "\n" )
+	FH.write( "<CENTER>\n" )
+	FH.write( "<TABLE BORDER=1>\n" )
+	FH.write( "<TR><TH> Timestamp </TH><TH> Description </TH><TH> ID </TH></TR>\n" )
+	FH.write( "\n" )
+
+	for dkey in reversed(sorted(msgqueue.keys())) :
+		FH.write( "<!-- ----------- {} ---------- -->\n".format( dkey ) )
+		for jjj in range( len(msgqueue[ dkey ] ) ) :
+			FH.write( msgqueue[ dkey ][jjj] )
+
+	FH.write( "</TABLE>\n" )
+	FH.write( "</CENTER>\n" )
+	FH.write( "\n<P> &nbsp;\n" )
+
+	# --------------------------------------------------------------------------------
+	#  This is a placeholder.  prev, if any, will be the target page name.
+	#
+	#  Here we need to find the most recent chunk of history.
+	# --------------------------------------------------------------------------------
+	if len( prev ) > 0 :
+		FH.write( "<P><A HREF=\"{}\"> Previous records </A>".format( prev ) )
+
+
+	FH.write( "\n<P ALIGN=CENTER> Updated &nbsp; {}\n".format( timestamp ) )
+	FH.write( "\n<P> &nbsp;\n" )
+	FH.write( "\n\n" )
+
+	FH.close
+
+	return
+
+
+# ----------------------------------------------------------------------------------------
+#  This deals with the log getting too long.  >= 200 records.
+#  We will chop in in half
+#
+#  - Find record 101.  We want to split at this record.
+#  - Write from record 101 on to a file named "{}_event_status.html".format( ts ).
+#     ts is the integer part of filename ts that will be first in this file.
+#
+#
+#
+# ----------------------------------------------------------------------------------------
+def prune_msgqueue( ) :
+	global work_dir
+	global msgqueue
+	global prev_page
+
+	prevqueue = {}
+	moving = False
+
+	log_and_message( "DEBUG: in prune_msgqueue( )" )
+
+#	return
+
+
+	iii = 0
+	for dkey in reversed(sorted(msgqueue.keys())) :
+		iii += 1
+		if iii == 101 :
+			moving = True
+			ts = re.sub(r'\.[0-9]+\.txt.*', r'', dkey)
+			proposed_prev_page = "{}/{}_event_status.html".format( work_dir, ts )
+			proposed_pp_short = "{}_event_status.html".format( ts )
+
+		if moving :
+			prevqueue[ dkey ] = msgqueue.pop( dkey )
+			log_and_message( "DEBUG: prevqueue #={}".format( len(prevqueue) ) )
+			unlink( "{}/{}".format( work_dir, dkey ) )
+
+	build_events_page( prevqueue, proposed_pp_short, prev_page )
+
+	push_to_server( proposed_prev_page, remote_dir, wserver )
+
+	prev_page = proposed_pp_short
+
+	return
+
+
 
 # ----------------------------------------------------------------------------------------
 #  Find the next "unprocessed" image file ... if any
@@ -301,6 +406,10 @@ def main():
 # ----------------------------------------------------------------------------------------
 def monitor_dir() :
 	global work_dir
+
+	global msgqueue
+	global prev_page
+
 	global last_image_dir_mtime
 	global last_timestamp
 
@@ -313,21 +422,24 @@ def monitor_dir() :
 
 
 
+# @@@
 	# --------------------------------------------------------------------------------
 	#  Check the modification time on the image directory.
 	#  If it hasn't changed since our last check, just return() now.
 	# --------------------------------------------------------------------------------
 	image_dir_mtime = stat( work_dir ).st_mtime
-
 	log_and_message( "DEBUG: image_dir_mtime = {}".format( image_dir_mtime ) )
 
-
-# @@@
+	log_and_message( "INFO: Waiting a directory change" )
 	while image_dir_mtime <= last_image_dir_mtime :
-		log_string( '.' )
+		log_string( "." )
 		sys.stdout.write( "." )
 		dot_counter += 1
-		sleep( 5 )
+		if ( dot_counter % 60 ) == 0 :
+			log_and_message( "msgqueue #={}".format( len(msgqueue) ) )
+#			log_string( "\n" )
+#			sys.stdout.write( "\n" )
+		sleep(sleep_for)
 		image_dir_mtime = stat( work_dir ).st_mtime
 
 # Messages should be named     time.time() + ".txt"
@@ -340,39 +452,69 @@ def monitor_dir() :
 
 	for iii in range( file_list_len ) :
 		filename = file_list[ iii ]
-		log_and_message( "DEBUG: processing {}".format( filename ) )
-#		if msgqueue[ filename ] in globals() :
-#		if msgqueue[ filename ] in locals() :
+
+		if len( prev_page ) < 5 :
+			if re.match('[0-9]{8,15}_event_status.html', filename, flags=re.I) :
+				found_prev_page = filename
+				log_and_message( "DEBUG: found_prev_page set to {}".format( prev_page ) )
+
+		# ------------------------------------------------------------------------
+		#  Check the file to make sure its a msg we want to process.
+		# ------------------------------------------------------------------------
+		if not re.match('[0-9]{8,15}\.[0-9]+.txt$', filename, flags=re.I) :
+			log_and_message( "DEBUG: skipping {}".format( filename ) )
+			continue
+
+
+
+		# ------------------------------------------------------------------------
+		#
+		#  NOTE: The test below
+		#           if filename > last_timestamp :
+		#  SHOULD use ts.  Of course last_timestamp should then also get a float...
+		#
+		# ------------------------------------------------------------------------
+		ts = float(re.sub(r'\.txt.*', r'', filename))
+		log_and_message( "DEBUG: ts = {}".format( ts ) )
+
 		try :
 			for_test =  msgqueue[ filename ]
-			print "DEBUG: Already in msgqueue..."
+###			log_and_message( "DEBUG: Already in msgqueue..." )
 		except KeyError:
-			print "DEBUG: Not found in msgqueue..."
+###			log_and_message( "DEBUG: Not found in msgqueue..." )
+			# Necessary when above is commented out...
+			pass
 
+		#
 		if filename > last_timestamp :
 			FH = open( "{}/{}".format( work_dir, filename ), "r" )
 			content = FH.readlines()
 			FH.close
 			msgqueue[ filename ] = content
-			print msgqueue[ filename ]
-			for jjj in range( len(msgqueue[ filename ] ) ) :
-				sys.stdout.write( "{}:  {}".format( jjj, msgqueue[ filename ][jjj] ) )
+			log_and_message( "DEBUG: {} added to msgqueue #={}".format( filename, len(msgqueue) ) )
+#DEBUG#			log_and_message( msgqueue[ filename ] )
+#DEBUG#			for jjj in range( len(msgqueue[ filename ] ) ) :
+#DEBUG#				sys.stdout.write( "{}:  {}".format( jjj, msgqueue[ filename ][jjj] ) )
 #	exit()
-
-
 
 	last_image_dir_mtime = image_dir_mtime
 	last_timestamp = filename
 
-	print "\n"
-	print "<TABLE BORDER=1>"
-	for dkey in reversed(sorted(msgqueue.keys())) :
-		print "<!-- ----------- {} ---------- -->".format( dkey )
-		for jjj in range( len(msgqueue[ dkey ] ) ) :
-			sys.stdout.write( msgqueue[ dkey ][jjj] )
-	print "</TABLE>"
-	print "\n"
+	events_page = "{}/event_status.html".format( work_dir )
+
+	if len(msgqueue) >= 200 :
+		prune_msgqueue( )
+
+	if len( prev_page ) < 5 :
+		prev_page = found_prev_page
+
+	build_events_page( msgqueue, events_page, prev_page )
+
+	push_to_server( events_page, remote_dir, wserver )
+
 	return
+
+
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -778,9 +920,15 @@ def push_to_server(local_file, remote_path, server) :
 	global ftp_login
 	global ftp_password
 
+	log_and_message( "DEBUG: local_file = {}   remote_path = {}   server = {}".format( local_file, remote_path, server ) )
+
 	if re.search('/', local_file) :
 		local_file_bare = re.sub(r'.*/', r'', local_file)
+	else :
+		local_file_bare = local_file
 
+
+	log_and_message( "DEBUG: local_file_bare = {}".format( local_file_bare ) )
 
 	# --------------------------------------------------------------------------------
 	#  Ran into a case where the first FTP command failed...
@@ -823,12 +971,16 @@ def push_to_server(local_file, remote_path, server) :
 ###			ftp.login( ftp_login, ftp_password )
 
 
-		try :
-#DEBUG#			logger( "DEBUG: FTP remote cd to {}".format( remote_path ) )
-			ftp.cwd( remote_path )
-		except Exception as problem :
-			logger( "ERROR: ftp.cwd {}".format( problem ) )
-			continue
+		log_and_message( "DEBUG: remote_path = {}".format( remote_path ) )
+
+
+		if len( remote_path ) > 0 :
+			try :
+#DEBUG#				logger( "DEBUG: FTP remote cd to {}".format( remote_path ) )
+				ftp.cwd( remote_path )
+			except Exception as problem :
+				logger( "ERROR: ftp.cwd {}".format( problem ) )
+				continue
 
 
 		try :
@@ -1658,12 +1810,6 @@ def tar_dailies(date_string) :
 # This handles the startup and shutdown of the script.
 # ----------------------------------------------------------------------------------------
 if __name__ == '__main__':
-	work_dir = "/home/pi/status"
-	image_dir_mtime = stat( work_dir ).st_mtime
-	log_and_message( "DEBUG: image_dir_mtime = {}".format( image_dir_mtime ) )
-
-	print time.time()
-	print time.time() - 1532634836.6
 
 	log_string( "\n\n\n\n" )
 	log_and_message("INFO: Starting {}   PID={}".format( this_script,getpid() ) )
