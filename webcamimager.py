@@ -753,13 +753,8 @@ def tar_dailies(date_string) :
 #    .
 # ----------------------------------------------------------------------------------------
 def next_image_file() :
-	global work_dir
-	global last_timestamp
-	global last_filename
-	global last_image_dir_mtime
-	global catching_up
-	global current_filename
-	global dot_counter
+	global work_dir, last_timestamp, last_filename, last_image_dir_mtime
+	global catching_up, current_filename, dot_counter
 
 	# Should only ever happen at startup...
 	if last_timestamp == 0 :
@@ -772,36 +767,19 @@ def next_image_file() :
 	#  updates, this should be around 120 secs, but here we all to skip on image.
 	# --------------------------------------------------------------------------------
 	if ( dot_counter * sleep_for ) > 300 :
-		if 0 == ( dot_counter % 5 ) :
+		if 0 == ( dot_counter % 10 ) :
 			log_string( "  ({})\n".format( dot_counter ) )
 			logger( "WARNING: Webcam might be down. More than {} secs since last update".format( dot_counter * sleep_for ) )
 			log_and_message( "WARNING: power-cycling webcam" )
 			power_cycle( 5 )
-
-
 
 	# --------------------------------------------------------------------------------
 	#  Check the modification time on the image directory.
 	#  If it hasn't changed since our last check, just return() now.
 	# --------------------------------------------------------------------------------
 	image_dir_mtime = stat( work_dir ).st_mtime
-
-#|||
-#|||
-#||| Note: this comparision is just not working correctly
-#||| Note: This may thwart the desire to all this script to "catch up" when we have a list of unprocessed snapshots.
-#|||       Though maybe, since we always make one pass through the files at start up, if we write a thumbnail,
-#|||       that will change the directory mtime, and that will trigger one more. ..... might be OK.
-#|||
-#||| The intent here, is to detect when the directory has change, i.e. mtime of the folder is updated.
-#|||
-#|||	print "DEBUG: os.stat(\"{}\").st_mtime = {}   Saved = {}".format(work_dir, image_dir_mtime, last_image_dir_mtime)
-#|||	if image_dir_mtime <> last_image_dir_mtime :
-#|||		print "DEBUG: bypass reading the directory... #1"
-#|||		last_image_dir_mtime = image_dir_mtime
-#|||		return
-
-	if image_dir_mtime - last_image_dir_mtime == 0.0 :
+#DEBUG#	logger( "DEBUG: image_dir_mtime {} == last_image_dir_mtime {} ?".format( image_dir_mtime, last_image_dir_mtime ) )
+	if image_dir_mtime == last_image_dir_mtime :
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# Progress indicator
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -811,9 +789,6 @@ def next_image_file() :
 		return
 
 	last_image_dir_mtime = image_dir_mtime
-
-###	print "DEBUG: last processed last_timestamp = " + last_timestamp
-###	print "DEBUG: last processed filename = " + last_filename
 
 	date_string = re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename)
 ###	print "DEBUG: date_string = " + date_string
@@ -844,6 +819,17 @@ def next_image_file() :
 #DEBUG#			messager( "DEBUG: file # {} of {} (last)".format( line, file_list_len ) )
 			if catching_up :
 				catching_up = False
+		# ------------------------------------------------------------------------
+		# NOTE: Got an extra '.' when Catch-up mode off
+		#
+		#    2018/07/28 22:17:13 DEBUG: skipping file snapshot-2018-07-28-22-11-11.jpg processing
+		#    .||  (1)
+		#    .||  (1)
+		# >> .2018/07/28 22:17:15 INFO: Catch-up mode off
+		#    .||  (2)
+		#    2018/07/28 22:17:27 DEBUG: Processing /home/pi/S/South/snapshot-2018-07-28-22-17-16.jpg
+		#    .......
+		# ------------------------------------------------------------------------
 				logger( "INFO: Catch-up mode off" )
 			break
 
@@ -916,7 +902,6 @@ def next_image_file() :
 		else :
 			jpg_size = check_stable_size( source_file )
 
-
 		# ------------------------------------------------------------------------
 		# This is used when I need to test a software change on a second Pi for
 		# processing webcam images.  Yesterday I used this when I was building
@@ -926,7 +911,6 @@ def next_image_file() :
 		# ------------------------------------------------------------------------
 		# push_to_test(source_file, work_dir)
 		# logger( "DEBUG: FTP'ing {} to Pi 03 {}".format( source_file, work_dir ) )
-
 
 		if jpg_size < 500 :
 			log_string( "    ({})\n".format( dot_counter ) )
@@ -982,6 +966,10 @@ def next_image_file() :
 ###		print "DEBUG: File age = {}  catching_up = {}".format( epoch_now - epoch_file, catching_up )
 
 		if not catching_up and ( epoch_now - epoch_file > 600 ) :
+			logger( "WARNING: Do not expect this to ever execute." )
+			logger( "WARNING: Do not expect this to ever execute." )
+			logger( "WARNING: Do not expect this to ever execute." )
+			logger( "WARNING: Do not expect this to ever execute." )
 			power_cycle( 5 )
 
 		# NOTE ###################################################################
@@ -1022,10 +1010,13 @@ def next_image_file() :
 				logger( "DEBUG: convert returned data: \"" + convert + "\"" )
 
 			push_to_server( thumbnail_file, remote_dir, wserver )
+
+			# First '.' right after processing is done...
+			log_string( '.' )
+			dot_counter += 1
 		else :
 			# Necessary to keep "processing"
 			subprocess.check_output( ['/usr/bin/touch', work_dir] )
-
 
 		store_file_data( next_timestamp, file_list[line] )
 		last_timestamp = next_timestamp
@@ -1041,13 +1032,11 @@ def next_image_file() :
 			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 			midnight_process(re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename))
 
-
 #DEBUG#		messager( "DEBUG: last_filename = {} current_filename = {}".format( last_filename, current_filename ) )
-
-		# First '.' right after processing is done...
-		log_string( '.' )
-		dot_counter += 1
 		last_filename = current_filename
+
+
+
 
 
 
