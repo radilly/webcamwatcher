@@ -576,7 +576,7 @@ def get_stored_ts() :
 	tstamp = str(content[0].strip("\n"))
 	log_and_message( "DEBUG: Stored tstamp = \"{}\" from get_stored_ts()".format( tstamp ) )
 
-	return tstamp
+	return float(tstamp)
 
 
 

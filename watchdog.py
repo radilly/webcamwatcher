@@ -1567,12 +1567,15 @@ def camera_down():
 
 	try:
 		response = urlopen( image_age_URL )
-		age = response.read()
+		age = int( response.read() )
 	except:
-		age = "0"
-		logger("WARNING: Assumed image age: {}".format( age ) )
+		age = 0
+		logger("WARNING: Read URL failed.  Assumed image age: {}".format( age ) )
 
-	age = int( age.rstrip() )
+	if len( age ) < 1 :
+		age = 0
+		logger("WARNING: Read null.  Assumed image age: {}".format( age ) )
+
 
 	# --------------------------------------------------------------------------------
 	#
