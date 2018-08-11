@@ -108,7 +108,7 @@ last_image_dir_mtime = 0.0
 ftp_login = ""
 ftp_password = ""
 
-last_timestamp = 0
+last_timestamp = 0.0
 dot_counter = 0
 sleep_for = 10
 
@@ -158,7 +158,7 @@ def main():
 		log_and_message( "ERROR: directory \"{}\" not found.".format( work_dir ) )
 		exit()
 
-	log_and_message( "DEBUG: monitoring directory \"{}\"".format( work_dir ) )
+	log_and_message( "INFO: monitoring directory \"{}\"".format( work_dir ) )
 
 	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
 
@@ -169,8 +169,15 @@ def main():
 	python_version = re.sub(r'\n', r', ', python_version )
 	log_and_message( "INFO: Python version: {}".format( python_version ) )
 
+	log_and_message( "INFO: initial build of Global msgqueue." )
+	build_msgqueue()
+	
 	# May have to hand-create this file initially...
 	last_image_dir_mtime = get_stored_ts()
+
+	prev_page = find_prev_page()
+
+	log_and_message( "INFO: Start monitoring." )
 
 	while True:
 		monitor_dir()
@@ -180,12 +187,71 @@ def main():
 
 
 
+
+
+
 # ----------------------------------------------------------------------------------------
 #  Write out an events page (html table)
 #
 #
 # ----------------------------------------------------------------------------------------
-def build_events_page( msgqueue, page, prev ) :
+def build_msgqueue( ) :
+	global msgqueue
+	global prev_page
+	global last_timestamp
+
+	# --------------------------------------------------------------------------------
+	#  Scan the files in the work directory.
+	# --------------------------------------------------------------------------------
+	file_list = listdir( work_dir )
+	file_list_len = len( file_list )
+	file_list.sort()
+
+	for iii in range( file_list_len ) :
+		filename = file_list[ iii ]
+
+		# ------------------------------------------------------------------------
+		#  Check the file to make sure its a msg we want to process.
+		#  Messages should be named - time.time() + ".txt"
+		# ------------------------------------------------------------------------
+		if not re.match('[0-9]{8,15}\.[0-9]+.txt$', filename, flags=re.I) :
+			log_and_message( "DEBUG: skipping {}".format( filename ) )
+			continue
+
+		# ------------------------------------------------------------------------
+		# Strip off the ".txt" and use the first part of the filename as a float.
+		# ------------------------------------------------------------------------
+		ts = float(re.sub(r'\.txt.*', r'', filename))
+#		log_and_message( "DEBUG: ts = {}".format( ts ) )
+
+		try :
+			found_msg = True
+			for_test =  msgqueue[ filename ]
+		except KeyError:
+			found_msg = False
+
+		if not found_msg :
+			FH = open( "{}/{}".format( work_dir, filename ), "r" )
+			content = FH.readlines()
+			FH.close
+			# NOTE: This will include the newlines in the file.
+			msgqueue[ filename ] = content
+			log_and_message( "DEBUG: {} added to msgqueue #={}  (build_msgqueue)".format( filename, len(msgqueue) ) )
+
+		last_timestamp = ts
+
+	log_and_message( "DEBUG: Global msgqueue loaded with {} members.".format( len(msgqueue) ) )
+
+
+
+
+
+# ----------------------------------------------------------------------------------------
+#  Write out an events page (html table)
+#
+#
+# ----------------------------------------------------------------------------------------
+def build_events_page( msgQ, page, prev ) :
 	timestamp = datetime.datetime.now().strftime(strftime_FMT)
 
 	FH = open( page, "w")
@@ -202,10 +268,10 @@ def build_events_page( msgqueue, page, prev ) :
 	FH.write( "<TR><TH> Timestamp </TH><TH> Description </TH><TH> ID </TH></TR>\n" )
 	FH.write( "\n" )
 
-	for dkey in reversed(sorted(msgqueue.keys())) :
+	for dkey in reversed(sorted(msgQ.keys())) :
 		FH.write( "<!-- ----------- {} ---------- -->\n".format( dkey ) )
-		for jjj in range( len(msgqueue[ dkey ] ) ) :
-			FH.write( msgqueue[ dkey ][jjj] )
+		for jjj in range( len(msgQ[ dkey ] ) ) :
+			FH.write( msgQ[ dkey ][jjj] )
 
 	FH.write( "</TABLE>\n" )
 	FH.write( "</CENTER>\n" )
@@ -249,14 +315,16 @@ def monitor_dir() :
 	global last_image_dir_mtime
 	global last_timestamp
 	global dot_counter
+
+	found_msg = False
 	# --------------------------------------------------------------------------------
-	#  Check the modification time on the image directory.
-	#  If it hasn't changed since our last check, just return() now.
+	#  Check the modification time on the message directory.
+	#  
 	# --------------------------------------------------------------------------------
 	image_dir_mtime = stat( work_dir ).st_mtime
 	log_and_message( "DEBUG: image_dir_mtime = {}".format( image_dir_mtime ) )
 
-	log_and_message( "INFO: Waiting a directory change" )
+	log_and_message( "INFO: Waiting for a directory change" )
 	while image_dir_mtime <= last_image_dir_mtime :
 		log_string( "." )
 		sys.stdout.write( "." )
@@ -272,6 +340,12 @@ def monitor_dir() :
 
 	store_file_data( image_dir_mtime )
 
+	# --------------------------------------------------------------------------------
+	#  Scan the files in the work directory.
+	#
+	#
+	#  This should be a separate routine...
+	# --------------------------------------------------------------------------------
 	file_list = listdir( work_dir )
 	file_list_len = len( file_list )
 	file_list.sort()
@@ -279,45 +353,40 @@ def monitor_dir() :
 	for iii in range( file_list_len ) :
 		filename = file_list[ iii ]
 
-		if len( prev_page ) < 5 :
-			if re.match('[0-9]{8,15}_event_status.html', filename, flags=re.I) :
-				found_prev_page = filename
-				log_and_message( "DEBUG: found_prev_page set to {}".format( prev_page ) )
-
 		# ------------------------------------------------------------------------
 		#  Check the file to make sure its a msg we want to process.
 		#  Messages should be named - time.time() + ".txt"
 		# ------------------------------------------------------------------------
 		if not re.match('[0-9]{8,15}\.[0-9]+.txt$', filename, flags=re.I) :
-			log_and_message( "DEBUG: skipping {}".format( filename ) )
+#DEBUG#			log_and_message( "DEBUG: skipping {}".format( filename ) )
 			continue
 
 
 		# ------------------------------------------------------------------------
-		#
-		#  NOTE: The test below
-		#           if filename > last_timestamp :
-		#  SHOULD use ts.  Of course last_timestamp should then also get a float...
-		#
+		# Strip off the ".txt" and use the first part of the filename as a float.
 		# ------------------------------------------------------------------------
 		ts = float(re.sub(r'\.txt.*', r'', filename))
-		log_and_message( "DEBUG: ts = {}".format( ts ) )
+#		log_and_message( "DEBUG: ts = {}".format( ts ) )
 
 		try :
+			found_msg = True
 			for_test =  msgqueue[ filename ]
 ###			log_and_message( "DEBUG: Already in msgqueue..." )
 		except KeyError:
+			found_msg = False
 ###			log_and_message( "DEBUG: Not found in msgqueue..." )
 			# Necessary when above is commented out...
 			pass
 
 		#
-		if filename > last_timestamp :
+		######################################################### if float(filename) > last_timestamp :
+		if not found_msg :
 			FH = open( "{}/{}".format( work_dir, filename ), "r" )
 			content = FH.readlines()
 			FH.close
 			msgqueue[ filename ] = content
 			log_and_message( "DEBUG: {} added to msgqueue #={}".format( filename, len(msgqueue) ) )
+			log_and_message( ">>> {}".format( msgqueue[ filename ][1] ) )
 #DEBUG#			log_and_message( msgqueue[ filename ] )
 #DEBUG#			for jjj in range( len(msgqueue[ filename ] ) ) :
 #DEBUG#				sys.stdout.write( "{}:  {}".format( jjj, msgqueue[ filename ][jjj] ) )
@@ -325,15 +394,12 @@ def monitor_dir() :
 
 	# NOTE: When we write the web page we change image_dir_mtime for the next pass.
 	last_image_dir_mtime = image_dir_mtime
-	last_timestamp = filename
+	last_timestamp = ts
 
 	events_page = "{}/event_status.html".format( work_dir )
 
 	if len(msgqueue) >= 200 :
 		prune_msgqueue( )
-
-	if len( prev_page ) < 5 :
-		prev_page = found_prev_page
 
 	build_events_page( msgqueue, events_page, prev_page )
 
@@ -370,21 +436,56 @@ def prune_msgqueue( ) :
 		if iii == 101 :
 			moving = True
 			ts = re.sub(r'\.[0-9]+\.txt.*', r'', dkey)
-			proposed_prev_page = "{}/{}_event_status.html".format( work_dir, ts )
-			proposed_pp_short = "{}_event_status.html".format( ts )
+			new_prev_page = "{}/{}_event_status.html".format( work_dir, ts )
+			new_pp_short = "{}_event_status.html".format( ts )
 
 		if moving :
 			prevqueue[ dkey ] = msgqueue.pop( dkey )
 			log_and_message( "DEBUG: prevqueue #={}".format( len(prevqueue) ) )
 			unlink( "{}/{}".format( work_dir, dkey ) )
 
-	build_events_page( prevqueue, proposed_pp_short, prev_page )
+	log_and_message( "DEBUG: Create {} (previous page)".format( new_pp_short ) )
+	build_events_page( prevqueue, new_pp_short, prev_page )
 
-	push_to_server( proposed_prev_page, remote_dir, wserver )
+	push_to_server( new_prev_page, remote_dir, wserver )
 
-	prev_page = proposed_pp_short
+	prev_page = new_pp_short
 
 	return
+
+
+
+
+
+
+
+# ----------------------------------------------------------------------------------------
+#  Call when this script is started, and prev_page is not yet set.
+#  This is needed to chain pages backwards in history.
+#
+# NOTE - We could save this in a file.  This isn't too expensive to run.  The risk is if
+#        for some reason work_dir gets cleaned out.  I suppose this is implicitly
+#        stored in the last page we wrote...
+# ----------------------------------------------------------------------------------------
+def find_prev_page() :
+	global prev_page
+
+	# --------------------------------------------------------------------------------
+	#  Scan the files in the work directory.
+	# --------------------------------------------------------------------------------
+	file_list = listdir( work_dir )
+	file_list_len = len( file_list )
+	file_list.sort()
+
+	for iii in range( file_list_len ) :
+		filename = file_list[ iii ]
+		if re.match('[0-9]{8,15}_event_status.html', filename, flags=re.I) :
+			found_prev_page = filename
+			log_and_message( "DEBUG: found_prev_page = \"{}\"".format( found_prev_page ) )
+
+
+	prev_page = found_prev_page
+	log_and_message( "DEBUG: Global prev_page now set to {} in find_prev_page()".format( prev_page ) )
 
 
 
@@ -401,14 +502,14 @@ def push_to_server(local_file, remote_path, server) :
 	global ftp_login
 	global ftp_password
 
-	log_and_message( "DEBUG: local_file = {}   remote_path = {}   server = {}".format( local_file, remote_path, server ) )
+	log_and_message( "DEBUG: FTP local_file = \"{}\"   remote_path = \"{}\"   server = \"{}\"".format( local_file, remote_path, server ) )
 
 	if re.search('/', local_file) :
 		local_file_bare = re.sub(r'.*/', r'', local_file)
 	else :
 		local_file_bare = local_file
 
-	log_and_message( "DEBUG: local_file_bare = {}".format( local_file_bare ) )
+	log_and_message( "DEBUG: local_file_bare = \"{}\"".format( local_file_bare ) )
 
 	# --------------------------------------------------------------------------------
 	#  Ran into a case where the first FTP command failed...
@@ -425,10 +526,11 @@ def push_to_server(local_file, remote_path, server) :
 	#     socket.error: [Errno 110] Connection timed out
 	# See https://stackoverflow.com/questions/567622/is-there-a-pythonic-way-to-try-something-up-to-a-maximum-number-of-times
 	# --------------------------------------------------------------------------------
-	for iii in range(8) :
-		if iii > 1 :
+	for iii in range(12) :
+		if iii > 0 :
 		# Not on first iteration.  The increase the sleep time with each iteration.
 			sleep( iii * 3 )
+			log_and_message( "WARNING: FTP attempt #{}".format( iii ) )
 
 		try :
 			# ----------------------------------------------------------------
@@ -442,9 +544,9 @@ def push_to_server(local_file, remote_path, server) :
 			logger( "ERROR: FTP (connect): {}".format( problem ) )
 			continue
 
-		log_and_message( "DEBUG: remote_path = {}".format( remote_path ) )
+#DEBUG#		log_and_message( "DEBUG: remote_path = {}".format( remote_path ) )
 
-		if len( remote_path ) > 0 :
+		if len( remote_path ) > 1 :
 			try :
 #DEBUG#				logger( "DEBUG: FTP remote cd to {}".format( remote_path ) )
 				ftp.cwd( remote_path )
@@ -760,11 +862,12 @@ def read_config( config_file ) :
 		log_and_message( "ERROR: Unexpected ERROR in FTP connect: {}".format( sys.exc_info()[0] ) )
 		log_and_message( "ERROR: FTP (connect): {}".format( problem ) )
 
-	try :
-		ftp.cwd( remote_dir )
-	except :
-		log_and_message( "ERROR: Unexpected ERROR in FTP cwd: {}".format( sys.exc_info()[0] ) )
-		log_and_message( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
+	if len( remote_path ) > 1 :
+		try :
+			ftp.cwd( remote_dir )
+		except :
+			log_and_message( "ERROR: Unexpected ERROR in FTP cwd: {}".format( sys.exc_info()[0] ) )
+			log_and_message( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
 
 	try :
 		ftp.quit()

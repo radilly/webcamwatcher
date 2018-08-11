@@ -157,6 +157,10 @@ logger_file = re.sub('\.py', '.log', logger_file)
 
 WS_Updates_URL = 'http://dillys.org/wx/WS_Updates.txt'
 realtime_URL = 'http://dillys.org/wx/realtime.txt'
+
+# NOTE We now have 2 cameras...
+image_age_S_URL = 'http://dillys.org/wx/South/S_age.txt'
+image_age_N_URL = 'http://dillys.org/wx/North/N_age.txt'
 image_age_URL = 'http://dillys.org/wx/North/N_age.txt'
 # N_Since_Updated_URL = 'http://dillys.org/wx/N_Since_Updated.txt'
 #    Replaced by above
@@ -1557,30 +1561,39 @@ def rf_dropped() :
 #
 #    Copied from "webcamwatch.py" and modified for here...
 #
+#  NOTE: Should make the camera a parameter.  2 things affected:
+#           * The URL to check
+#           * The index to store in data[]
+#
 #  NOTE: Question:  Is pcyc_holdoff_time really required?  It adds complexity...
 #
 # ----------------------------------------------------------------------------------------
 def camera_down():
 	global data
 	global pcyc_holdoff_time
+	age = ""
 	is_down = 1
 
 	try:
 		response = urlopen( image_age_URL )
-		age = int( response.read() )
+		age = response.read()
+		age = age.rstrip()
 	except:
-		age = 0
+		age = "0"
 		logger("WARNING: Read URL failed.  Assumed image age: {}".format( age ) )
 
+	# --------------------------------------------------------------------------------
+	# Keep as string up until this point, because of...
+	#      TypeError: object of type 'int' has no len()
+	# --------------------------------------------------------------------------------
 	if len( age ) < 1 :
-		age = 0
+		age = "0"
 		logger("WARNING: Read null.  Assumed image age: {}".format( age ) )
-
 
 	# --------------------------------------------------------------------------------
 	#
 	# --------------------------------------------------------------------------------
-	if age > 600 :
+	if int(age) > 600 :
 		logger("WARNING: Old image age: {}".format( age ) )
 		## power_cycle()
 
