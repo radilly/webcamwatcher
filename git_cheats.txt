@@ -1,0 +1,44 @@
+ 2091  git remote set-url origin git@github.com:radilly/webcamwatcher.git
+------------------------------------------------------------
+vi webcamwatch.py 
+cd webcamwatcher/
+ls -altr
+cat bash_history.txt 
+
+git status
+git add *.py
+git status
+
+git diff watchdog.py  (showed nothing, probably because of git add)
+git diff *.py | less
+
+git commit -am "webcamwatch.py as a service would auto-restart properly. Sweeping up collected changes to watchdog.py."
+git status
+
+git push
+git status
+
+https://github.com/radilly/webcamwatcher
+
+
+SET UP NEW LOCAL REPO
+------------------------------------------------------------
+If not installed...
+	sudo apt-get install git
+
+git clone https://github.com/radilly/webcamwatcher
+
+git remote set-url origin git@github.com:radilly/webcamwatcher.git
+
+git config --global user.name "Bob Dilly"
+git config --global user.email "GitHub@radilly.org"
+
+Add ssh key to https://github.com/settings/keys
+	Run ssh-keygen if necessary
+	https://www.digitalocean.com/community/tutorials/how-to-set-up-ssh-keys-on-ubuntu-1604
+
+git commit -am "Starting working on webcamimager.py"
+
+
+
+
