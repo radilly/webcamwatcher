@@ -815,7 +815,7 @@ def next_image_file() :
 	#######################  current_filename = ""
 	while next_timestamp <= last_timestamp :
 		line += 1
-		if line >= file_list_len :
+		if (file_list_len - line) < 3 :
 #DEBUG#			messager( "DEBUG: file # {} of {} (last)".format( line, file_list_len ) )
 			if catching_up :
 				catching_up = False
@@ -1023,6 +1023,7 @@ def next_image_file() :
 
 #DEBUG#		print "DEBUG: day = " + tok[3]
 		if last_day_code != day_code :
+			log_string( "\n" )
 			logger( "INFO: MIDNIGHT ROLLOVER!" )
 			logger( "INFO: MIDNIGHT ROLLOVER!" )
 			logger( "INFO: MIDNIGHT ROLLOVER!" )
