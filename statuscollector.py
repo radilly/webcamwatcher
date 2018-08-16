@@ -386,7 +386,10 @@ def monitor_dir() :
 			FH.close
 			msgqueue[ filename ] = content
 			log_and_message( "DEBUG: {} added to msgqueue #={}".format( filename, len(msgqueue) ) )
-			log_and_message( ">>> {}".format( msgqueue[ filename ][1] ) )
+
+			tmp = msgqueue[ filename ][1]
+			tmp.strip( "\n" )
+			log_and_message( ">>>>>>> {}".format( tmp ) )
 #DEBUG#			log_and_message( msgqueue[ filename ] )
 #DEBUG#			for jjj in range( len(msgqueue[ filename ] ) ) :
 #DEBUG#				sys.stdout.write( "{}:  {}".format( jjj, msgqueue[ filename ][jjj] ) )
@@ -445,7 +448,7 @@ def prune_msgqueue( ) :
 			unlink( "{}/{}".format( work_dir, dkey ) )
 
 	log_and_message( "DEBUG: Create {} (previous page)".format( new_pp_short ) )
-	build_events_page( prevqueue, new_pp_short, prev_page )
+	build_events_page( prevqueue, new_prev_page, prev_page )
 
 	push_to_server( new_prev_page, remote_dir, wserver )
 
