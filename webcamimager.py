@@ -230,8 +230,12 @@ remote_dir = ""
 image_age_URL = ""
 
 this_script = sys.argv[0]
+if re.match('^\./', this_script) :
+	this_script = "{}/{}".format( os.getcwd(), re.sub('^\./', '', this_script) )
+
 image_data_file = re.sub('\.py', '__.dat', this_script)
 logger_file = re.sub('\.py', '.log', this_script)
+
 
 # Real mtime will always be larger
 last_image_dir_mtime = 0.0
@@ -815,7 +819,7 @@ def next_image_file() :
 	#######################  current_filename = ""
 	while next_timestamp <= last_timestamp :
 		line += 1
-		if line >= file_list_len :
+		if (file_list_len - line) < 3 :
 #DEBUG#			messager( "DEBUG: file # {} of {} (last)".format( line, file_list_len ) )
 			if catching_up :
 				catching_up = False
@@ -1023,6 +1027,7 @@ def next_image_file() :
 
 #DEBUG#		print "DEBUG: day = " + tok[3]
 		if last_day_code != day_code :
+			log_string( "\n" )
 			logger( "INFO: MIDNIGHT ROLLOVER!" )
 			logger( "INFO: MIDNIGHT ROLLOVER!" )
 			logger( "INFO: MIDNIGHT ROLLOVER!" )
@@ -1645,7 +1650,7 @@ if __name__ == '__main__':
 	#### This might be useful...
 	#### if sys.argv[1] = "stop"
 	log_string( "\n\n\n\n" )
-	log_and_message("INFO: Starting {}   PID={}".format( this_script,getpid() ) )
+	log_and_message("INFO: Starting {}   PID={}".format( this_script, getpid() ) )
 
 ###		For testing @@@
 ###	global ftp_login
