@@ -28,7 +28,24 @@
 #       sudo apt-get install proftpd      - - - - to allow webcam to upload....
 #       sudo apt-get install graphicsmagick-imagemagick-compat
 #       sudo apt-get install ffmpeg       - - - - This is a fairly big package....
-#       vi .ftp.credentials
+#
+#       mkdir ~/N
+#       mkdir ~/N/North
+#       mkdir ~/N/North/arc_2018
+#       mkdir ~/S
+#       mkdir ~/S/South
+#       mkdir ~/S/South/arc_2018
+#
+#       vi S/South/.ftp.credentials
+#       vi N/North/.ftp.credentials
+#
+#       ln -s ~/webcamwatcher/webcamimager.py  ~/N
+#       ln -s ~/webcamwatcher/webcamimager.py  ~/S
+#       ln -s /home/pi/webcamwatcher/north.cfg ~/N
+#       ln -s /home/pi/webcamwatcher/south.cfg ~/S
+#
+#       printf "20180523214508\nsnapshot-2018-05-23-21-45-08.jpg\n" > ~/S/webcamimager__.dat
+#       printf "20180523214508\nsnapshot-2018-05-23-21-45-08.jpg\n" > ~/N/webcamimager__.dat
 #
 # ----------------------------------------------------------------------------------------
 #    * NOTE: Exception handling is weak / inconsistent.  Look at try - except blocks.
