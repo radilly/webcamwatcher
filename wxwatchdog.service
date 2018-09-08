@@ -1,0 +1,66 @@
+# Service for starting Weather Station Watchdog
+# -------------------------------------------------------
+# http://www.diegoacuna.me/how-to-run-a-script-as-a-service-in-raspberry-pi-raspbian-jessie/
+# https://www.freedesktop.org/software/systemd/man/systemd.unit.html
+# -------------------------------------------------------
+[Unit]
+Description=WX Station Watchdog Service
+
+# -------------------------------------------------------
+# https://www.freedesktop.org/software/systemd/man/systemd.service.html
+# -------------------------------------------------------
+[Service]
+Type=simple
+# User=pi
+# Group=pi
+### WorkingDirectory=/home/pi
+###   Relocated 09/04/2017
+WorkingDirectory=/mnt/root/home/pi
+# ExecStart=/mnt/root/home/pi/webcamwatch.py
+ExecStart=/usr/bin/python -u ./webcamwatch.py
+
+Restart=always
+###  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### https://unix.stackexchange.com/questions/316114/service-start-request-repeated-too-quickly-refusing-to-start
+### suggests this might be the issue:
+###   ● wxwatchdog.service - WX Station Watchdog Service
+###     Loaded: loaded (/lib/systemd/system/wxwatchdog.service; enabled)
+###     Active: failed (Result: start-limit) since Mon 2017-08-28 08:36:38 EDT; 22h ago
+###    Process: 759 ExecStart=/home/pi/webcamwatch.py (code=exited, status=1/FAILURE)
+###   Main PID: 759 (code=exited, status=1/FAILURE)
+###  
+###  Aug 28 08:36:37 raspberrypi_02 systemd[1]: wxwatchdog.service: main process exited, code=exited, status=1/FAILURE
+###  Aug 28 08:36:37 raspberrypi_02 systemd[1]: Unit wxwatchdog.service entered failed state.
+###  Aug 28 08:36:38 raspberrypi_02 systemd[1]: wxwatchdog.service holdoff time over, scheduling restart.
+###  Aug 28 08:36:38 raspberrypi_02 systemd[1]: Stopping WX Station Watchdog Service...
+###  Aug 28 08:36:38 raspberrypi_02 systemd[1]: Starting WX Station Watchdog Service...
+###  Aug 28 08:36:38 raspberrypi_02 systemd[1]: wxwatchdog.service start request repeated too quickly, refusing to start.
+###  Aug 28 08:36:38 raspberrypi_02 systemd[1]: Failed to start WX Station Watchdog Service.
+###  Aug 28 08:36:38 raspberrypi_02 systemd[1]: Unit wxwatchdog.service entered failed state.
+###  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+###  https://unix.stackexchange.com/questions/289629/systemd-restart-always-is-not-honored
+###  
+###  Aug 28 08:36:38 raspberrypi_02 systemd[1]: Unit wxwatchdog.service entered failed state.
+###  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+RestartSec=20
+
+# -------------------------------------------------------
+# https://www.freedesktop.org/software/systemd/man/systemd.unit.html#id-1.9
+# Used by 'systemctl enable' to set up a symbolic link
+# -------------------------------------------------------
+[Install]
+### WantedBy=multi-user.target
+### WantedBy=cumulusmx.service
+# After=cumulusmx.service
+
+# NOTE: This may be needed for Stretch ... Not required for Jesse
+RequiredBy=multi-user.target
+# Without the above, this service wasn't starting on boot up.  Enabling displayed...
+# Created symlink /etc/systemd/system/multi-user.target.requires/webcam_north.service → /lib/systemd/system/webcam_north.service.
+
+# -------------------------------------------------------
+# http://sandaysoft.com/forum/viewtopic.php?f=27&t=16087
+# I have done 'sudo systemctl enable cumulusmx' [worked fine]
+# and then 'sudo systemctl start cumulusmx' but this does not
+# quite work.
+# -------------------------------------------------------

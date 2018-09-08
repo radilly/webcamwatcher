@@ -812,11 +812,15 @@ def ws_data_stopped():
 				# . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 				if len(restart) > 0 :
 					logger( "DEBUG: restart returned data: \"" + restart + "\"" )
-				exit()
+###########################################################################################################################################################################################################################################################################################################				exit()
+				sleep( 10 )
+				print "\n\n\n\n\n"
+				messager( "INFO: systemctl restarted cumulusmx.   (code 998)" )
+				log_event("", "systemctl restarted cumulusmx.", 998 )
 
 
 			# Short message while this status continues
-			if 0 == ws_data_last_count % 3 :
+			elif 0 == ws_data_last_count % 3 :
 				messager( "WARNING:  CumulusMX reports data_stopped ... " + str(elapsed) + " sec" )
 	else:
 		ws_data_last_secs = 0

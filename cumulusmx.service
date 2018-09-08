@@ -1,0 +1,84 @@
+# Service for starting CumulusMX
+#
+# /lib/systemd/system/cumulusmx.service
+#
+# http://sandaysoft.com/forum/viewtopic.php?f=27&t=16087
+#
+# https://www.freedesktop.org/software/systemd/man/systemd.unit.html
+# http://www.diegoacuna.me/how-to-run-a-script-as-a-service-in-raspberry-pi-raspbian-jessie/
+
+
+# http://sandaysoft.com/forum/viewtopic.php?f=27&t=16087
+#
+
+# https://www.freedesktop.org/software/systemd/man/systemd.unit.html
+# -------------------------------------------------------
+[Unit]
+Description=CumulusMX Service
+
+# https://www.freedesktop.org/software/systemd/man/systemd.service.html
+# -------------------------------------------------------
+[Service]
+# https://stackoverflow.com/questions/18464295/degraded-allocation-consider-increasing-nursery-size-if-the-warning-persists
+Environment=MONO_GC_PARAMS=nursery-size=8m
+### Type=forking
+Type=simple
+# User=pi
+# Group=pi
+### WorkingDirectory=/opt/CumulusMX
+### WorkingDirectory=/home/pi/Cumulus_MX
+###   Relocated 09/04/2017
+WorkingDirectory=/mnt/root/home/pi/Cumulus_MX
+### ExecStart=/opt/mono/bin/mono-service CumulusMX.exe
+### ExecStart=/usr/bin/nohup /usr/bin/mono /home/pi/Cumulus_MX/CumulusMX.exe &
+ExecStart=/usr/bin/mono /mnt/root/home/pi/Cumulus_MX/CumulusMX.exe
+Restart=always
+
+# https://unix.stackexchange.com/questions/316114/service-start-request-repeated-too-quickly-refusing-to-start
+# https://unix.stackexchange.com/questions/289629/systemd-restart-always-is-not-honored
+#
+RestartSec=60
+# StartLimitIntervalSec=interval, StartLimitBurst=burst
+StartLimitInterval=700
+StartLimitBurst=10
+#  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# https://serverfault.com/questions/736624/systemd-service-automatic-restart-after-startlimitinterval
+#  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# May not be strictly needed according to 
+# https://www.freedesktop.org/software/systemd/man/systemd.unit.html#id-1.9
+# Used by 'systemctl enable' to set up a symbolic link
+# -------------------------------------------------------
+[Install]
+# After=multi-user.target
+
+# NOTE: This may be needed for Stretch ... Not required for Jesse
+RequiredBy=multi-user.target
+# Without the above, this service wasn't starting on boot up.  Enabling displayed...
+# Created symlink /etc/systemd/system/multi-user.target.requires/webcam_north.service → /lib/systemd/system/webcam_north.service.
+
+# WantedBy=multi-user.target
+
+# I have done 'sudo systemctl enable cumulusmx' [worked fine] and then 'sudo systemctl start cumulusmx' but this does not quite work.
+#
+#
+##############################################################################
+#
+# Need to look at these Wants and After clauses
+#
+##############################################################################
+
+#################################################################################################### [Unit]
+#################################################################################################### Wants=network-online.target
+#################################################################################################### After=network.target network-online.target
+
+###     [Service]
+###     WorkingDirectory=/home/pi/CumulusMX
+###     ExecStart=/usr/bin/mono /home/pi/CumulusMX/CumulusMX.exe
+
+#
+##############################################################################
+#   Filesystem     1K-blocks     Used Available Use% Mounted on
+#   tmpfs             473864        0    473864   0% /sys/fs/cgroup
+#   /dev/mmcblk0p6     67434    21530     45904  32% /boot
+#   tmpfs              94776        0     94776   0% /run/user/1000
+#   /dev/sda1      244196348 38457960 205738388  16% /media/pi/Marie
