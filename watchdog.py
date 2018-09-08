@@ -142,6 +142,7 @@ last_date = ""
 proc_load_lim = 4.0         # See https://www.booleanworld.com/guide-linux-top-command/
 mem_usage_lim = 85
 ws_data_last_secs = 0       # Number of epoch secs at outage start
+ws_data_last_count = 0
 saved_contact_lost = -1     # Number of epoch secs when RF contact lost
 
 BASE_DIR =              "/mnt/root/home/pi/Cumulus_MX"
@@ -751,6 +752,8 @@ def write_pid_file():
 	pid_file = sys.argv[0]
 	pid_file = re.sub('\.py', '.PID', pid_file)
 
+	messager( "DEBUG: Writing {}".format( pid_file ) )
+
 	FH = open(pid_file, "w")
 	FH.write(PID)
 	FH.close
@@ -769,6 +772,7 @@ def write_pid_file():
 def ws_data_stopped():
 	global data
 	global ws_data_last_secs
+	global ws_data_last_count
 	# Had a case where this file was empty so the string returned was "", which caused
 	# a "ValueError: invalid literal for int() with base 10: ''" from readline().
 	# NOTE: Here I added logic to use a -1 value, but the better answer might be
@@ -782,6 +786,7 @@ def ws_data_stopped():
 
 	FH.close
 	if data_status > 0 :
+		ws_data_last_count += 1
 		if ws_data_last_secs < 1 :
 			ws_data_last_secs = int( datetime.datetime.utcnow().strftime("%s") )
 			# Long message the first time we see this...
@@ -789,10 +794,33 @@ def ws_data_stopped():
 			log_event("", "CumulusMX reports data_stopped (<#DataStopped> == 1).", 101 )
 		else:
 			elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  ws_data_last_secs 
+			if elapsed > 400 :
+				messager( "WARNING:   systemctl restart cumulusmx.   (code 999)" )
+				log_event("", "systemctl restart cumulusmx.", 999 )
+				restart_cmd = ['/usr/bin/sudo',
+					'systemctl',
+					'restart',
+					'cumulusmx']
+
+				try :
+					restart = subprocess.check_output( restart_cmd, stderr=subprocess.STDOUT )
+				except:
+					logger( "ERROR: Unexpected ERROR in restart: {}".format( sys.exc_info()[0] ) )
+
+				# . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+				# Generally nothing, unless -verbose is used...
+				# . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+				if len(restart) > 0 :
+					logger( "DEBUG: restart returned data: \"" + restart + "\"" )
+				exit()
+
+
 			# Short message while this status continues
-			messager( "WARNING:  CumulusMX reports data_stopped ... " + str(elapsed) + " sec" )
+			if 0 == ws_data_last_count % 3 :
+				messager( "WARNING:  CumulusMX reports data_stopped ... " + str(elapsed) + " sec" )
 	else:
 		ws_data_last_secs = 0
+		ws_data_last_count = 0
 	data['ws_data_stopped'] = data_status
 	return data_status
 
@@ -1776,6 +1804,8 @@ if __name__ == '__main__':
 	cmx_svc_runtime()	# This reads the PID for the main mono process
 
 	messager("Mono version: {}" .format( mono_version() ) )
+
+	messager("DEBUG: Looging to {}" .format( logger_file ) )
 
 	try:
 		main()

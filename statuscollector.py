@@ -389,6 +389,8 @@ def monitor_dir() :
 
 			tmp = msgqueue[ filename ][1]
 			tmp.strip( "\n" )
+			log_string( "\n" )
+			sys.stdout.write( "\n" )
 			log_and_message( ">>>>>>> {}".format( tmp ) )
 #DEBUG#			log_and_message( msgqueue[ filename ] )
 #DEBUG#			for jjj in range( len(msgqueue[ filename ] ) ) :
