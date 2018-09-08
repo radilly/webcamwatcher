@@ -26,9 +26,26 @@
 #    * NOTE: When I started this up on the North camera on Pi 03 I had to tweak / create
 #            / install a few things to get going...
 #       sudo apt-get install proftpd      - - - - to allow webcam to upload....
-#       sudo apt-get install graphicsmagick-imagemagick-compat
 #       sudo apt-get install ffmpeg       - - - - This is a fairly big package....
-#       vi .ftp.credentials
+# XXXXX sudo apt-get install graphicsmagick-imagemagick-compat
+#
+#       mkdir ~/N
+#       mkdir ~/N/North
+#       mkdir ~/N/North/arc_2018
+#       mkdir ~/S
+#       mkdir ~/S/South
+#       mkdir ~/S/South/arc_2018
+#
+#       vi S/South/.ftp.credentials
+#       vi N/North/.ftp.credentials
+#
+#       ln -s ~/webcamwatcher/webcamimager.py  ~/N
+#       ln -s ~/webcamwatcher/webcamimager.py  ~/S
+#       ln -s /home/pi/webcamwatcher/north.cfg ~/N
+#       ln -s /home/pi/webcamwatcher/south.cfg ~/S
+#
+#       printf "20180523214508\nsnapshot-2018-05-23-21-45-08.jpg\n" > ~/S/webcamimager__.dat
+#       printf "20180523214508\nsnapshot-2018-05-23-21-45-08.jpg\n" > ~/N/webcamimager__.dat
 #
 # ----------------------------------------------------------------------------------------
 #    * NOTE: Exception handling is weak / inconsistent.  Look at try - except blocks.
@@ -249,6 +266,7 @@ last_timestamp = 0
 last_filename = ""
 catching_up = False
 dot_counter = 0
+small_counter = 0
 sleep_for = 5
 
 # strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
@@ -758,7 +776,7 @@ def tar_dailies(date_string) :
 # ----------------------------------------------------------------------------------------
 def next_image_file() :
 	global work_dir, last_timestamp, last_filename, last_image_dir_mtime
-	global catching_up, current_filename, dot_counter
+	global catching_up, current_filename, dot_counter, small_counter
 
 	# Should only ever happen at startup...
 	if last_timestamp == 0 :
@@ -771,7 +789,7 @@ def next_image_file() :
 	#  updates, this should be around 120 secs, but here we all to skip on image.
 	# --------------------------------------------------------------------------------
 	if ( dot_counter * sleep_for ) > 300 :
-		if 0 == ( dot_counter % 10 ) :
+		if 0 == ( dot_counter % 20 ) :
 			log_string( "  ({})\n".format( dot_counter ) )
 			logger( "WARNING: Webcam might be down. More than {} secs since last update".format( dot_counter * sleep_for ) )
 			log_and_message( "WARNING: power-cycling webcam" )
@@ -919,7 +937,9 @@ def next_image_file() :
 		if jpg_size < 500 :
 			log_string( "    ({})\n".format( dot_counter ) )
 			dot_counter = 0
-			power_cycle( 5 )
+			small_counter += 1
+			if 0 == ( small_counter % 4 ) :
+				power_cycle( 5 )
 			logger( "WARNING: Skipping image file {} size = {}".format( source_file, jpg_size ) )
 
 			try:
@@ -935,7 +955,8 @@ def next_image_file() :
 			# ----------------------------------------------------------------
 			subprocess.check_output( ['/usr/bin/touch', work_dir] )
 			return
-
+		else :
+			small_counter = 0
 
 
 		# NOTE ###################################################################
@@ -969,12 +990,12 @@ def next_image_file() :
 ###		print "DEBUG: epoch_file = {}".format( epoch_file )
 ###		print "DEBUG: File age = {}  catching_up = {}".format( epoch_now - epoch_file, catching_up )
 
-		if not catching_up and ( epoch_now - epoch_file > 600 ) :
-			logger( "WARNING: Do not expect this to ever execute." )
-			logger( "WARNING: Do not expect this to ever execute." )
-			logger( "WARNING: Do not expect this to ever execute." )
-			logger( "WARNING: Do not expect this to ever execute." )
-			power_cycle( 5 )
+#########################################################################################################################		if not catching_up and ( epoch_now - epoch_file > 600 ) :
+#########################################################################################################################			logger( "WARNING: Do not expect this to ever execute." )
+#########################################################################################################################			logger( "WARNING: Do not expect this to ever execute." )
+#########################################################################################################################			logger( "WARNING: Do not expect this to ever execute." )
+#########################################################################################################################			logger( "WARNING: Do not expect this to ever execute." )
+#########################################################################################################################			power_cycle( 5 )
 
 		# NOTE ###################################################################
 		# NOTE ###################################################################
@@ -1662,8 +1683,8 @@ if __name__ == '__main__':
 ###	exit()
 ###	wait_ffmpeg()
 ###	exit()
-###	daylight_image_list( "2018-06-22", "/home/pi/South" )
-###	exit()
+
+###  For re-processing fialed overnight video creations, etc.
 ###	test_remove_night_images()
 ###	exit()
 
@@ -1694,8 +1715,7 @@ if __name__ == '__main__':
 #  this remains here are the end of the file just in case.
 # ----------------------------------------------------------------------------------------
 def test_remove_night_images() :
-	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
-
+	global work_dir, remote_dir
 	if len(sys.argv) < 3 :
 		print "Too few arguments"
 		exit()
@@ -1717,24 +1737,12 @@ def test_remove_night_images() :
 		print "Arg #1 is bad.  Use N or S"
 		exit()
 
-	if daylight_image_list( date_string, work_dir ) < 1 :
-		print "Could not find images for date \"{}\"".format( date_string )
-		exit()
+	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
 
-	tnf = daily_thumbnail( date_string, work_dir )
-	if len(tnf) > 0 :
-		push_to_server( tnf, remote_dir, wserver )
+#  Example argument:   2018-05-23
+	midnight_process( date_string )
 
-	ffmpeg_failed = generate_video( date_string, mp4_file )
-	if not ffmpeg_failed :
-		push_to_server( mp4_file, remote_dir, wserver )
-
-	try:
-		subprocess.check_output("rm " + work_dir + "/snapshot-" + date_string + r"*.jpg", shell=True)
-	except :
-		logger( "ERROR: Unexpected ERROR in rm: {}".format( sys.exc_info()[0] ) )
-
-	exit()
+	return
 
 # ========================================================================================
 #    * NOTE: Some Python pages I refer to
