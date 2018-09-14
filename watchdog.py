@@ -769,6 +769,13 @@ def write_pid_file():
 #   1 ==> data has stopped
 #   0 ==> OK
 # ----------------------------------------------------------------------------------------
+# Near the bottom of this file there is a log fragment showing the messaging leading
+# up to a restart of CMX.  The USB coms goes down periodically, and this seems to be
+# the only way to fix it. Not sure the timing of that is right yet, and there are 3
+# (now 4) different messages when we lose the USB.  That's messy buit largely working.
+# It definately *evolved*, and could probably stand a re-write.
+# 20180908
+# ----------------------------------------------------------------------------------------
 def ws_data_stopped():
 	global data
 	global ws_data_last_secs
@@ -833,7 +840,7 @@ def ws_data_stopped():
 # stripping off the timestamp). WS_Updates.txt is a count of the unique checksums
 # in this mini log, across the past 12 updates to realtime.txt (12 minutes).
 #
-# Returms:
+# Returns:
 #   1 ==> data has stopped
 #   0 ==> OK
 # ----------------------------------------------------------------------------------------
@@ -847,6 +854,7 @@ def server_stalled():
 		response = urlopen( WS_Updates_URL )
 		content = response.read()
 #@@@#
+	# At one point got "httplib.BadStatusLine: ''" (unhandled) - See below
 	except URLError as e :
 		if hasattr(e, 'reason'):
 			print 'We failed to reach a server.'
@@ -1888,6 +1896,75 @@ if __name__ == '__main__':
 #    Unexpected ERROR in last_realtime: <type 'exceptions.IOError'>
 #    2018/06/07 12:29:34 DEBUG: content = "00/00/00 00:00:00 45.5 80 39.7 0.0 0.7 360 0.00 0.05 30.14 N 0 mph ..." in last_realtime()
 #    Unexpected ERROR in camera_down: <type 'exceptions.IOError'>
+#
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+#
+#  2018/09/07 18:04:30, 0, 0, 0,  24,    0.00, 0,    15, 177552, 18%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.3%,    1.2285, 0, ,
+#  2018/09/07 18:04:55, 0, 0, 0,  24,    0.00, 0,    15, 177796, 18%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.5%,    1.2288, 0, ,
+#  2018/09/07 22:05:19 WARNING:  CumulusMX reports data_stopped (<#DataStopped> == 1).   (code 101)
+#  2018/09/07 18:05:19, 0, 1, 0,  24,    0.06, 0,    15, 194376, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   2.3%,    1.2290, 0, <<<<<,
+#  2018/09/07 18:05:44, 0, 1, 0,  24,    0.04, 0,    15, 194936, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.5%,    1.2293, 0, <<<<<,
+#  date-time, server_stalled, ws_data_stopped, rf_dropped, last_realtime, proc_load, camera_down, mono_threads, effective_used, mem_pct, swacpu_temp_c, cpu_temp_f, amb_temp, proc_pct, cmx_svc_runtime, webcamwatch_down,
+#  2018/09/07 22:06:08 WARNING:  CumulusMX reports data_stopped ... 49 sec
+#  2018/09/07 18:06:08, 0, 1, 0,  24,    0.02, 0,    15, 195060, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.3%,    1.2296, 0, <<<<<,
+#  2018/09/07 18:06:33, 0, 1, 0,  24,    0.01, 0,    15, 195136, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.4%,    1.2299, 0, <<<<<,
+#  2018/09/07 18:06:58, 0, 1, 0,  24,    0.01, 0,    15, 194916, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.2%,    1.2302, 0, <<<<<,
+#  2018/09/07 22:07:22 WARNING:  CumulusMX reports data_stopped ... 123 sec
+#  2018/09/07 22:07:22 INFO: "Data input appears to have stopped", USB likely disconnected.   (code 120)
+#  2018/09/07 18:07:22, 0, 1, 1,  24,    0.00, 0,    15, 195016, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.3%,    1.2305, 0, <<<<<,
+#  2018/09/07 22:07:46 INFO: "Data input appears to have stopped", USB likely disconnected.   (code 120)
+#  2018/09/07 18:07:47, 0, 1, 1,  24,    0.00, 0,    15, 195292, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.5%,    1.2308, 0, <<<<<,
+#  2018/09/07 18:08:11, 0, 1, 0,  24,    0.00, 0,    15, 195296, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.3%,    1.2310, 0, <<<<<,
+#  2018/09/07 22:08:36 WARNING:  CumulusMX reports data_stopped ... 197 sec
+#  2018/09/07 18:08:36, 0, 1, 0,  24,    0.00, 0,    15, 195152, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.4%,    1.2313, 0, <<<<<,
+#  2018/09/07 18:09:01, 0, 1, 0,  24,    0.13, 0,    15, 195404, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.3%,    1.2316, 0, <<<<<,
+#  2018/09/07 18:09:25, 0, 1, 0,  24,    0.10, 0,    15, 195056, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.3%,    1.2319, 0, <<<<<,
+#  2018/09/07 22:09:49 WARNING:  CumulusMX reports data_stopped ... 270 sec
+#  2018/09/07 18:09:50, 0, 1, 0,  24,    0.06, 0,    15, 195820, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.4%,    1.2322, 0, <<<<<,
+#  2018/09/07 18:10:14, 0, 1, 0,  24,    0.17, 0,    16, 178240, 18%,   1120,  1%, 48.9c, 119.9f,  82.6f,   1.7%,    1.2325, 0, <<<<<,
+#  2018/09/07 18:10:39, 0, 1, 0,  24,    0.11, 0,    15, 178256, 18%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.9%,    1.2327, 0, <<<<<,
+#  2018/09/07 22:11:03 WARNING:  CumulusMX reports data_stopped ... 344 sec
+#  2018/09/07 18:11:04, 0, 1, 0,  24,    0.07, 0,    15, 178048, 18%,   1120,  1%, 48.9c, 119.9f,  82.6f,   0.3%,    1.2330, 0, <<<<<,
+#  2018/09/07 18:11:28, 0, 1, 0,  24,    0.05, 0,    15, 178048, 18%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.3%,    1.2333, 0, <<<<<,
+#  2018/09/07 18:11:53, 0, 1, 0,  24,    0.03, 0,    15, 178168, 18%,   1120,  1%, 48.9c, 119.9f,  82.6f,   0.4%,    1.2336, 0, <<<<<,
+#  date-time, server_stalled, ws_data_stopped, rf_dropped, last_realtime, proc_load, camera_down, mono_threads, effective_used, mem_pct, swacpu_temp_c, cpu_temp_f, amb_temp, proc_pct, cmx_svc_runtime, webcamwatch_down,
+#  2018/09/07 22:12:17 WARNING:   systemctl restart cumulusmx.   (code 999)
+#
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+#
+#   Traceback (most recent call last):
+#     File "/mnt/root/home/pi/watchdog.py", line 1811, in <module>
+#
+#     File "/mnt/root/home/pi/watchdog.py", line 378, in main
+#       server_stalled()
+#     File "/mnt/root/home/pi/watchdog.py", line 843, in server_stalled
+#       # Returms:
+#     File "/usr/lib/python2.7/urllib2.py", line 154, in urlopen
+#       return opener.open(url, data, timeout)
+#     File "/usr/lib/python2.7/urllib2.py", line 431, in open
+#       response = self._open(req, data)
+#     File "/usr/lib/python2.7/urllib2.py", line 449, in _open
+#       '_open', req)
+#     File "/usr/lib/python2.7/urllib2.py", line 409, in _call_chain
+#       result = func(*args)
+#     File "/usr/lib/python2.7/urllib2.py", line 1227, in http_open
+#       return self.do_open(httplib.HTTPConnection, req)
+#     File "/usr/lib/python2.7/urllib2.py", line 1200, in do_open
+#       r = h.getresponse(buffering=True)
+#     File "/usr/lib/python2.7/httplib.py", line 1111, in getresponse
+#       response.begin()
+#     File "/usr/lib/python2.7/httplib.py", line 444, in begin
+#       version, status, reason = self._read_status()
+#     File "/usr/lib/python2.7/httplib.py", line 408, in _read_status
+#       raise BadStatusLine(line)
+#   httplib.BadStatusLine: ''
+#   nohup: ignoring input
 #
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------

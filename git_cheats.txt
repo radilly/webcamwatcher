@@ -46,9 +46,13 @@ COMMON PI TWEAKS
 #    * NOTE: When I started this up on the North camera on Pi 03 I had to tweak / create
 #            / install a few things to get going...
 #       sudo apt-get install proftpd      - - - - to allow webcam to upload....
-#       sudo apt-get install graphicsmagick-imagemagick-compat
+#   ### sudo apt-get install graphicsmagick-imagemagick-compat  <===== Not really needed...
 #       sudo apt-get install ffmpeg       - - - - This is a fairly big package....
-#       vi .ftp.credentials
+#       sudo apt-get install vim
+#       echo "syntax enable
+#             set hlsearch" > ~/.vimrc
+#        OR      printf "syntax enable\nset hlsearch\n" > ~/.vimrc
+#       vi .ftp.credentals
 #
 
 
