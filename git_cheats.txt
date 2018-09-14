@@ -20,6 +20,10 @@ git status
 
 https://github.com/radilly/webcamwatcher
 
+git checkout watchdog.py  (TO ABANDON CHANGES)
+	https://docs.gitlab.com/ee/topics/git/numerous_undo_possibilities_in_git/
+
+
 
 SET UP NEW LOCAL REPO
 ------------------------------------------------------------

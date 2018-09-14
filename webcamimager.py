@@ -795,6 +795,23 @@ def next_image_file() :
 			log_and_message( "WARNING: power-cycling webcam" )
 			power_cycle( 5 )
 
+# ----------------------------------------------------------------------------------------
+# @@@
+#  Assume we are in catch-up mode.
+#  
+#  
+#  
+#  * If we're in catch-up mode keep at it until we get to the last file....
+#        Possibly "process" every 10th file so that the web server sees activity???
+#  
+#  * If we've missed 2 images (4 minutes), power-cycle the camera.
+#  
+#  * If we're not in catch-up mode, start watching the folder for a change.
+#  
+#  
+#  
+# @@@
+# ----------------------------------------------------------------------------------------
 	# --------------------------------------------------------------------------------
 	#  Check the modification time on the image directory.
 	#  If it hasn't changed since our last check, just return() now.
