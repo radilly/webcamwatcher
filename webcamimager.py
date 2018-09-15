@@ -117,7 +117,10 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
-# 20180728 RAD Occurred to me we aren't realling doing anything with the 24-hour mp4s.
+# 20180914 RAD Had a case where the catching_up scheme wasn't working correctly. This
+#              script was several images behind and wasn't catching up.  Rewrote
+#              next_image_file().
+# 20180728 RAD Occurred to me we aren't really doing anything with the 24-hour mp4s.
 #              The daylight version is far more interesting.  Changed midnight_process()
 #              to skip building the 24-hour image.
 # 20180723 RAD Changed wait from 1 to 2 secs in check_stable_size().  Got a failure,
@@ -261,9 +264,10 @@ ftp_login = ""
 ftp_password = ""
 current_filename = ""
 
-last_image_name = ""
-last_timestamp = 0
+last_mtime = 0.0
+
 last_filename = ""
+last_day_code = -1
 catching_up = False
 dot_counter = 0
 small_counter = 0
@@ -278,6 +282,7 @@ cfg_parameters = [
 	"work_dir",
 	"main_image",
 	"thumbnail_image",
+	"wserver",
 	"remote_dir",
 	"image_age_URL",
 	"relay_GPIO",
@@ -311,6 +316,7 @@ def main():
 	log_and_message( "INFO: work_dir = \"{}\"".format(work_dir) )
 	log_and_message( "INFO: main_image = \"{}\"".format(main_image) )
 	log_and_message( "INFO: thumbnail_image = \"{}\"".format(thumbnail_image) )
+	log_and_message( "INFO: wserver = \"{}\"".format(wserver) )
 	log_and_message( "INFO: remote_dir = \"{}\"".format(remote_dir) )
 	log_and_message( "INFO: image_age_URL = \"{}\"".format( image_age_URL ) )
 	log_and_message( "INFO: relay_GPIO = \"{}\"".format( relay_GPIO ) )
@@ -331,14 +337,293 @@ def main():
 
 	while True:
 		next_image_file()
-
-		if catching_up :
-			duration = 0.5
-		else :
-			duration = sleep_for
-		sleep(duration)
+		sleep(sleep_for)
 
 	exit()
+
+
+
+
+
+
+
+# ----------------------------------------------------------------------------------------
+# Handle a new snapshot image:
+#  * Make an copy with a generic name
+#  * Make a thumbnail version
+#  * Upload both to the web server
+#
+#  Globals referenced: remote_dir, wserver, work_dir, thumbnail_image
+# ----------------------------------------------------------------------------------------
+def process_new_image( source, target) :
+	logger( "INFO: process {}".format(source) )
+#DEBUG#	logger( "DEBUG: Called process_new_image(\n\t {},\n\t {} )".format(source, target) )
+
+	shutil.copy2( source, target )
+	push_to_server( target, remote_dir, wserver )
+
+	thumbnail_file = work_dir + '/' + thumbnail_image
+#DEBUG#	logger( "DEBUG: Create thumbnail {} and upload to {}".format(thumbnail_file, remote_dir ) )
+	convert = ""
+	convert_cmd = ['/usr/bin/convert',
+			target,
+			'-resize', '30%',
+			thumbnail_file ]
+	try :
+		convert = subprocess.check_output( convert_cmd, stderr=subprocess.STDOUT )
+	except:
+		logger( "ERROR: Unexpected ERROR in convert: {}".format( sys.exc_info()[0] ) )
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# Generally nothing, unless -verbose is used...
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	if len(convert) > 0 :
+		logger( "WARNING: convert returned data: \"" + convert + "\"" )
+
+	push_to_server( thumbnail_file, remote_dir, wserver )
+
+
+
+
+
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+#  Find the next "unprocessed" image file ... if any
+#
+#  Note: Would do well to break this up a little.
+#
+# ----------------------------------------------------------------------------------------
+#  NOTE: One thing not addressed, which is a little complicated, is how to handle DST.
+#  In the fall the range of 2:00 - 3:00 AM is repeated so that could mess up the
+#  image sequence (when building the video).  It could be that images may be
+#  over-written.
+# ----------------------------------------------------------------------------------------
+# @@@
+#
+#  * If we're in catch-up mode keep at it until we get to the last file....
+#	Possibly "process" every 10th file so that the web server sees activity???
+#
+#  * If we've missed 2 images (4 minutes), power-cycle the camera.
+#
+#  ??????? If we're not in catch-up mode, start watching the folder for a change.
+#
+#  * If the timestamp on the work folder has not changed, print a '.' and return.
+#
+#  * Loop through all the files.
+#		We were using the timestamp embedded on the filename, but DST could
+#		cause an issue.  Using the filetime should be more general, i.e. stat()
+#	* Skip any files older than the last...
+#
+#  * Loop through all the files.
+#
+#  * Loop through all the files.
+#
+#
+#
+# @@@   JUNK>>>>>>>>>>
+# ----------------------------------------------------------------------------------------
+def next_image_file() :
+	global work_dir, last_mtime, last_filename, last_image_dir_mtime
+	global catching_up, current_filename, dot_counter, small_counter
+	global last_day_code
+
+#DEBUG#	logger( "DEBUG: in next_image_file()   last_mtime = {}".format( last_mtime ) )
+#TEST#	sleep( 0.5 )
+	# Should only ever happen at startup...
+	if last_mtime == 0.0 :
+		last_mtime = float(get_stored_ts())
+		last_filename = get_stored_filename()
+		last_day_code = int( re.sub(r'snapshot-....-..-(..).*', r'\1', last_filename) )
+
+
+
+
+	# --------------------------------------------------------------------------------
+	#  This product of ( dot_counter * sleep_for ) is a rough estimate of the time
+	#  since the last webcam update (and the work folder was modified).  At 2 minute
+	#  image updates, this should be around 120 secs, but here allow for a missing
+	#  image.  (Most often we count 22 dots per image upload.)
+	# --------------------------------------------------------------------------------
+	elapsed = ( dot_counter * sleep_for )
+	if elapsed > 300 :
+		if 0 == ( dot_counter % 22 ) :
+			log_string( "  ({})\n".format( dot_counter ) )
+			logger( "WARNING: Webcam might be down. More than {} secs since last update".format( elapsed ) )
+			log_and_message( "WARNING: power-cycling webcam" )
+			power_cycle( 5 )
+
+
+	# --------------------------------------------------------------------------------
+	#  Check the modification time on the image directory.
+	#  If it hasn't changed since our last check, just return() now.
+	# --------------------------------------------------------------------------------
+	image_dir_mtime = stat( work_dir ).st_mtime
+#DEBUG#	logger( "DEBUG: image_dir_mtime {} == last_image_dir_mtime {} ?".format( image_dir_mtime, last_image_dir_mtime ) )
+	if image_dir_mtime == last_image_dir_mtime :
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# Progress indicator
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		log_string( '.' )
+		dot_counter += 1
+		return
+
+
+#DEBUG#	log_string( "\n DEBUG:\n" )
+
+
+	last_image_dir_mtime = image_dir_mtime
+
+	date_string = re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename)
+
+	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
+
+###	print "DEBUG: date_string = " + date_string
+###	print "DEBUG: date_stamp = " + date_stamp
+###	print "DEBUG: last processed day code = " + last_day_code
+
+	# --------------------------------------------------------------------------------
+	#  We look through all files and remove any not starting with "snapshot-".
+	#
+	#  Look for the most recent *unprocessed* snapshot image file.
+	#  We look through all remaining files and examine the name-embedded timestamp
+	#  by converting it to an integer to see if it is greater than the one saved
+	#  from the last image processed.
+	# --------------------------------------------------------------------------------
+	file_list = listdir( work_dir )
+	file_list.sort()
+	line = 0
+	while line < len( file_list ) :
+		if "snapshot-" not in file_list[line] :
+			file_list.pop(line)
+		else :
+			line += 1
+
+	file_list_len = len( file_list )
+
+	# --------------------------------------------------------------------------------
+	#  Run through the list of snapshot files.
+	#
+	# --------------------------------------------------------------------------------
+	line = 0
+	while line < file_list_len :
+#DEBUG#		logger( "DEBUG: file {} of {} - - -  {}".format( line+1, file_list_len, file_list[line] ) )
+
+		date_string = re.sub(r'snapshot-(....-..-..).*', r'\1', file_list[line] )
+		source_file = work_dir + '/' + file_list[line]
+		target_file = work_dir + '/' + main_image
+		current_mtime = stat( source_file ).st_mtime
+
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# Skip already processed files.
+		#	Technically files older than the one last processed.
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		if current_mtime <= last_mtime :
+#DEBUG#			logger( "DEBUG: file {} of {}, {} should have already been processed.".format( line+1, file_list_len, file_list[line] ) )
+			line += 1
+			continue
+
+		if not catching_up and ( (file_list_len - line) > 1 ) :
+			catching_up = True
+			logger( "INFO: Catch-up mode on" )
+
+		if catching_up and (file_list_len - line) < 2 :
+			catching_up = False
+			logger( "INFO: Catch-up mode off" )
+
+		# snapshot-2018-05-23-16-57-04.jpg
+		tok = re.split('-', re.sub('\.jpg', '', file_list[line]) )
+
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# May happen when webcam power-cycles, but NTP hasn't synched yet...
+		# -rw-r--r-- 1 pi pi 44070 Jul 11 06:19 N/North/snapshot-1969-12-31-19-02-00.jpg
+		# Because of the timezone, this is before the start of the Unix epoch!!!
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		if int(tok[1]) < 2000 :
+			log_string( "||  ({})\n".format( dot_counter ) )
+			dot_counter = 0
+			old_file = file_list[line]
+			logger( "WARNING: Probably webcam recently rebooted: old file! {}".format( old_file ) )
+			unlink( "{}/{}".format(work_dir, old_file ) )
+
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# We only know that we have to run the midnight proecess when we get the
+		# first image of a new day - i.e. that date number has changed.  The
+		# last (previous) image filename contains yesterday's date string.
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		day_code = int(tok[3])
+#DEBUG#		logger( "DEBUG: last_day_code = {}   day_code = {}".format( day_code, last_day_code ) )
+		if last_day_code != day_code :
+			log_string( "\n" )
+			logger( "INFO: MIDNIGHT ROLLOVER!" )
+			logger( "INFO: MIDNIGHT ROLLOVER!" )
+			logger( "INFO: MIDNIGHT ROLLOVER!" )
+			logger( "INFO: MIDNIGHT ROLLOVER!" )
+			midnight_process(re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename))
+
+		jpg_size = check_stable_size( source_file )
+
+		if jpg_size < 500 :
+			log_string( "    ({})\n".format( dot_counter ) )
+			logger( "WARNING: Skipping image file {} size = {}".format( source_file, jpg_size ) )
+			dot_counter = 0
+			small_counter += 1
+			# Don't power-cycle unless we've seen a few of these in a row...
+			if 0 == ( small_counter % 4 ) :
+				power_cycle( 5 )
+
+			try:
+				subprocess.check_output("rm {}/{}".format( work_dir, file_list[line] ), shell=True)
+			except :
+				logger( "ERROR: Unexpected ERROR in rm: {}".format( sys.exc_info()[0] ) )
+
+			store_file_data ( current_mtime, file_list[line] )
+			last_mtime = current_mtime
+
+			line += 1
+			continue
+		else :
+			small_counter = 0
+			# ----------------------------------------------------------------
+
+
+
+		# ------------------------------------------------------------------------
+		#  Exception cases handled.  Process the file.  (If not catching_up.)
+		#
+		# ------------------------------------------------------------------------
+		if catching_up :
+			logger( "DEBUG: file {} of {} !!!!!! Skip processing {} (in Catch-up)".format( line+1, file_list_len, file_list[line] ) )
+		else :
+			log_string( "||  ({})\n".format( dot_counter ) )
+			process_new_image( source_file, target_file )
+			# First '.' right after processing is done...
+			log_string( '.' )
+			dot_counter = 1
+
+		store_file_data ( current_mtime, file_list[line] )
+		last_day_code = day_code
+		last_mtime = current_mtime
+		last_filename = file_list[line]
+
+
+		# ------------------------------------------------------------------------
+		#  Increment loop index
+		# ------------------------------------------------------------------------
+		line += 1
+
+	# ----------------------------------------------------------------------------------------
+	# Here were are past the last file
+	# ----------------------------------------------------------------------------------------
+	# ----------------------------------------------------------------------------------------
+	# ----------------------------------------------------------------------------------------
+	# ----------------------------------------------------------------------------------------
+	# ----------------------------------------------------------------------------------------
+	# ----------------------------------------------------------------------------------------
+
+
+
+
+
+
 
 
 
@@ -346,10 +631,10 @@ def main():
 # Read the config file, and set global variables based on it.
 #
 # NOTE: While the flexibility to override any global may have some benefits, it's not
-#       clear this shouldn't be limited to specific variables.  We do some verification
-#       of the values, and in fact some of these are required or we fail to run.
+#	clear this shouldn't be limited to specific variables.  We do some verification
+#	of the values, and in fact some of these are required or we fail to run.
 #
-#       See cfg_parameters array for checking.
+#	See cfg_parameters array for checking.
 # ----------------------------------------------------------------------------------------
 def read_config( config_file ) :
 	global work_dir, main_image, thumbnail_image, remote_dir
@@ -455,7 +740,7 @@ def read_config( config_file ) :
 # Caller can specify the initial state.
 #
 # NOTE: For the SunFounder module, if we don't set the 2nd GPIO high it seems to
-#       "float", so the LED for relay 2 comes on dimly.  This is a little "cleaner."
+#	"float", so the LED for relay 2 comes on dimly.  This is a little "cleaner."
 # ----------------------------------------------------------------------------------------
 def setup_gpio():
 	GPIO.setwarnings(False)
@@ -667,7 +952,7 @@ def tar_dailies(date_string) :
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	#  NOTE: This is a bit draconian ... Need to think through a kinder, gentler approach
-	#        In practice, I've been moving the existing one to /tmp.
+	#	In practice, I've been moving the existing one to /tmp.
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	if os.path.isfile( tar_file ) :
@@ -684,7 +969,7 @@ def tar_dailies(date_string) :
 	#  Creats a list like South/arc_2018/index-2018-06-01.txt for use with -T
 	nnn = daily_image_list(date_string, '.' )
 	if ( nnn < 50 ) :
-		logger( "WARNING: Index list looks short with {} items.".format( nn ) )
+		logger( "WARNING: Index list looks short with {} items.".format( nnn ) )
 	else :
 		tar_cmd = "tar -c -T " + image_index + " -zf " + tar_file
 
@@ -714,376 +999,6 @@ def tar_dailies(date_string) :
 
 
 # ----------------------------------------------------------------------------------------
-#  Find the next "unprocessed" image file ... if any
-#
-#  Note: Would do well to break this up a little.
-#
-# ----------------------------------------------------------------------------------------
-#  This is a section of the nohup.out file with some DEBUG statements still in place
-#  06/01/2018 after the script has been running about 24 hours. There are 4 iterations
-#  through the main loop below. The first and the last are the same, #1 and #4.
-#
-#  #1 & #4 - This case should be the least expensive type of interation. We cheat a
-#       little to keep the code simple.  We're still polling, but the mtime of a
-#       Unix directory (modification time) changes when a new file is written.  So we
-#       only need to stat() the directory and see if the mtime changed since the last
-#       check.  If the mtime is the same we just return and go back to sleep.
-#       Note: There are several Python ways to wait for a directory change, e.q.
-#       a file added to trigger some action.  It is interesting and effecient I
-#       expect, but involves a callback and is a little complicated.
-#
-#  #2 - This is the periodic image processing. At present the web cam ftps a jpg
-#       to the Pi every 5 minutes.  We basically upload 2 files to the hosted web
-#       server, a copy of the latest image with a generic name, and a thumbnail
-#       version created with "convert," which is part of imagemagick.  With the
-#       sleep time at 30 seconds this fires about every 10 iterations when the
-#       processing is "caught up."
-#
-#  #3 - This is a non-image-processing iteration. It's an artifact of the capability
-#       to go into "catchup mode."  In this mode we process the backlog of files
-#       which can build up while this script is *not* running.  Note that the
-#       folder mtime has changed so we ran through the list of files in the folder
-#       and got to the last one without find a new file.  The mtime changed because
-#       of thumbnail generation which keeps is in a #2 type cycle until we hit
-#       the end of the list of files.
-#       Note: Consider the midnight case - when, if the tar goes well, all the
-#       files in it are deleted, i.e. the number of files drops.
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-#  1 .     .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
-#    DEBUG: os.stat("South").st_mtime = 1527888257.13   Saved = 1527888257.13
-#    DEBUG: bypass reading the directory... #2 directory mtime is unchanged.
-#    2018/06/01 21:28:48 DEBUG: Sleep seconds = 30
-#  2 .     .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
-#    DEBUG: os.stat("South").st_mtime = 1527888554.81   Saved = 1527888257.13
-#    DEBUG: last processed last_timestamp = 20180601172410
-#    DEBUG: write ./webcamimager__.dat
-#    2018/06/01 21:29:18 DEBUG: Make copy of image file South/snapshot-2018-06-01-17-29-10.jpg as NW.jpg
-#    2018/06/01 21:29:18 DEBUG: Upload to server directory  South
-#    2018/06/01 21:29:20 DEBUG: Create thumbnail South/NW_thumb.jpg
-#    2018/06/01 21:29:20 DEBUG: Upload thumbnail South/NW_thumb.jpg  to server directory  South
-#    DEBUG: day = 01
-#    2018/06/01 21:29:21 DEBUG: Sleep seconds = 30
-#  3 .     .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
-#    DEBUG: os.stat("South").st_mtime = 1527888560.51   Saved = 1527888554.81
-#    DEBUG: last processed last_timestamp = 20180601172910
-#    2018/06/01 21:29:51 DEBUG: line # = 222   file_list_len = 222  (End of list.)
-#    2018/06/01 21:29:51 DEBUG: Sleep seconds = 30
-#  4 .     .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
-#    DEBUG: os.stat("South").st_mtime = 1527888560.51   Saved = 1527888560.51
-#    DEBUG: bypass reading the directory... #2 directory mtime is unchanged.
-#    2018/06/01 21:30:21 DEBUG: Sleep seconds = 30
-#    .
-# ----------------------------------------------------------------------------------------
-def next_image_file() :
-	global work_dir, last_timestamp, last_filename, last_image_dir_mtime
-	global catching_up, current_filename, dot_counter, small_counter
-
-	# Should only ever happen at startup...
-	if last_timestamp == 0 :
-		last_timestamp = int(get_stored_ts())
-		last_filename = get_stored_filename()
-
-	# --------------------------------------------------------------------------------
-	#  This product of ( dot_counter * sleep_for ) is a rough estimate of the time
-	#  since the last webcam update (and the work folder was modified).  At 2 minute
-	#  updates, this should be around 120 secs, but here we all to skip on image.
-	# --------------------------------------------------------------------------------
-	if ( dot_counter * sleep_for ) > 300 :
-		if 0 == ( dot_counter % 20 ) :
-			log_string( "  ({})\n".format( dot_counter ) )
-			logger( "WARNING: Webcam might be down. More than {} secs since last update".format( dot_counter * sleep_for ) )
-			log_and_message( "WARNING: power-cycling webcam" )
-			power_cycle( 5 )
-
-# ----------------------------------------------------------------------------------------
-# @@@
-#  Assume we are in catch-up mode.
-#  
-#  
-#  
-#  * If we're in catch-up mode keep at it until we get to the last file....
-#        Possibly "process" every 10th file so that the web server sees activity???
-#  
-#  * If we've missed 2 images (4 minutes), power-cycle the camera.
-#  
-#  * If we're not in catch-up mode, start watching the folder for a change.
-#  
-#  
-#  
-# @@@
-# ----------------------------------------------------------------------------------------
-	# --------------------------------------------------------------------------------
-	#  Check the modification time on the image directory.
-	#  If it hasn't changed since our last check, just return() now.
-	# --------------------------------------------------------------------------------
-	image_dir_mtime = stat( work_dir ).st_mtime
-#DEBUG#	logger( "DEBUG: image_dir_mtime {} == last_image_dir_mtime {} ?".format( image_dir_mtime, last_image_dir_mtime ) )
-	if image_dir_mtime == last_image_dir_mtime :
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		# Progress indicator
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		log_string( '.' )
-		dot_counter += 1
-		last_image_dir_mtime = image_dir_mtime
-		return
-
-	last_image_dir_mtime = image_dir_mtime
-
-	date_string = re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename)
-###	print "DEBUG: date_string = " + date_string
-
-	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
-###	print "DEBUG: date_stamp = " + date_stamp
-
-	last_day_code = re.sub(r'^......(..)....*', r'\1', str(last_timestamp))
-###	print "DEBUG: last processed day code = " + last_day_code
-
-	# --------------------------------------------------------------------------------
-	#  Look for the most recent *unprocessed* snapshot image file.
-	#  We look through all files, and examine the name-embedded timestamp by
-	#  converting it to an integer to see if it is greater than the one saved
-	#  from the last image processed.
-	# --------------------------------------------------------------------------------
-	file_list = listdir( work_dir )
-	file_list_len = len( file_list )
-	file_list.sort()
-
-	digit_string = ""
-	next_timestamp = 0
-	line = 0
-	#######################  current_filename = ""
-	while next_timestamp <= last_timestamp :
-		line += 1
-		if (file_list_len - line) < 3 :
-#DEBUG#			messager( "DEBUG: file # {} of {} (last)".format( line, file_list_len ) )
-			if catching_up :
-				catching_up = False
-		# ------------------------------------------------------------------------
-		# NOTE: Got an extra '.' when Catch-up mode off
-		#
-		#    2018/07/28 22:17:13 DEBUG: skipping file snapshot-2018-07-28-22-11-11.jpg processing
-		#    .||  (1)
-		#    .||  (1)
-		# >> .2018/07/28 22:17:15 INFO: Catch-up mode off
-		#    .||  (2)
-		#    2018/07/28 22:17:27 DEBUG: Processing /home/pi/S/South/snapshot-2018-07-28-22-17-16.jpg
-		#    .......
-		# ------------------------------------------------------------------------
-				logger( "INFO: Catch-up mode off" )
-			break
-
-		if "snapshot" in file_list[line] :
-			# snapshot-2018-05-23-16-57-04.jpg
-			tok = re.split('-', re.sub('\.jpg', '', file_list[line]) )
-
-			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-			# May happen when webcam power-cycles, but NTP hasn't synched yet...
-			# -rw-r--r-- 1 pi pi 44070 Jul 11 06:19 N/North/snapshot-1969-12-31-19-02-00.jpg
-			# Because of the timezone, this is before the start of the Unix epoch!!!
-			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-			if int(tok[1]) < 2000 :
-				log_string( "||  ({})\n".format( dot_counter ) )
-				dot_counter = 0
-				old_file = file_list[line]
-				logger( "WARNING: Probably webcam reboot: old file! {}".format( old_file ) )
-				unlink( "{}/{}".format(work_dir, old_file ) )
-
-			digit_string = tok[1]
-			for iii in range(2, 7) :
-				digit_string = digit_string + tok[iii]
-
-			day_code = tok[3]
-			next_timestamp = int(digit_string)
-
-
-###			print "DEBUG: digit_string = " + digit_string
-			if next_timestamp > last_timestamp :
-				current_filename = file_list[line]
-###				print "DEBUG: found new image file = {}".format( next_timestamp )
-				break
-
-	# --------------------------------------------------------------------------------
-	#  Ended loop above for 1 of 2 reasons:
-	#    We found a new, unprocessed file (same if as breaks out of loop above)
-	#  ... or
-	#    We ran through the snapshot files and did not find one with a newer
-	#       timestamp in the name.
-	# --------------------------------------------------------------------------------
-	if next_timestamp > last_timestamp :
-#DEBUG#		print "DEBUG: Earliest unprocessed image file is " + file_list[line]
-		source_file = work_dir + '/' + file_list[line]
-		target_file = work_dir + '/' + main_image
-
-		# ------------------------------------------------------------------------
-		# If we have a backlog of at least 3 files (might no be snapshots),
-		# shorten the sleep time
-		# ------------------------------------------------------------------------
-		if (file_list_len - line) > 3 :
-			log_string( "  ({})\n".format( dot_counter ) )
-			dot_counter = 0
-			logger( "DEBUG: file # {} of {} (Catching up)".format( line, file_list_len ) )
-			logger( "DEBUG: skipping file {} processing".format( file_list[line] ) )
-			catching_up = True
-		else :
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		# Progress indicator Ending
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-			log_string( "||  ({})\n".format( dot_counter ) )
-			dot_counter = 0
-
-		# ------------------------------------------------------------------------
-		#  This is a strange failure mode of the web cam...    06/02/2018
-		#   -rw-r--r--  1 pi pi        0 Jun  2 01:59 snapshot-2018-06-02-01-59-13.jpg
-		#
-		# ------------------------------------------------------------------------
-		if catching_up :
-			jpg_size = stat( source_file ).st_size
-		else :
-			jpg_size = check_stable_size( source_file )
-
-		# ------------------------------------------------------------------------
-		# This is used when I need to test a software change on a second Pi for
-		# processing webcam images.  Yesterday I used this when I was building
-		# a larger SD card for 2 purposes:
-		# * To (briefly) test that this script would run (all prereqs met)
-		# * To accumulate the full days images to support midnight processing
-		# ------------------------------------------------------------------------
-		# push_to_test(source_file, work_dir)
-		# logger( "DEBUG: FTP'ing {} to Pi 03 {}".format( source_file, work_dir ) )
-
-		if jpg_size < 500 :
-			log_string( "    ({})\n".format( dot_counter ) )
-			dot_counter = 0
-			small_counter += 1
-			if 0 == ( small_counter % 4 ) :
-				power_cycle( 5 )
-			logger( "WARNING: Skipping image file {} size = {}".format( source_file, jpg_size ) )
-
-			try:
-				subprocess.check_output("rm {}/{}".format( work_dir, file_list[line] ), shell=True)
-			except :
-				logger( "ERROR: Unexpected ERROR in rm: {}".format( sys.exc_info()[0] ) )
-			store_file_data ( next_timestamp, file_list[line] )
-			last_timestamp = next_timestamp
-			# ----------------------------------------------------------------
-			#  As above, there were a stack of 0-length images.  We want to get
-			#  through them quickly.  The folder is "touched" so that mtime
-			#  changes or we'd have to wait for the next image to be FTP'ed.
-			# ----------------------------------------------------------------
-			subprocess.check_output( ['/usr/bin/touch', work_dir] )
-			return
-		else :
-			small_counter = 0
-
-
-		# NOTE ###################################################################
-		# NOTE ###################################################################
-		# NOTE ###################################################################
-		# NOTE ###################################################################
-		# NOTE ###################################################################
-		# NOTE ###################################################################
-		# NOTE ###################################################################
-		# ------------------------------------------------------------------------
-		#  This is pretty much untested.  And may cause DST issues...
-		#    though we attempt to use UTC...
-		# ------------------------------------------------------------------------
-		#  This probably needs to go.  I copied camera_down() here from
-		#  webcamwatch.py which goes out to the web server and checks the age
-		#  of the last image uploaded when the cron process fires.  That script
-		#  runs on a pi without the camera actually attached so we need something
-		#  that acquires remote data.  Here we have dot_counter which can do
-		#  the age check locally.  Still, it might be useful at this point to
-		#  make sure the web server is being updated.
-		#
-		#
-		#
-		# ------------------------------------------------------------------------
-		# Returns current UTC time
-		epoch_now = int( time.time() )
-		# This should be the file modification tim in UTC time
-		epoch_file = int(stat(work_dir + '/' + current_filename).st_mtime)
-
-###		print "DEBUG: epoch_now = {}".format( epoch_now )
-###		print "DEBUG: epoch_file = {}".format( epoch_file )
-###		print "DEBUG: File age = {}  catching_up = {}".format( epoch_now - epoch_file, catching_up )
-
-#########################################################################################################################		if not catching_up and ( epoch_now - epoch_file > 600 ) :
-#########################################################################################################################			logger( "WARNING: Do not expect this to ever execute." )
-#########################################################################################################################			logger( "WARNING: Do not expect this to ever execute." )
-#########################################################################################################################			logger( "WARNING: Do not expect this to ever execute." )
-#########################################################################################################################			logger( "WARNING: Do not expect this to ever execute." )
-#########################################################################################################################			power_cycle( 5 )
-
-		# NOTE ###################################################################
-		# NOTE ###################################################################
-		# NOTE ###################################################################
-		# NOTE ###################################################################
-		# NOTE ###################################################################
-		# NOTE ###################################################################
-
-
-
-
-
-		if not catching_up :
-			logger( "DEBUG: Processing {}".format( source_file ) )
-
-			shutil.copy2( source_file, target_file )
-			push_to_server( target_file, remote_dir, wserver )
-
-			thumbnail_file = work_dir + '/' + thumbnail_image
-
-			convert = ""
-#DEBUG#			logger( "DEBUG: Create thumbnail {} and upload to {}".format(thumbnail_file, remote_dir ) )
-			convert_cmd = ['/usr/bin/convert',
-					work_dir + '/' + main_image,
-					'-resize', '30%',
-					thumbnail_file ]
-			try :
-				convert = subprocess.check_output( convert_cmd, stderr=subprocess.STDOUT )
-				subprocess.check_output( ['/usr/bin/touch', work_dir] )
-			except:
-				logger( "ERROR: Unexpected ERROR in convert: {}".format( sys.exc_info()[0] ) )
-
-			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-			# Generally nothing, unless -verbose is used...
-			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-			if len(convert) > 0 :
-				logger( "DEBUG: convert returned data: \"" + convert + "\"" )
-
-			push_to_server( thumbnail_file, remote_dir, wserver )
-
-			# First '.' right after processing is done...
-			log_string( '.' )
-			dot_counter += 1
-		else :
-			# Necessary to keep "processing"
-			subprocess.check_output( ['/usr/bin/touch', work_dir] )
-
-		store_file_data( next_timestamp, file_list[line] )
-		last_timestamp = next_timestamp
-
-#DEBUG#		print "DEBUG: day = " + tok[3]
-		if last_day_code != day_code :
-			log_string( "\n" )
-			logger( "INFO: MIDNIGHT ROLLOVER!" )
-			logger( "INFO: MIDNIGHT ROLLOVER!" )
-			logger( "INFO: MIDNIGHT ROLLOVER!" )
-			logger( "INFO: MIDNIGHT ROLLOVER!" )
-			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-			# snapshot-2018-05-23-16-57-04.jpg
-			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-			midnight_process(re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename))
-
-#DEBUG#		messager( "DEBUG: last_filename = {} current_filename = {}".format( last_filename, current_filename ) )
-		last_filename = current_filename
-
-
-
-
-
-
-# ----------------------------------------------------------------------------------------
 #  A single stat() may not be enough.  It is possible that the files is in the
 #  process of being written.  In the message below we had determined that the file
 #  was at least 500 bytes.  The final size was 118090. When I ran the cobert by hand...
@@ -1094,7 +1009,7 @@ def next_image_file() :
 #
 #
 #   2018/06/14 16:37:09 DEBUG: convert returned data: "convert: Premature end of JPEG file
-#      `South/S.jpg' @ warning/jpeg.c/JPEGWarningHandler/352.
+#	`South/S.jpg' @ warning/jpeg.c/JPEGWarningHandler/352.
 #
 # ----------------------------------------------------------------------------------------
 def check_stable_size( filename ) :
@@ -1146,7 +1061,7 @@ def daily_thumbnail( date_string, working_dir ) :
 
 			if int(hh) > 7 :
 ###				logger( "DEBUG: For thumbnail file[{}] = {}.".format( iii, file_list[iii] ) )
-				morning_image = working_dir + '/' + file_list[iii] 
+				morning_image = working_dir + '/' + file_list[iii]
 				break
 
 	if len(morning_image) > 0 :
@@ -1180,25 +1095,25 @@ def daily_thumbnail( date_string, working_dir ) :
 #
 # ----------------------------------------------------------------------------------------
 # NOTE: What I'd like to do, ideally, is vary the length of the video based on the date.
-#       In the Summer we have around 15 hours of daylight here, in Winter about 9.
-#       First light is maybe 30 minutes before.  I might try to approximate this.
-#       Python Astral, https://astral.readthedocs.io/en/latest/ can calulate accurately
-#       but I really just want to lop off the "boring" black frames at either end of the
-#       day.
+#	In the Summer we have around 15 hours of daylight here, in Winter about 9.
+#	First light is maybe 30 minutes before.  I might try to approximate this.
+#	Python Astral, https://astral.readthedocs.io/en/latest/ can calulate accurately
+#	but I really just want to lop off the "boring" black frames at either end of the
+#	day.
 #
 # Also see:
-#     https://www.timeanddate.com/astronomy/astronomical-twilight.html
-#     http://aa.usno.navy.mil/data/docs/RS_OneYear.php
-#     http://aa.usno.navy.mil/cgi-bin/aa_rstablew.pl?ID=AA&year=2018&task=0&state=PA&place=Canonsburg
-#     https://michelanders.blogspot.com/2010/12/calulating-sunrise-and-sunset-in-python.html
-#     https://stackoverflow.com/questions/19615350/calculate-sunrise-and-sunset-times-for-a-given-gps-coordinate-within-postgresql
+#	https://www.timeanddate.com/astronomy/astronomical-twilight.html
+#	http://aa.usno.navy.mil/data/docs/RS_OneYear.php
+#	http://aa.usno.navy.mil/cgi-bin/aa_rstablew.pl?ID=AA&year=2018&task=0&state=PA&place=Canonsburg
+#	https://michelanders.blogspot.com/2010/12/calulating-sunrise-and-sunset-in-python.html
+#	https://stackoverflow.com/questions/19615350/calculate-sunrise-and-sunset-times-for-a-given-gps-coordinate-within-postgresql
 #
 #
-#    Daylight saving time 2018 in Pennsylvania began at 2:00 AM on
-#    Sunday, March 11
-#    and ends at 2:00 AM on
-#    Sunday, November 4
-#    All times are in Eastern Time.
+#	Daylight saving time 2018 in Pennsylvania began at 2:00 AM on
+#	Sunday, March 11
+#	and ends at 2:00 AM on
+#	Sunday, November 4
+#	All times are in Eastern Time.
 #
 #  date_string example = "2018-07-04" - i.e. the date part of a snapshot file.
 #  working_dir example = "/home/pi/N/North"
@@ -1275,7 +1190,7 @@ def daily_image_list( date_string, working_dir ) :
 #  These routines store and fetch information we need to persist between invocations
 #  of this script.  This needs to track what's already been "processed."
 #
-#  The variable last_timestamp is initialized to 0, but otherwise hold the ts for
+#  The variable last_mtime is initialized to 0.0, but otherwise hold the ts for
 #  the file last processed.
 #
 # ----------------------------------------------------------------------------------------
@@ -1341,15 +1256,15 @@ def push_to_server(local_file, remote_path, server) :
 	#  Ran into a case where the first FTP command failed...
 	#
 	#
-	#       File "./webcamimager.py", line 492, in push_to_server
-	#         ftp = FTP('dillys.org')
-	#       File "/usr/lib/python2.7/ftplib.py", line 120, in __init__
-	#         self.connect(host)
-	#       File "/usr/lib/python2.7/ftplib.py", line 135, in connect
-	#         self.sock = socket.create_connection((self.host, self.port), self.timeout)
-	#       File "/usr/lib/python2.7/socket.py", line 575, in create_connection
-	#         raise err
-	#     socket.error: [Errno 110] Connection timed out
+	#	File "./webcamimager.py", line 492, in push_to_server
+	#	ftp = FTP('dillys.org')
+	#	File "/usr/lib/python2.7/ftplib.py", line 120, in __init__
+	#	self.connect(host)
+	#	File "/usr/lib/python2.7/ftplib.py", line 135, in connect
+	#	self.sock = socket.create_connection((self.host, self.port), self.timeout)
+	#	File "/usr/lib/python2.7/socket.py", line 575, in create_connection
+	#	raise err
+	#	socket.error: [Errno 110] Connection timed out
 	#
 	# See https://stackoverflow.com/questions/567622/is-there-a-pythonic-way-to-try-something-up-to-a-maximum-number-of-times
 	# --------------------------------------------------------------------------------
@@ -1365,7 +1280,7 @@ def push_to_server(local_file, remote_path, server) :
 			#
 			# Ref: https://docs.python.org/2/library/ftplib.html
 			# NOTE: The login/user, and password could be given here...
-			#     FTP([host[, user[, passwd[, acct[, timeout]]]]])
+			#	FTP([host[, user[, passwd[, acct[, timeout]]]]])
 			#
 			# ----------------------------------------------------------------
 			ftp = FTP( server, ftp_login, ftp_password )
@@ -1465,7 +1380,7 @@ def fetch_FTP_credentials( ftp_credentials_file ) :
 # Write message to the log file with a leading timestamp.
 #
 # NOTE: Most of the call to messager() should be converted to logger() at some point.
-#       especially if we want to turn this into a service.
+#	especially if we want to turn this into a service.
 # ----------------------------------------------------------------------------------------
 def logger(message):
 	timestamp = datetime.datetime.now().strftime(strftime_FMT)
@@ -1643,7 +1558,7 @@ def camera_down():
 # ----------------------------------------------------------------------------------------
 # TEST Support
 #
-# 
+#
 # ----------------------------------------------------------------------------------------
 def push_to_test(source_file, remote_path) :
 #      source_file = work_dir + '/' + file_list[line]
