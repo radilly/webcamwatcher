@@ -2,14 +2,14 @@
 
 # Use in the Pi staging folder to delete older files.
 #
-# KEEP controls how many we keep, typically a mulitple of 4
+# KEEP controls how many we keep, typically a mulitple of 3
 
-KEEP=16
+KEEP=12
 #  One set of midnight files:
 #       -rw-r--r-- 1 pi pi 37381560 Jul  9 00:02 arc-2018-07-08.tgz
 #       -rw-r--r-- 1 pi pi 12864722 Jul  9 00:03 20180708.mp4
 #       -rw-r--r-- 1 pi pi     4280 Jul  9 00:03 20180708-thumb.jpg
-#       -rw-r--r-- 1 pi pi 12147344 Jul  9 00:05 20180708_daylight.mp4
+# >>>>  -rw-r--r-- 1 pi pi 12147344 Jul  9 00:05 20180708_daylight.mp4 <<<< Not making now
 DELETE=`ls *.tgz *.mp4 *.jpg | head -n -${KEEP} | wc -l`
 USED_BEFORE=`df . | grep -v 'Filesystem' | awk '{print $3}'`
 
