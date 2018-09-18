@@ -417,9 +417,6 @@ def process_new_image( source, target) :
 #
 #  * Loop through all the files.
 #
-#
-#
-# @@@   JUNK>>>>>>>>>>
 # ----------------------------------------------------------------------------------------
 def next_image_file() :
 	global work_dir, last_mtime, last_filename, last_image_dir_mtime
