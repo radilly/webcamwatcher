@@ -1389,6 +1389,21 @@ def logger(message):
 	FH.write( "{} {}\n".format( timestamp, message) )
 	FH.close
 
+# ----------------------------------------------------------------------------------------
+# Print message with a leading timestamp.
+#
+# ----------------------------------------------------------------------------------------
+def messager(message):
+	timestamp = datetime.datetime.now().strftime(strftime_FMT)
+	print "{} {}".format( timestamp, message)
+
+# ----------------------------------------------------------------------------------------
+# Print and log the message with a leading timestamp.
+#
+# ----------------------------------------------------------------------------------------
+def log_and_message(message):
+	messager(message):
+	logger(message):
 
 # ----------------------------------------------------------------------------------------
 # This prints just a symbol or two - for a progress indicator.
@@ -1399,26 +1414,6 @@ def logger(message):
 def log_string(text):
 	FH = open(logger_file, "a")
 	FH.write( text )
-	FH.close
-
-# ----------------------------------------------------------------------------------------
-# Print message with a leading timestamp.
-#
-# ----------------------------------------------------------------------------------------
-def messager(message):
-	timestamp = datetime.datetime.now().strftime(strftime_FMT)
-	print "{} {}".format( timestamp, message)
-
-# ----------------------------------------------------------------------------------------
-# Print message with a leading timestamp.
-#
-# ----------------------------------------------------------------------------------------
-def log_and_message(message):
-	timestamp = datetime.datetime.now().strftime(strftime_FMT)
-	print "{} {}".format( timestamp, message)
-
-	FH = open(logger_file, "a")
-	FH.write( "{} {}\n".format( timestamp, message) )
 	FH.close
 
 # ----------------------------------------------------------------------------------------

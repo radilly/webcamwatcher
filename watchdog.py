@@ -856,14 +856,15 @@ def server_stalled():
 #@@@#
 	# At one point got "httplib.BadStatusLine: ''" (unhandled) - See below
 	except URLError as e :
+		messager( "Unexpected ERROR in server_stalled:", sys.exc_info()[0] )
 		if hasattr(e, 'reason'):
-			print 'We failed to reach a server.'
-			print 'Reason: ', e.reason
+			messager( 'We failed to reach a server.' )
+			messager( 'Reason: ', e.reason )
 			# Avoid downstream issue working with this variable.
 			content = "1"
 		elif hasattr(e, 'code'):
-			print 'The server couldn\'t fulfill the request.'
-			print 'Error code: ', e.code
+			messager( 'The server couldn\'t fulfill the request.' )
+			messager( 'Error code: ', e.code )
 			# Avoid downstream issue working with this variable.
 			content = "1"
 ####	else:
@@ -924,8 +925,19 @@ def last_realtime():
 	try :
 		response = urlopen( realtime_URL )
 		content = response.read()
+	except URLError as e :
+		messager( "Unexpected ERROR in last_realtime:", sys.exc_info()[0] )
+		if hasattr(e, 'reason'):
+			messager( 'We failed to reach a server.' )
+			messager( 'Reason: ', e.reason )
+			# Avoid downstream issue working with this variable.
+			content = "1"
+		elif hasattr(e, 'code'):
+			messager( 'The server couldn\'t fulfill the request.' )
+			messager( 'Error code: ', e.code )
+			# Avoid downstream issue working with this variable.
+			content = "1"
 	except :
-		print "Unexpected ERROR in last_realtime:", sys.exc_info()[0]
 		# --------------------------------------------------------------
 		#  https://docs.python.org/2/tutorial/errors.html
 		#  https://docs.python.org/2/library/sys.html
