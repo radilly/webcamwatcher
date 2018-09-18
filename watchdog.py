@@ -36,6 +36,12 @@
 # ========================================================================================
 #              NOTE: Don't necessarily need "Cumulus MX Exception thrown (see above)"
 #                    messages.  Added end message 01/08/2018.
+# 20180918 RAD Got some confusing log messages tied to a urlopen() failure. See
+#                  NOTE: This doesn't seem like it was handled well.  Messaging ...
+#              near the bottom - a log frament.  Wrapped the same exception
+#              handling around each of 3 calls to urlopen() plus added a leading
+#              WARNING message to indicate which routine we are in.
+#              Perhaps we should be trying this call several times?????
 # 20180707 RAD Cleaned up the webcam checking code, here and on the virtual web
 #              server.  camera_down() is somewhat cleaned up, though at present
 #              it is pretty hard-wired for the North cam.
@@ -360,7 +366,7 @@ def main():
 	python_version = re.sub(' *\n *', '<BR>', python_version )
 	python_version = re.sub(' *\(', '<BR>(', python_version )
 
-	messager("Python version: " + str(sys.version))
+	messager("INFO: Python version: " + str(sys.version))
 	data['python_version'] = python_version
 
 	iii = 0
@@ -719,29 +725,43 @@ def destroy():
 	GPIO.output(17, GPIO.HIGH)
 	GPIO.cleanup()
 
+
 # ----------------------------------------------------------------------------------------
 # Write message to the log file with a leading timestamp.
 #
-# NOTE: Most of the call to messager() should be converted to logger() at some point.
-#       especially if we want to turn this into a service.
+# NOTE: This just calls messager() at the moment.  (Not exactly sure why I did this...
+#       testing maybe?) (There are about 4X as many calls to messager() at the moment.)
+#
+# NOTE: Most of the calls to messager() should be converted to logger() at some point.
+#	especially if we want to turn this into a service.
 # ----------------------------------------------------------------------------------------
 def logger(message):
-	timestamp = datetime.datetime.utcnow().strftime(strftime_FMT)
-
-	print timestamp + " " + message
-
-	if 0 > 1 :
-		FH = open(logger_file, "a")
-		FH.write(timestamp + message + "\n")
-		FH.close
+	# This is not being launched automatically and output is redirected to the log.
+	messager(message)
+#############################################################################
+####	timestamp = datetime.datetime.now().strftime(strftime_FMT)
+####
+####	FH = open(logger_file, "a")
+####	FH.write( "{} {}\n".format( timestamp, message) )
+####	FH.close
+#############################################################################
 
 # ----------------------------------------------------------------------------------------
 # Print message with a leading timestamp.
 #
 # ----------------------------------------------------------------------------------------
 def messager(message):
-	timestamp = datetime.datetime.utcnow().strftime(strftime_FMT)
-	print timestamp + " " + message
+	timestamp = datetime.datetime.now().strftime(strftime_FMT)
+	print "{} {}".format( timestamp, message)
+
+# ----------------------------------------------------------------------------------------
+# Print and log the message with a leading timestamp.
+#
+# ----------------------------------------------------------------------------------------
+def log_and_message(message):
+	messager(message)
+	logger(message)
+
 
 # ----------------------------------------------------------------------------------------
 # Write the PID of this Python script to a .PID file by the name name.
@@ -856,15 +876,15 @@ def server_stalled():
 #@@@#
 	# At one point got "httplib.BadStatusLine: ''" (unhandled) - See below
 	except URLError as e :
-		messager( "Unexpected ERROR in server_stalled:", sys.exc_info()[0] )
+		messager( "ERROR: in server_stalled:", sys.exc_info()[0] )
 		if hasattr(e, 'reason'):
-			messager( 'We failed to reach a server.' )
-			messager( 'Reason: ', e.reason )
+			messager( 'ERROR: We failed to reach a server.' )
+			messager( 'ERROR: Reason: ', e.reason )
 			# Avoid downstream issue working with this variable.
 			content = "1"
 		elif hasattr(e, 'code'):
-			messager( 'The server couldn\'t fulfill the request.' )
-			messager( 'Error code: ', e.code )
+			messager( 'ERROR: The server couldn\'t fulfill the request.' )
+			messager( 'ERROR: code: ', e.code )
 			# Avoid downstream issue working with this variable.
 			content = "1"
 ####	else:
@@ -926,18 +946,13 @@ def last_realtime():
 		response = urlopen( realtime_URL )
 		content = response.read()
 	except URLError as e :
-		messager( "Unexpected ERROR in last_realtime:", sys.exc_info()[0] )
+		messager( "ERROR: in last_realtime:", sys.exc_info()[0] )
 		if hasattr(e, 'reason'):
-			messager( 'We failed to reach a server.' )
-			messager( 'Reason: ', e.reason )
-			# Avoid downstream issue working with this variable.
-			content = "1"
+			messager( 'ERROR: We failed to reach a server.' )
+			messager( 'ERROR: Reason: ', e.reason )
 		elif hasattr(e, 'code'):
-			messager( 'The server couldn\'t fulfill the request.' )
-			messager( 'Error code: ', e.code )
-			# Avoid downstream issue working with this variable.
-			content = "1"
-	except :
+			messager( 'ERROR: The server couldn\'t fulfill the request.' )
+			messager( 'ERROR: code: ', e.code )
 		# --------------------------------------------------------------
 		#  https://docs.python.org/2/tutorial/errors.html
 		#  https://docs.python.org/2/library/sys.html
@@ -1630,9 +1645,17 @@ def camera_down():
 		response = urlopen( image_age_URL )
 		age = response.read()
 		age = age.rstrip()
-	except:
+	except URLError as e :
+		messager( "ERROR: in camera_down:", sys.exc_info()[0] )
+		if hasattr(e, 'reason'):
+			messager( 'ERROR: We failed to reach a server.' )
+			messager( 'ERROR: Reason: ', e.reason )
+		elif hasattr(e, 'code'):
+			messager( 'ERROR: The server couldn\'t fulfill the request.' )
+			messager( 'ERROR: code: ', e.code )
 		age = "0"
 		logger("WARNING: Read URL failed.  Assumed image age: {}".format( age ) )
+
 
 	# --------------------------------------------------------------------------------
 	# Keep as string up until this point, because of...
@@ -1822,12 +1845,12 @@ if __name__ == '__main__':
 
 	print "\n\n\n\n\n"
 
-	messager("  Starting " + this_script + "  PID=" + str(getpid()))
+	messager("INFO: Starting " + this_script + "  PID=" + str(getpid()))
 
 	write_pid_file()
 	cmx_svc_runtime()	# This reads the PID for the main mono process
 
-	messager("Mono version: {}" .format( mono_version() ) )
+	messager("INFO: Mono version: {}" .format( mono_version() ) )
 
 	messager("DEBUG: Looging to {}" .format( logger_file ) )
 
@@ -1978,6 +2001,41 @@ if __name__ == '__main__':
 #   httplib.BadStatusLine: ''
 #   nohup: ignoring input
 #
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+#
+# NOTE: This doesn't seem like it was handled well.  Messaging timestamps are confusing.
+#
+#  2018/09/18 04:15:54, 0, 0, 0,  24,    0.04, 0,    15, 192640, 20%,   4700,  4%, 44.0c, 111.2f,  76.6f,   0.7%,   10.2629, 0, ,
+#  2018/09/18 04:16:19, 0, 0, 0,  24,    0.03, 0,    15, 192652, 20%,   4700,  4%, 44.5c, 112.2f,  76.6f,   0.4%,   10.2632, 0, ,
+#  2018/09/18 04:16:43, 0, 0, 0,  24,    0.02, 0,    15, 192136, 20%,   4700,  4%, 44.5c, 112.2f,  76.6f,   0.4%,   10.2635, 0, ,
+#  We failed to reach a server.
+#  Reason:  [Errno -2] Name or service not known
+#  Unexpected ERROR in last_realtime: <class 'urllib2.URLError'>
+#  2018/09/18 08:17:47 DEBUG: content = "00/00/00 00:00:00 45.5 80 39.7 0.0 0.7 360 0.00 0.05 30.14 N 0 mph ..." in last_realtime()
+#  2018/09/18 08:17:47 DEBUG: Got large negative value from record:
+#	00/00/00 00:00:00 45.5 80 39.7 0.0 0.7 360 0.00 0.05 30.14 N 0 mph ...
+#  2018/09/18 08:17:47 DEBUG: Likely the day rolled over as save date does not match...
+#  2018/09/18 08:17:47 DEBUG:    ... and seconds = 0
+#  2018/09/18 08:18:07 WARNING: Read URL failed.  Assumed image age: 0
+#  2018/09/18 04:18:08, 1, 0, 0, -15400,    0.00, 0,    16, 192848, 20%,   4700,  4%, 44.0c, 111.2f,  76.6f,   0.3%,   10.2644, 0, <<<<<,
+#  We failed to reach a server.
+#  Reason:  [Errno -2] Name or service not known
+#  46092	2018-09-18 04:18:19.970 Error connecting ftp - Could not resolve host 'dillys.org'
+#  46093	2018-09-18 04:18:34.983 Error uploading realtime.txt to realtime.txt : Could not resolve host 'dillys.org'
+#  46094	2018-09-18 04:18:39.991 Error connecting ftp - Could not resolve host 'dillys.org'
+#  46095	2018-09-18 04:18:40.622 WU update: The Task was canceled
+#  2018/09/18 08:18:42 WARNING:   "The Task was canceled"  from  /mnt/root/home/pi/Cumulus_MX/MXdiags/20180907-215720.txt
+#
+#  Unexpected ERROR in last_realtime: <class 'urllib2.URLError'>
+#  2018/09/18 08:18:42 DEBUG: content = "00/00/00 00:00:00 45.5 80 39.7 0.0 0.7 360 0.00 0.05 30.14 N 0 mph ..." in last_realtime()
+#  2018/09/18 08:18:42 WARNING: Read URL failed.  Assumed image age: 0
+#  2018/09/18 04:18:42, 1, 0, 0,   0,    0.04, 0,    18, 193080, 20%,   4700,  4%, 44.0c, 111.2f,  76.6f,   0.4%,   10.2648, 0, <<<<<,
+#  2018/09/18 08:19:06 WARNING: 15544 elapsed since realtime.txt was updated.
+#  2018/09/18 04:19:06, 0, 0, 0, 15544,    0.02, 0,    18, 190496, 20%,   4700,  4%, 44.5c, 112.2f,  76.6f,   0.9%,   10.2651, 0, ,
+#  2018/09/18 04:19:31, 0, 0, 0,  24,    0.02, 0,    18, 190644, 20%,   4700,  4%, 44.0c, 111.2f,  76.6f,   0.3%,   10.2654, 0, ,
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------

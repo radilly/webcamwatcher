@@ -1402,8 +1402,8 @@ def messager(message):
 #
 # ----------------------------------------------------------------------------------------
 def log_and_message(message):
-	messager(message):
-	logger(message):
+	messager(message)
+	logger(message)
 
 # ----------------------------------------------------------------------------------------
 # This prints just a symbol or two - for a progress indicator.
