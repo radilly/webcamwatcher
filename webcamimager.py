@@ -117,6 +117,11 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20180919 RAD Looking over the log I noticed a brief catchup - for 1 image.  This
+#              followed a delay from check_stable_size(). See "log fragment 2" below.
+#              I changed the threshold for setting "catching_up = True" from 1 to 2
+#              even though I can't quite see why.  I expected this mode would only
+#              fire when the script was starting up.
 # 20180914 RAD Had a case where the catching_up scheme wasn't working correctly. This
 #              script was several images behind and wasn't catching up.  Rewrote
 #              next_image_file().
@@ -356,7 +361,7 @@ def main():
 #  Globals referenced: remote_dir, wserver, work_dir, thumbnail_image
 # ----------------------------------------------------------------------------------------
 def process_new_image( source, target) :
-	logger( "INFO: process {}".format(source) )
+	logger( "INFO: Process {}".format(source) )
 #DEBUG#	logger( "DEBUG: Called process_new_image(\n\t {},\n\t {} )".format(source, target) )
 
 	shutil.copy2( source, target )
@@ -396,6 +401,9 @@ def process_new_image( source, target) :
 #  In the fall the range of 2:00 - 3:00 AM is repeated so that could mess up the
 #  image sequence (when building the video).  It could be that images may be
 #  over-written.
+# ----------------------------------------------------------------------------------------
+#  NOTE: On startup, this reprocesses the last file processed.  That was unintended but
+#  I decided it was not harmful.  As a result you always see "||  (0)" in the log.
 # ----------------------------------------------------------------------------------------
 # @@@
 #
@@ -518,12 +526,14 @@ def next_image_file() :
 			line += 1
 			continue
 
-		if not catching_up and ( (file_list_len - line) > 1 ) :
+		if not catching_up and ( (file_list_len - line) > 2 ) :
 			catching_up = True
+			log_string( "\n" )
 			logger( "INFO: Catch-up mode on" )
 
 		if catching_up and (file_list_len - line) < 2 :
 			catching_up = False
+			log_string( "\n" )
 			logger( "INFO: Catch-up mode off" )
 
 		# snapshot-2018-05-23-16-57-04.jpg
@@ -1019,6 +1029,7 @@ def check_stable_size( filename ) :
 
 		last_size = file_size
 		if iii > 0 :
+			log_string( "\n" )
 			logger( "DEBUG: check_stable_size wait #{}.  {} bytes.".format(iii+1, file_size) )
 		sleep( 2 )
 
@@ -1750,3 +1761,32 @@ def test_remove_night_images() :
 #  [libx264 @ 0x1962db0] kb/s:1725.10
 #  2018/06/04 04:04:22 INFO: Tar is large enough to delete jpg files.
 #  2018/06/04 04:04:29 DEBUG: file # 6 of 6 (last)
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# log fragment 2
+# I only really expected Catch-up mode to occur when the script starts up.  I can't see
+# why it would occur here, other than check_stable_size() induced delay which is fairly
+# rare when we're in steady state.  I bumped the threshold for setting "catching_up = True"
+# from 1 to 2 ... without fully understanding why.
+#
+# 2018/09/18 16:50:32 INFO: process /home/pi/N/North/snapshot-2018-09-18-16-50-47.jpg
+# .......................||  (23)
+# 2018/09/18 16:52:32 INFO: process /home/pi/N/North/snapshot-2018-09-18-16-52-47.jpg
+# .......................2018/09/18 16:54:31 DEBUG: check_stable_size wait #2.  69819 bytes.
+# ||  (23)
+# 2018/09/18 16:54:33 INFO: process /home/pi/N/North/snapshot-2018-09-18-16-54-47.jpg
+# .......................2018/09/18 16:56:31 INFO: Catch-up mode on
+# 2018/09/18 16:56:33 DEBUG: file 1031 of 1032 !!!!!! Skip processing snapshot-2018-09-18-16-54-47.jpg (in Catch-up)
+# 2018/09/18 16:56:33 INFO: Catch-up mode off
+# ||  (23)
+# 2018/09/18 16:56:35 INFO: process /home/pi/N/North/snapshot-2018-09-18-16-56-47.jpg
+# .......................||  (23)
+#
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
