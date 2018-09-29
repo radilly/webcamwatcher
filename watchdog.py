@@ -875,16 +875,16 @@ def server_stalled():
 		content = response.read()
 #@@@#
 	# At one point got "httplib.BadStatusLine: ''" (unhandled) - See below
-	except URLError as e :
-		messager( "ERROR: in server_stalled:", sys.exc_info()[0] )
-		if hasattr(e, 'reason'):
+	except URLError as err :
+		messager( "ERROR: in server_stalled: {}".format( sys.exc_info()[0] ) )
+		if hasattr(err, 'reason'):
 			messager( 'ERROR: We failed to reach a server.' )
-			messager( 'ERROR: Reason: ', e.reason )
+			messager( 'ERROR: Reason: ()'.format( err.reason ) )
 			# Avoid downstream issue working with this variable.
 			content = "1"
-		elif hasattr(e, 'code'):
+		elif hasattr(err, 'code'):
 			messager( 'ERROR: The server couldn\'t fulfill the request.' )
-			messager( 'ERROR: code: ', e.code )
+			messager( 'ERROR: code: ()'.format( err.code ) )
 			# Avoid downstream issue working with this variable.
 			content = "1"
 ####	else:
@@ -945,14 +945,14 @@ def last_realtime():
 	try :
 		response = urlopen( realtime_URL )
 		content = response.read()
-	except URLError as e :
-		messager( "ERROR: in last_realtime:", sys.exc_info()[0] )
-		if hasattr(e, 'reason'):
+	except URLError as err :
+		messager( "ERROR: in last_realtime: {}".format( sys.exc_info()[0] ) )
+		if hasattr(err, 'reason'):
 			messager( 'ERROR: We failed to reach a server.' )
-			messager( 'ERROR: Reason: ', e.reason )
-		elif hasattr(e, 'code'):
+			messager( 'ERROR: Reason: ()'.format( err.reason ) )
+		elif hasattr(err, 'code'):
 			messager( 'ERROR: The server couldn\'t fulfill the request.' )
-			messager( 'ERROR: code: ', e.code )
+			messager( 'ERROR: code: ()'.format( err.code ) )
 		# --------------------------------------------------------------
 		#  https://docs.python.org/2/tutorial/errors.html
 		#  https://docs.python.org/2/library/sys.html
@@ -1645,14 +1645,14 @@ def camera_down():
 		response = urlopen( image_age_URL )
 		age = response.read()
 		age = age.rstrip()
-	except URLError as e :
-		messager( "ERROR: in camera_down:", sys.exc_info()[0] )
-		if hasattr(e, 'reason'):
+	except URLError as err :
+		messager( "ERROR: in camera_down: {}".format( sys.exc_info()[0] ) )
+		if hasattr(err, 'reason'):
 			messager( 'ERROR: We failed to reach a server.' )
-			messager( 'ERROR: Reason: ', e.reason )
-		elif hasattr(e, 'code'):
+			messager( 'ERROR: Reason: ()'.format( err.reason ) )
+		elif hasattr(err, 'code'):
 			messager( 'ERROR: The server couldn\'t fulfill the request.' )
-			messager( 'ERROR: code: ', e.code )
+			messager( 'ERROR: code: ()'.format( err.code ) )
 		age = "0"
 		logger("WARNING: Read URL failed.  Assumed image age: {}".format( age ) )
 
