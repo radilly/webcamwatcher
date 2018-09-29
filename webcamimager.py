@@ -28,6 +28,10 @@
 #       sudo apt-get install proftpd      - - - - to allow webcam to upload....
 #       sudo apt-get install ffmpeg       - - - - This is a fairly big package....
 # XXXXX sudo apt-get install graphicsmagick-imagemagick-compat
+#   OPTIONALLY for Astral ...  https://astral.readthedocs.io/en/stable/index.html
+#       sudo apt-get install python-pip   - - - - Python package installer (2)
+#	pip install astral
+#
 #
 #       mkdir ~/N
 #       mkdir ~/N/North
@@ -46,6 +50,9 @@
 #
 #       printf "20180523214508\nsnapshot-2018-05-23-21-45-08.jpg\n" > ~/S/webcamimager__.dat
 #       printf "20180523214508\nsnapshot-2018-05-23-21-45-08.jpg\n" > ~/N/webcamimager__.dat
+#
+# (2) See https://www.makeuseof.com/tag/install-pip-for-python/ - - pip not included in
+#	Raspbian lite distros
 #
 # ----------------------------------------------------------------------------------------
 #    * NOTE: Exception handling is weak / inconsistent.  Look at try - except blocks.
@@ -1109,6 +1116,12 @@ def daily_thumbnail( date_string, working_dir ) :
 #	but I really just want to lop off the "boring" black frames at either end of the
 #	day.
 #
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#	https://pypi.org/project/astral/
+#	https://astral.readthedocs.io/en/stable/index.html
+#	https://www.programcreek.com/python/example/104603/astral.Astral
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#
 # Also see:
 #	https://www.timeanddate.com/astronomy/astronomical-twilight.html
 #	http://aa.usno.navy.mil/data/docs/RS_OneYear.php
@@ -1125,6 +1138,15 @@ def daily_thumbnail( date_string, working_dir ) :
 #
 #  date_string example = "2018-07-04" - i.e. the date part of a snapshot file.
 #  working_dir example = "/home/pi/N/North"
+# ----------------------------------------------------------------------------------------
+# NOTE: Cheap sunrise-sunset solution...
+# I loaded data from http://aa.usno.navy.mil/data/docs/RS_OneYear.php into a spreadsheet.
+#  Doesn't handle DST
+#
+# cal -hy 2018 | sed 's/ /~/a'
+#
+# date -d 20181104 +'%u %Z'
+# date -d 20181105 +'%u %Z'
 # ----------------------------------------------------------------------------------------
 def remove_night_images( date_string, working_dir ) :
 
