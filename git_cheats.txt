@@ -32,6 +32,8 @@ If not installed...
 
 git clone https://github.com/radilly/webcamwatcher
 
+cd webcamwatcher
+
 git remote set-url origin git@github.com:radilly/webcamwatcher.git
 
 git config --global user.name "Bob Dilly"
@@ -47,10 +49,13 @@ COMMON PI TWEAKS
 ------------------------------------------------------------
 
 # ========================================================================================
+#       sudo apt-get vim
+#
+#
 #    * NOTE: When I started this up on the North camera on Pi 03 I had to tweak / create
 #            / install a few things to get going...
 #       sudo apt-get install proftpd      - - - - to allow webcam to upload....
-#   ### sudo apt-get install graphicsmagick-imagemagick-compat  <===== Not really needed...
+#       sudo apt-get install graphicsmagick-imagemagick-compat  <===== Not really needed...
 #       sudo apt-get install ffmpeg       - - - - This is a fairly big package....
 #       sudo apt-get install vim
 #       echo "syntax enable
