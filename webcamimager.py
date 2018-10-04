@@ -993,7 +993,7 @@ def tar_dailies(date_string) :
 			tar_failed = False
 			unlink( image_index )
 		except :
-			logger( "ERROR: Unexpected ERROR in tar: {}".format( sys.exc_info()[0] ) )
+			logger( "ERROR: Unexpected ERROR in {}: {}".format( tar_cmd, sys.exc_info()[0] ) )
 
 	try:
 		tar_size = stat( tar_file ).st_size
@@ -1003,9 +1003,29 @@ def tar_dailies(date_string) :
 
 	logger( "DEBUG: tar file size = {}".format( tar_size ) )
 
-	os.chdir( current_directory )
 
-	##### if not tar_failed :
+
+# @@@
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	#  If the system crashes before this is complete, you might see this
+	#     gzip: stdin: unexpected end of file
+	#     tar: Unexpected EOF in archive
+	#     tar: Error is not recoverable: exiting now
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	tar_cmd = [ "tar",
+			"-tzf",
+			tar_file ]
+	try:
+##		reply = subprocess.check_call(tar_cmd, shell=True)
+		reply = subprocess.check_output( tar_cmd, stderr=subprocess.STDOUT )
+##		print reply
+##		logger( "DEBUG: tar -tzf members = {}".format( len(reply) ) )
+		logger( "DEBUG: tar -tzf {} checked.  Returned = {} bytes.".format( tar_file, len(reply) ) )
+	except :
+		logger( "ERROR: Unexpected ERROR in {}: {}".format( tar_cmd, sys.exc_info()[0] ) )
+		tar_size = -1
+
+	os.chdir( current_directory )
 
 	return tar_size
 
@@ -1641,8 +1661,8 @@ if __name__ == '__main__':
 ###	wait_ffmpeg()
 ###	exit()
 
-###  For re-processing fialed overnight video creations, etc.
-###	test_remove_night_images()
+###  For re-processing failed overnight video creation, etc.
+###	do_midnight()
 ###	exit()
 
 
@@ -1670,8 +1690,18 @@ if __name__ == '__main__':
 #  This started as a test.  Turned out with some embellishment, to be helpful in
 #  going back in history to create a _daylight version of the video.  For the moment
 #  this remains here are the end of the file just in case.
+#
+#  You may want to hack up logger()...
+#  def logger(message):
+#	messager(message)
+#	return
+#	timestamp = datetime.datetime.now().strftime(strftime_FMT)
+#
+#  Arguments:
+#   1 - "N" or "S"
+#   2 - date string, e.g. 2018-05-23
 # ----------------------------------------------------------------------------------------
-def test_remove_night_images() :
+def do_midnight() :
 	global work_dir, remote_dir
 	if len(sys.argv) < 3 :
 		print "Too few arguments"
@@ -1696,7 +1726,6 @@ def test_remove_night_images() :
 
 	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
 
-#  Example argument:   2018-05-23
 	midnight_process( date_string )
 
 	return
@@ -1807,8 +1836,54 @@ def test_remove_night_images() :
 # 2018/09/18 16:56:35 INFO: process /home/pi/N/North/snapshot-2018-09-18-16-56-47.jpg
 # .......................||  (23)
 #
+#
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
+#
+#  $ ./do_midnight.py S 2018-09-30
+#  2018/10/01 09:28:04 INFO: Starting /home/pi/do_midnight.py   PID=3739
+#  3 arguments
+#  2018/10/01 09:28:14 DEBUG: Creating mp4 using cmd: cat /home/pi/S/South/snapshot-2018-09-30*.jpg | ffmpeg -f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 /home/pi/S/South/arc_2018/20180930_daylight.mp4
+#  ffmpeg version 3.2.10-1~deb9u1+rpt2 Copyright (c) 2000-2018 the FFmpeg developers
+#    built with gcc 6.3.0 (Raspbian 6.3.0-18+rpi1+deb9u1) 20170516
+#    configuration: --prefix=/usr --extra-version='1~deb9u1+rpt2' --toolchain=hardened --libdir=/usr/lib/arm-linux-gnueabihf --incdir=/usr/include/arm-linux-gnueabihf --enable-gpl --disable-stripping --enable-avresample --enable-avisynth --enable-gnutls --enable-ladspa --enable-libass --enable-libbluray --enable-libbs2b --enable-libcaca --enable-libcdio --enable-libebur128 --enable-libflite --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libgme --enable-libgsm --enable-libmp3lame --enable-libopenjpeg --enable-libopenmpt --enable-libopus --enable-libpulse --enable-librubberband --enable-libshine --enable-libsnappy --enable-libsoxr --enable-libspeex --enable-libssh --enable-libtheora --enable-libtwolame --enable-libvorbis --enable-libvpx --enable-libwavpack --enable-libwebp --enable-libx265 --enable-libxvid --enable-libzmq --enable-libzvbi --enable-omx-rpi --enable-mmal --enable-openal --enable-opengl --enable-sdl2 --enable-libdc1394 --enable-libiec61883 --arch=armhf --enable-chromaprint --enable-frei0r --enable-libopencv --enable-libx264 --enable-shared
+#    libavutil      55. 34.101 / 55. 34.101
+#    libavcodec     57. 64.101 / 57. 64.101
+#    libavformat    57. 56.101 / 57. 56.101
+#    libavdevice    57.  1.100 / 57.  1.100
+#    libavfilter     6. 65.100 /  6. 65.100
+#    libavresample   3.  1.  0 /  3.  1.  0
+#    libswscale      4.  2.100 /  4.  2.100
+#  libswresample   2.  3.100 /  2.  3.100
+#    libpostproc    54.  1.100 / 54.  1.100
+#  Input #0, image2pipe, from 'pipe:':
+#    Duration: N/A, bitrate: N/A
+#      Stream #0:0: Video: mjpeg, yuvj420p(pc, bt470bg/unknown/unknown), 640x480, 8 fps, 8 tbr, 8 tbn, 8 tbc
+#  No pixel format specified, yuvj420p for H.264 encoding chosen.
+#  Use -pix_fmt yuv420p for compatibility with outdated media players.
+#  [libx264 @ 0x558db0] using cpu capabilities: ARMv6 NEON
+#  [libx264 @ 0x558db0] profile High, level 2.2
+#  [libx264 @ 0x558db0] 264 - core 148 r2748 97eaef2 - H.264/MPEG-4 AVC codec - Copyleft 2003-2016 - http://www.videolan.org/x264.html - options: cabac=1 ref=3 deblock=1:0:0 analyse=0x3:0x113 me=hex subme=7 psy=1 psy_rd=1.00:0.00 mixed_ref=1 me_range=16 chroma_me=1 trellis=1 8x8dct=1 cqm=0 deadzone=21,11 fast_pskip=1 chroma_qp_offset=-2 threads=6 lookahead_threads=1 sliced_threads=0 nr=0 decimate=1 interlaced=0 bluray_compat=0 constrained_intra=0 bframes=3 b_pyramid=2 b_adapt=1 b_bias=0 direct=1 weightb=1 open_gop=0 weightp=2 keyint=250 keyint_min=8 scenecut=40 intra_refresh=0 rc_lookahead=40 rc=crf mbtree=1 crf=23.0 qcomp=0.60 qpmin=0 qpmax=69 qpstep=4 ip_ratio=1.40 aq=1:1.00
+#  Output #0, mp4, to '/home/pi/S/South/arc_2018/20180930_daylight.mp4':
+#    Metadata:
+#      encoder         : Lavf57.56.101
+#      Stream #0:0: Video: h264 (libx264) ([33][0][0][0] / 0x0021), yuvj420p(pc), 640x480, q=-1--1, 8 fps, 16384 tbn, 8 tbc
+#      Metadata:
+#        encoder         : Lavc57.64.101 libx264
+#      Side data:
+#        cpb: bitrate max/min/avg: 0/0/0 buffer size: 0 vbv_delay: -1
+#  Stream mapping:
+#    Stream #0:0 -> #0:0 (mjpeg (native) -> h264 (libx264))
+#  frame=  154 fps= 14 q=24.0 size=    1827kB time=00:00:12.62 bitrate=1185.8kbits/s speed=1.12x
+#      ** CRASH **
+#
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+
+
