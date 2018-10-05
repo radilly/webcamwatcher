@@ -117,6 +117,12 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20181005 RAD Had a blip in Internet connectivity which cause this script to restart
+#              by exiting after FTP failed to connect.  This might be a good thing if
+#              the FTP issue is something local to the host, but the retry loop was
+#              never really getting executed. I changed the routine a lot, but for
+#              reference, I copied push_to_server() to push_to_server_OLD() and
+#              inadvertently committed it in c284c8f9b79bebc537e23cf2e0567c51a4eafb31.
 # 20180728 RAD Occurred to me we aren't realling doing anything with the 24-hour mp4s.
 #              The daylight version is far more interesting.  Changed midnight_process()
 #              to skip building the 24-hour image.
@@ -1315,6 +1321,7 @@ def get_stored_filename() :
 def push_to_server(local_file, remote_path, server) :
 	global ftp_login
 	global ftp_password
+	ftp_OK = False
 
 	if re.search('/', local_file) :
 		local_file_bare = re.sub(r'.*/', r'', local_file)
@@ -1331,246 +1338,51 @@ def push_to_server(local_file, remote_path, server) :
 	#  First try to connect to the server.
 	# --------------------------------------------------------------------------------
 	for iii in range(8) :
+		# Not on first iteration.  Then increase the sleep time with each iteration.
+		#  With a 4 sec multiplier this comes to 112 seconds max...     (28 * 4)
 		if iii > 1 :
-		# Not on first iteration.  The increase the sleep time with each iteration.
-			sleep( iii * 3 )
-
+			sleep( iii * 4 )
 
 		try :
-			#
+			# ----------------------------------------------------------------
+			#  Odds are if this works, the remainng commands probably will
 			# ----------------------------------------------------------------
 			ftp = FTP( server, ftp_login, ftp_password )
+			ftp_OK = True
+			break
 		except Exception as problem :
-			logger( "ERROR: FTP (connect): {}".format( problem ) )
+			logger( "ERROR: in push_to_server() FTP (connect): {}".format( problem ) )
 
-#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-#   2018/10/05 09:07:58 DEBUG: Processing /home/pi/N/North/snapshot-2018-10-05-09-04-08.jpg
-#   ......................||  (22)
-#   2018/10/05 09:09:58 DEBUG: Processing /home/pi/N/North/snapshot-2018-10-05-09-06-08.jpg
-#   2018/10/05 09:10:18 ERROR: FTP (connect): [Errno -3] Temporary failure in name resolution
-#
-#   2018/10/05 09:11:18 INFO: Starting /home/pi/N/webcamimager.py   PID=18431
-#   2018/10/05 09:11:18 INFO: reading "/home/pi/N/north.cfg"
-#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-#
-# @@@ Not sure about this.   Doesn't look like it tried a second time...
-#    ......................||  (22)
-#    2018/07/26 16:32:44 DEBUG: Processing /home/pi/S/South/snapshot-2018-07-26-16-32-37.jpg
-#    ........................||  (24)
-#    2018/07/26 16:34:54 DEBUG: Processing /home/pi/S/South/snapshot-2018-07-26-16-34-37.jpg
-#    2018/07/26 16:35:04 ERROR: FTP (connect): [Errno -3] Temporary failure in name resolution
-#
-			exit()
-			continue
-
-
-###		try :
-###			ftp.login( ftp_login, ftp_password )
-
-
+	if ftp_OK :
 		try :
 #DEBUG#			logger( "DEBUG: FTP remote cd to {}".format( remote_path ) )
 			ftp.cwd( remote_path )
 		except Exception as problem :
-			logger( "ERROR: ftp.cwd {}".format( problem ) )
-			continue
+			logger( "ERROR: in push_to_server() ftp.cwd {}".format( problem ) )
+			ftp_OK = False
+	# --------------------------------------------------------------------------------
+	#  Not absolutely sure I want to do this, but sometimes the process is just hosed...
+	# --------------------------------------------------------------------------------
+	else :
+		exit()
 
 
+	if ftp_OK :
 		try :
 #DEBUG#			logger( "DEBUG: FTP STOR {} to  {}".format( local_file_bare, local_file) )
 			ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
 		except Exception as problem :
-			logger( "ERROR: ftp.storbinary {}".format( problem ) )
-			continue
+			logger( "ERROR: in push_to_server() ftp.storbinary {}".format( problem ) )
+			ftp_OK = False
 
-
+	# For now, always try to quit.
+	try :
 		ftp.quit()
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		# Yes, that's a return that's not at the funtion end
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		return
+	except Exception as problem :
+		logger( "ERROR: in push_to_server() ftp.quit {}".format( problem ) )
 
-##### -----------------------------------------------------------------------------
-##### Example output.  Good message, but I had all the ftp commands in the same try
-##### block so I don't know which call actually failed.
-##### 2018/07/17 02:35:31 FTP Socket Error 113: No route to host
-#####
-#####		except socket.error, e :
-#####			iii += 1
-#####			logger( "FTP Socket Error {}: {}".format( e.args[0], e.args[1]) )
-#####			for jjj in range(0, len(e.args)) :
-#####				logger( "    {}",format( e.args[jjj] ) )
-#####			# Increase the sleep time with each iteration
-#####			sleep( iii * 3 )
-##### -----------------------------------------------------------------------------
 
-###		except :
-###			messager( "ERROR: Unexpected ERROR in FTP: {}".format( sys.exc_info()[0] ) )
-###			iii += 1
-###			# Increase the sleep time with each iteration
-###			sleep(iii)
-#CHECK#		except socket.error, e :
-#CHECK#			iii += 1
-#CHECK#			print "FTP Socket Error %d: %s" % (e.args[0], e.args[1])
-#CHECK#			for jjj in range(0, len(e.args) - 1) :
-#CHECK#				print "    {}",format( e.args[jjj] )
-			# Increase the sleep time with each iteration
-#CHECK#			sleep(iii)
 	return
-
-
-
-
-
-
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-def push_to_server_OLD(local_file, remote_path, server) :
-	global ftp_login
-	global ftp_password
-
-	if re.search('/', local_file) :
-		local_file_bare = re.sub(r'.*/', r'', local_file)
-
-
-	# --------------------------------------------------------------------------------
-	#  Ran into a case where the first FTP command failed...
-	#
-	#
-	#       File "./webcamimager.py", line 492, in push_to_server
-	#         ftp = FTP('dillys.org')
-	#       File "/usr/lib/python2.7/ftplib.py", line 120, in __init__
-	#         self.connect(host)
-	#       File "/usr/lib/python2.7/ftplib.py", line 135, in connect
-	#         self.sock = socket.create_connection((self.host, self.port), self.timeout)
-	#       File "/usr/lib/python2.7/socket.py", line 575, in create_connection
-	#         raise err
-	#     socket.error: [Errno 110] Connection timed out
-	#
-	# See https://stackoverflow.com/questions/567622/is-there-a-pythonic-way-to-try-something-up-to-a-maximum-number-of-times
-	# --------------------------------------------------------------------------------
-	for iii in range(8) :
-		if iii > 1 :
-		# Not on first iteration.  The increase the sleep time with each iteration.
-			sleep( iii * 3 )
-
-
-		try :
-			# ----------------------------------------------------------------
-#DEBUG#			messager( "DEBUG: FTP connect to {}".format( server ) )
-			#
-			# Ref: https://docs.python.org/2/library/ftplib.html
-			# NOTE: The login/user, and password could be given here...
-			#     FTP([host[, user[, passwd[, acct[, timeout]]]]])
-			#
-			# ----------------------------------------------------------------
-			ftp = FTP( server, ftp_login, ftp_password )
-		except Exception as problem :
-			logger( "ERROR: FTP (connect): {}".format( problem ) )
-
-#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-#   2018/10/05 09:07:58 DEBUG: Processing /home/pi/N/North/snapshot-2018-10-05-09-04-08.jpg
-#   ......................||  (22)
-#   2018/10/05 09:09:58 DEBUG: Processing /home/pi/N/North/snapshot-2018-10-05-09-06-08.jpg
-#   2018/10/05 09:10:18 ERROR: FTP (connect): [Errno -3] Temporary failure in name resolution
-#
-#   2018/10/05 09:11:18 INFO: Starting /home/pi/N/webcamimager.py   PID=18431
-#   2018/10/05 09:11:18 INFO: reading "/home/pi/N/north.cfg"
-#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-#
-# @@@ Not sure about this.   Doesn't look like it tried a second time...
-#    ......................||  (22)
-#    2018/07/26 16:32:44 DEBUG: Processing /home/pi/S/South/snapshot-2018-07-26-16-32-37.jpg
-#    ........................||  (24)
-#    2018/07/26 16:34:54 DEBUG: Processing /home/pi/S/South/snapshot-2018-07-26-16-34-37.jpg
-#    2018/07/26 16:35:04 ERROR: FTP (connect): [Errno -3] Temporary failure in name resolution
-#
-			exit()
-			continue
-
-
-###		try :
-###			ftp.login( ftp_login, ftp_password )
-
-
-		try :
-#DEBUG#			logger( "DEBUG: FTP remote cd to {}".format( remote_path ) )
-			ftp.cwd( remote_path )
-		except Exception as problem :
-			logger( "ERROR: ftp.cwd {}".format( problem ) )
-			continue
-
-
-		try :
-#DEBUG#			logger( "DEBUG: FTP STOR {} to  {}".format( local_file_bare, local_file) )
-			ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
-		except Exception as problem :
-			logger( "ERROR: ftp.storbinary {}".format( problem ) )
-			continue
-
-
-		ftp.quit()
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		# Yes, that's a return that's not at the funtion end
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		return
-
-##### -----------------------------------------------------------------------------
-##### Example output.  Good message, but I had all the ftp commands in the same try
-##### block so I don't know which call actually failed.
-##### 2018/07/17 02:35:31 FTP Socket Error 113: No route to host
-#####
-#####		except socket.error, e :
-#####			iii += 1
-#####			logger( "FTP Socket Error {}: {}".format( e.args[0], e.args[1]) )
-#####			for jjj in range(0, len(e.args)) :
-#####				logger( "    {}",format( e.args[jjj] ) )
-#####			# Increase the sleep time with each iteration
-#####			sleep( iii * 3 )
-##### -----------------------------------------------------------------------------
-
-###		except :
-###			messager( "ERROR: Unexpected ERROR in FTP: {}".format( sys.exc_info()[0] ) )
-###			iii += 1
-###			# Increase the sleep time with each iteration
-###			sleep(iii)
-#CHECK#		except socket.error, e :
-#CHECK#			iii += 1
-#CHECK#			print "FTP Socket Error %d: %s" % (e.args[0], e.args[1])
-#CHECK#			for jjj in range(0, len(e.args) - 1) :
-#CHECK#				print "    {}",format( e.args[jjj] )
-			# Increase the sleep time with each iteration
-#CHECK#			sleep(iii)
-	return
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-
-
-
-
-
 
 
 # ----------------------------------------------------------------------------------------
