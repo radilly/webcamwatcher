@@ -63,6 +63,9 @@ COMMON PI TWEAKS
 #        OR      printf "syntax enable\nset hlsearch\n" > ~/.vimrc
 #       vi .ftp.credentals
 #
+#       tar xzvf created_dirs.tgz
+#
+#
 
 
 
