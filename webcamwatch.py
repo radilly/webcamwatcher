@@ -62,7 +62,9 @@ log_file = ""
 restart_file = ""
 check_counter = 0
 
-image_age_URL = 'http://dillys.org/wx/North/N_age.txt'
+# Suggestion of GoDaddy support...
+# image_age_URL = 'http://dillys.org/wx/North/N_age.txt'
+image_age_URL = 'http://50.62.26.1/wx/North/N_age.txt'
 
 # ----------------------------------------------------------------------------------------
 # See https://www.sunfounder.com/modules/input-module/relay/2-channel-dc-5v-relay-module-with-optocoupler-low-level-trigger-expansion-board-for-arduino-uno-r3-mega-2560-1280-dsp-arm-pic-avr-stm32-raspberry-pi.html
