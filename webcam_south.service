@@ -35,8 +35,8 @@ Restart=always
 #
 RestartSec=60
 # StartLimitIntervalSec=interval, StartLimitBurst=burst
-StartLimitInterval=700
-StartLimitBurst=10
+StartLimitInterval=7000
+StartLimitBurst=100
 #  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # https://serverfault.com/questions/736624/systemd-service-automatic-restart-after-startlimitinterval
 #  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
