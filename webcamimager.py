@@ -122,6 +122,14 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+#     Hacked this change back in .... 20181011 https://github.com/radilly/webcamwatcher/commit/02d2380ec09d1a054934fe8021de508c4ef4d62c#diff-d63b4d59d8d25f5618cb001bf3613c1a
+# 20181005 RAD Had a blip in Internet connectivity which cause this script to restart
+#              by exiting after FTP failed to connect.  This might be a good thing if
+#              the FTP issue is something local to the host, but the retry loop was
+#              never really getting executed. I changed the routine a lot, but for
+#              reference, I copied push_to_server() to push_to_server_OLD() and
+#              inadvertently committed it in c284c8f9b79bebc537e23cf2e0567c51a4eafb31.
+#
 # 20180919 RAD Looking over the log I noticed a brief catchup - for 1 image.  This
 #              followed a delay from check_stable_size(). See "log fragment 2" below.
 #              I changed the threshold for setting "catching_up = True" from 1 to 2
@@ -287,6 +295,7 @@ sleep_for = 5
 # Could not get %Z to work. "empty string if the the object is naive" ... which now() is...
 strftime_FMT = "%Y/%m/%d %H:%M:%S"
 wserver = "dillys.org"
+wserver = "50.62.26.1"
 
 cfg_parameters = [
 	"work_dir",
@@ -572,7 +581,13 @@ def next_image_file() :
 			logger( "INFO: MIDNIGHT ROLLOVER!" )
 			midnight_process(re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename))
 
-		jpg_size = check_stable_size( source_file )
+		if not catching_up :
+			# this takes 4 seconds.
+			jpg_size = check_stable_size( source_file )
+		else :
+			jpg_size = stat( source_file ).st_size
+
+#DEBUG#		logger( "DEBUG: jpg_size = {}".format( jpg_size ) )
 
 		if jpg_size < 500 :
 			log_string( "    ({})\n".format( dot_counter ) )
@@ -617,6 +632,7 @@ def next_image_file() :
 		last_mtime = current_mtime
 		last_filename = file_list[line]
 
+#DEBUG#		logger( "DEBUG: NEXT!" )
 
 		# ------------------------------------------------------------------------
 		#  Increment loop index
@@ -707,24 +723,31 @@ def read_config( config_file ) :
 	#  See push_to_server() which tries this in a loop... To handle GoDaddy outages.
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
+	ftp_OK = False
 
 	try :
 		ftp = FTP( wserver, ftp_login, ftp_password )
+		ftp_OK = True
 	except Exception as problem :
 		log_and_message( "ERROR: Unexpected ERROR in FTP connect: {}".format( sys.exc_info()[0] ) )
 		log_and_message( "ERROR: FTP (connect): {}".format( problem ) )
 
-	try :
-		ftp.cwd( remote_dir )
-	except :
-		log_and_message( "ERROR: Unexpected ERROR in FTP cwd: {}".format( sys.exc_info()[0] ) )
-		log_and_message( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
+	if ftp_OK :
+		try :
+			ftp.cwd( remote_dir )
+		except :
+			ftp_OK = False
+			log_and_message( "ERROR: Unexpected ERROR in FTP cwd: {}".format( sys.exc_info()[0] ) )
+			log_and_message( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
 
-	try :
-		ftp.quit()
-	except :
-		log_and_message( "ERROR: Unexpected ERROR in FTP quit: {}".format( sys.exc_info()[0] ) )
-		log_and_message( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
+		try :
+			ftp.quit()
+		except :
+			ftp_OK = False
+			log_and_message( "ERROR: Unexpected ERROR in FTP quit: {}".format( sys.exc_info()[0] ) )
+			log_and_message( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
+
+	if not ftp_OK :
 		exit()
 
 	try:
@@ -1057,7 +1080,7 @@ def check_stable_size( filename ) :
 		if iii > 0 :
 			log_string( "\n" )
 			logger( "DEBUG: check_stable_size wait #{}.  {} bytes.".format(iii+1, file_size) )
-		sleep( 2 )
+		sleep( 4 )
 
 	return last_size
 
@@ -1296,109 +1319,76 @@ def get_stored_filename() :
 def push_to_server(local_file, remote_path, server) :
 	global ftp_login
 	global ftp_password
+	ftp_OK = False
 
 	if re.search('/', local_file) :
 		local_file_bare = re.sub(r'.*/', r'', local_file)
 
-
 	# --------------------------------------------------------------------------------
+	#  The ftp sequence involves 4 commands.  If any fail, those that follow may
+	#  not make any sense to attempt, with the possible exception of quit (which
+	#  could itself fail.
+	#    ftp = FTP( server, ftp_login, ftp_password )
+	#    ftp.cwd( remote_path )
+	#    ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
+	#    ftp.quit()
 	#  Ran into a case where the first FTP command failed...
 	#
-	#
-	#	File "./webcamimager.py", line 492, in push_to_server
-	#	ftp = FTP('dillys.org')
-	#	File "/usr/lib/python2.7/ftplib.py", line 120, in __init__
-	#	self.connect(host)
-	#	File "/usr/lib/python2.7/ftplib.py", line 135, in connect
-	#	self.sock = socket.create_connection((self.host, self.port), self.timeout)
-	#	File "/usr/lib/python2.7/socket.py", line 575, in create_connection
-	#	raise err
-	#	socket.error: [Errno 110] Connection timed out
-	#
-	# See https://stackoverflow.com/questions/567622/is-there-a-pythonic-way-to-try-something-up-to-a-maximum-number-of-times
+	# https://stackoverflow.com/questions/567622/is-there-a-pythonic-way-to-try-something-up-to-a-maximum-number-of-times
 	# --------------------------------------------------------------------------------
 	for iii in range(8) :
+		# Not on first iteration.  Then increase the sleep time with each iteration.
+		#  With a 4 sec multiplier this comes to 112 seconds max...     (28 * 4)
 		if iii > 1 :
-		# Not on first iteration.  The increase the sleep time with each iteration.
-			sleep( iii * 3 )
-
+			sleep( iii * 4 )
 
 		try :
 			# ----------------------------------------------------------------
-#DEBUG#			messager( "DEBUG: FTP connect to {}".format( server ) )
 			#
 			# Ref: https://docs.python.org/2/library/ftplib.html
 			# NOTE: The login/user, and password could be given here...
 			#	FTP([host[, user[, passwd[, acct[, timeout]]]]])
 			#
 			# ----------------------------------------------------------------
+			#  Odds are if this works, the remainng commands probably will
+			# ----------------------------------------------------------------
+#DEBUG#			messager( "DEBUG: FTP connect to {}".format( server ) )
 			ftp = FTP( server, ftp_login, ftp_password )
+			ftp_OK = True
+			break
 		except Exception as problem :
-			logger( "ERROR: FTP (connect): {}".format( problem ) )
-#
-# @@@ Not sure about this.   Doesn't look like it tried a second time...
-#    ......................||  (22)
-#    2018/07/26 16:32:44 DEBUG: Processing /home/pi/S/South/snapshot-2018-07-26-16-32-37.jpg
-#    ........................||  (24)
-#    2018/07/26 16:34:54 DEBUG: Processing /home/pi/S/South/snapshot-2018-07-26-16-34-37.jpg
-#    2018/07/26 16:35:04 ERROR: FTP (connect): [Errno -3] Temporary failure in name resolution
-#
-			exit()
-			continue
+			logger( "ERROR: in push_to_server() FTP (connect): {}".format( problem ) )
 
 
-###		try :
-###			ftp.login( ftp_login, ftp_password )
-
-
+	if ftp_OK :
 		try :
 #DEBUG#			logger( "DEBUG: FTP remote cd to {}".format( remote_path ) )
 			ftp.cwd( remote_path )
 		except Exception as problem :
-			logger( "ERROR: ftp.cwd {}".format( problem ) )
-			continue
+			logger( "ERROR: in push_to_server() ftp.cwd {}".format( problem ) )
+			ftp_OK = False
+	# --------------------------------------------------------------------------------
+	#  Not absolutely sure I want to do this, but sometimes the process is just hosed...
+	# --------------------------------------------------------------------------------
+	else:
+		exit()
 
 
+	if ftp_OK :
 		try :
 #DEBUG#			logger( "DEBUG: FTP STOR {} to  {}".format( local_file_bare, local_file) )
 			ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
 		except Exception as problem :
-			logger( "ERROR: ftp.storbinary {}".format( problem ) )
-			continue
+			logger( "ERROR: in push_to_server() ftp.storbinary {}".format( problem ) )
+			ftp_OK = False
 
 
+	try :
 		ftp.quit()
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		# Yes, that's a return that's not at the funtion end
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		return
+	except Exception as problem :
+		logger( "ERROR: in push_to_server() ftp.quit {}".format( problem ) )
 
-##### -----------------------------------------------------------------------------
-##### Example output.  Good message, but I had all the ftp commands in the same try
-##### block so I don't know which call actually failed.
-##### 2018/07/17 02:35:31 FTP Socket Error 113: No route to host
-#####
-#####		except socket.error, e :
-#####			iii += 1
-#####			logger( "FTP Socket Error {}: {}".format( e.args[0], e.args[1]) )
-#####			for jjj in range(0, len(e.args)) :
-#####				logger( "    {}",format( e.args[jjj] ) )
-#####			# Increase the sleep time with each iteration
-#####			sleep( iii * 3 )
-##### -----------------------------------------------------------------------------
 
-###		except :
-###			messager( "ERROR: Unexpected ERROR in FTP: {}".format( sys.exc_info()[0] ) )
-###			iii += 1
-###			# Increase the sleep time with each iteration
-###			sleep(iii)
-#CHECK#		except socket.error, e :
-#CHECK#			iii += 1
-#CHECK#			print "FTP Socket Error %d: %s" % (e.args[0], e.args[1])
-#CHECK#			for jjj in range(0, len(e.args) - 1) :
-#CHECK#				print "    {}",format( e.args[jjj] )
-			# Increase the sleep time with each iteration
-#CHECK#			sleep(iii)
 	return
 
 
