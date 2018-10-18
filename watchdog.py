@@ -926,6 +926,8 @@ def server_stalled():
 		return 0
 
 
+
+
 # ----------------------------------------------------------------------------------------
 #
 #     NO RETURN VALUE - Well, none that is used consistently.
@@ -933,42 +935,46 @@ def server_stalled():
 #              Return value should be like status, 0 or 1, FALSE or TRUE
 #
 # ----------------------------------------------------------------------------------------
-##########################################        def realtime_stalled():
 def last_realtime():
 	global data
 	global last_secs
 	global last_date
-	#  ---------------------------------------------------------------------
+	# --------------------------------------------------------------------------------
 	#  09/10/17 12:02:47 73.0 92 70.6 3.1 4.5 270 ...
 	#  09/10/17 12:03:11 73.0 92 70.6 3.1 4.5 270 ...
-	#  ---------------------------------------------------------------------
+	#  Search for "20181015" to see an odd error I've gotten several times...
+	#         BadStatusLine 
+	# --------------------------------------------------------------------------------
 	try :
 		response = urlopen( realtime_URL )
 		content = response.read()
-	except URLError as err :
+	except ( URLError, httplib.HTTPException, BadStatusLine ) as err :
 		messager( "ERROR: in last_realtime: {}".format( sys.exc_info()[0] ) )
+		# ------------------------------------------------------------------------
+		#  See https://docs.python.org/2/tutorial/errors.html (~ middle)
+		# ------------------------------------------------------------------------
+		messager( "ERROR: type: {}".format( type(err) ) )
+		messager( "ERROR: args: {}".format( err.args ) )
 		if hasattr(err, 'reason'):
 			messager( 'ERROR: We failed to reach a server.' )
 			messager( 'ERROR: Reason: ()'.format( err.reason ) )
 		elif hasattr(err, 'code'):
 			messager( 'ERROR: The server couldn\'t fulfill the request.' )
 			messager( 'ERROR: code: ()'.format( err.code ) )
-		# --------------------------------------------------------------
+		# ------------------------------------------------------------------------
 		#  https://docs.python.org/2/tutorial/errors.html
 		#  https://docs.python.org/2/library/sys.html
 		#  https://docs.python.org/3/library/traceback.html
 		#  https://docs.python.org/2/library/traceback.html
-		#  
-		#
 		#
 		#  https://stackoverflow.com/questions/8238360/how-to-save-traceback-sys-exc-info-values-in-a-variable
-		# --------------------------------------------------------------
+		# ------------------------------------------------------------------------
 		content = "00/00/00 00:00:00 45.5 80 39.7 0.0 0.7 360 0.00 0.05 30.14 N 0 mph ..."
 		messager( "DEBUG: content = \"" + content + "\" in last_realtime()" )
 
 	words = re.split(' +', content)
 
-	#  ---------------------------------------------------------------------
+	# --------------------------------------------------------------------------------
 	#  20170815 14:38:55 Zulu
 	#  server_stalled() = 0
 	#  ws_data_stopped = 0
@@ -981,7 +987,7 @@ def last_realtime():
     	#  timestamp = words[1]
 	#  IndexError: list index out of range
 	#       *** File may not have been completely written
-	#  ---------------------------------------------------------------------
+	# --------------------------------------------------------------------------------
 	if (len(words)) < 2 :
 		date_str = "00/00/00"
 		timestamp = "00:00:00"
@@ -996,7 +1002,7 @@ def last_realtime():
 		seconds = int(words[2]) + 60 * ( int(words[1]) + ( 60 * int(words[0]) ) )
 		diff_secs = seconds - last_secs
 
-	#  ---------------------------------------------------------------------
+	# --------------------------------------------------------------------------------
 	#  date-time, server_stalled, ws_data_stopped, rf_dropped, last_realtime, proc_load, 
 	#  2017/09/17 22:11:59 GMT,  0,  0,  0,  -65471,  0.0,  101244,  10%,  0,  0%,
 	#  free|945512|560184|385328|6768|317368|141572|101244|844268|102396|0|102396
@@ -1009,7 +1015,7 @@ def last_realtime():
 	#  last_realtime.  The nominal value we expect is 24, or perhaps
 	#  48 - 48 being the transmit interval for the remote sensors.
 	#  
-	#  ---------------------------------------------------------------------
+	# --------------------------------------------------------------------------------
 	if last_secs == 999999 :
 		stat_text = "ok"
 		status = 0
@@ -1247,10 +1253,9 @@ def rf_dropped() :
 
 	file_list.sort()
 
-	#for iii in range(0, len(file_list)):
-	#	___print str(iii) + "  " + file_list[iii]
-
-	for iii in range(-1, -5, -1):
+	#  At time I collect files here, so look at the whole list if need be...
+	count = len( file_list )
+	for iii in range(-1, -1 * count, -1):
 		### messager( "DEBUG:  Checking in diags file, " + file_list[iii])
 		if re.search('^20', file_list[iii]) :
 			log_file = file_list[iii]
@@ -1852,7 +1857,7 @@ if __name__ == '__main__':
 
 	messager("INFO: Mono version: {}" .format( mono_version() ) )
 
-	messager("DEBUG: Looging to {}" .format( logger_file ) )
+	messager("DEBUG: Logging to {}" .format( logger_file ) )
 
 	try:
 		main()
@@ -1972,6 +1977,7 @@ if __name__ == '__main__':
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
+# 20181015  (and once before)
 #
 #   Traceback (most recent call last):
 #     File "/mnt/root/home/pi/watchdog.py", line 1811, in <module>
