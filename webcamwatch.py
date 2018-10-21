@@ -4,6 +4,19 @@
 # watchdog running on a Pi that will detect when images stopped uploading
 # from my webcam, and then power-cycle the sucker.
 #
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+#
+# I've been thinking about separating the part that does the power-cycling, and the
+# part which does the monitoring.  This is partly because I swapped locations of 2 Pis
+# but not the attached webcams.
+#
+#
+#
+#
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+#
 # Invoke with ...  python -u ./webcamwatch.py 2>&1 | tee -a webcamwatch.txt
 #
 # https://stackoverflow.com/questions/22676/how-do-i-download-a-file-over-http-using-python
@@ -18,7 +31,7 @@
 # ========================================================================================
 # 20181018 RAD Turns out using the IP address only works for GoDaddy FTP, but not for
 #              HTTP.  Also moved the weather station receiver to the master bedroom,
-#              because the RF kept dropping.
+#              because the RF kept dropping. (Now at South webcam.)
 # 20180707 RAD Cleaned up the webcam checking code, here and on the virtual web
 #              server.  camera_down() is somewhat cleaned up, though at present
 #              it is pretty hard-wired for the North cam.
@@ -67,7 +80,7 @@ check_counter = 0
 
 # Suggestion of GoDaddy support...
 # image_age_URL = 'http://50.62.26.1/wx/North/N_age.txt'
-image_age_URL = 'http://dillys.org/wx/North/N_age.txt'
+# image_age_URL = 'http://dillys.org/wx/North/N_age.txt'
 image_age_URL = 'http://dillys.org/wx/South/S_age.txt'
 
 # ----------------------------------------------------------------------------------------
@@ -255,28 +268,4 @@ if __name__ == '__main__':
 		main()
 	except KeyboardInterrupt:
 		destroy()
-
-
-
-
-
-
-#  Oct 17 22:18:45 rasp_02_Cumulus systemd[1]: wxwatchdog.service: main process exited, code=exited, status=1/FAILURE
-#  Oct 17 22:18:45 rasp_02_Cumulus systemd[1]: Unit wxwatchdog.service entered failed state.
-#  Oct 17 22:19:05 rasp_02_Cumulus systemd[1]: wxwatchdog.service holdoff time over, scheduling restart.
-#  Oct 17 22:19:05 rasp_02_Cumulus systemd[1]: Stopping WX Station Watchdog Service...
-#  Oct 17 22:19:05 rasp_02_Cumulus systemd[1]: Starting WX Station Watchdog Service...
-#  Oct 17 22:19:05 rasp_02_Cumulus systemd[1]: Started WX Station Watchdog Service.
-#  Oct 17 22:19:05 rasp_02_Cumulus python[1168]: 20181018 02:19:05 Starting ./webcamwatch.py  PID=1168
-#  Oct 17 22:19:06 rasp_02_Cumulus python[1168]: Traceback (most recent call last):
-#  Oct 17 22:19:06 rasp_02_Cumulus python[1168]: File "./webcamwatch.py", line 251, in <module>
-#  Oct 17 22:19:06 rasp_02_Cumulus python[1168]: main()
-#  Oct 17 22:19:06 rasp_02_Cumulus python[1168]: File "./webcamwatch.py", line 244, in main
-#  Oct 17 22:19:06 rasp_02_Cumulus python[1168]: camera_down()
-#  Oct 17 22:19:06 rasp_02_Cumulus python[1168]: File "./webcamwatch.py", line 206, in camera_down
-#  Oct 17 22:19:06 rasp_02_Cumulus python[1168]: age = int( age.rstrip() )
-#  Oct 17 22:19:06 rasp_02_Cumulus python[1168]: ValueError: invalid literal for int() with base 10: '<!-- pageok -->\n<!-- managed by puppet -->\n<html>\n<pre>pageok</pre>\n</html>'
-#  Oct 17 22:19:06 rasp_02_Cumulus systemd[1]: wxwatchdog.service: main process exited, code=exited, status=1/FAILURE
-#  Oct 17 22:19:06 rasp_02_Cumulus systemd[1]: Unit wxwatchdog.service entered failed state.
-
 
