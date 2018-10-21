@@ -16,6 +16,9 @@
 # reducing the output.
 #
 # ========================================================================================
+# 20181018 RAD Turns out using the IP address only works for GoDaddy FTP, but not for
+#              HTTP.  Also moved the weather station receiver to the master bedroom,
+#              because the RF kept dropping.
 # 20180707 RAD Cleaned up the webcam checking code, here and on the virtual web
 #              server.  camera_down() is somewhat cleaned up, though at present
 #              it is pretty hard-wired for the North cam.
@@ -32,7 +35,7 @@
 #              GPIO (warning only), and a failure in trying to read the file on the
 #              web server which I wrapped in a try block...
 # 20170830 RAD Moved code to camera_down() to make it easier to integrate into the
-#              watchdog.py script which chancks a number of other things.  Not
+#              watchdog.py script which checks a number of other things.  Not
 #              clear combining these makes sense because they will drive different
 #              actions.  Although both look at the web server, the actions here
 #              have nothing to do with Cumulus MX.
@@ -63,8 +66,9 @@ restart_file = ""
 check_counter = 0
 
 # Suggestion of GoDaddy support...
-# image_age_URL = 'http://dillys.org/wx/North/N_age.txt'
-image_age_URL = 'http://50.62.26.1/wx/North/N_age.txt'
+# image_age_URL = 'http://50.62.26.1/wx/North/N_age.txt'
+image_age_URL = 'http://dillys.org/wx/North/N_age.txt'
+image_age_URL = 'http://dillys.org/wx/South/S_age.txt'
 
 # ----------------------------------------------------------------------------------------
 # See https://www.sunfounder.com/modules/input-module/relay/2-channel-dc-5v-relay-module-with-optocoupler-low-level-trigger-expansion-board-for-arduino-uno-r3-mega-2560-1280-dsp-arm-pic-avr-stm32-raspberry-pi.html
@@ -251,4 +255,28 @@ if __name__ == '__main__':
 		main()
 	except KeyboardInterrupt:
 		destroy()
+
+
+
+
+
+
+#  Oct 17 22:18:45 rasp_02_Cumulus systemd[1]: wxwatchdog.service: main process exited, code=exited, status=1/FAILURE
+#  Oct 17 22:18:45 rasp_02_Cumulus systemd[1]: Unit wxwatchdog.service entered failed state.
+#  Oct 17 22:19:05 rasp_02_Cumulus systemd[1]: wxwatchdog.service holdoff time over, scheduling restart.
+#  Oct 17 22:19:05 rasp_02_Cumulus systemd[1]: Stopping WX Station Watchdog Service...
+#  Oct 17 22:19:05 rasp_02_Cumulus systemd[1]: Starting WX Station Watchdog Service...
+#  Oct 17 22:19:05 rasp_02_Cumulus systemd[1]: Started WX Station Watchdog Service.
+#  Oct 17 22:19:05 rasp_02_Cumulus python[1168]: 20181018 02:19:05 Starting ./webcamwatch.py  PID=1168
+#  Oct 17 22:19:06 rasp_02_Cumulus python[1168]: Traceback (most recent call last):
+#  Oct 17 22:19:06 rasp_02_Cumulus python[1168]: File "./webcamwatch.py", line 251, in <module>
+#  Oct 17 22:19:06 rasp_02_Cumulus python[1168]: main()
+#  Oct 17 22:19:06 rasp_02_Cumulus python[1168]: File "./webcamwatch.py", line 244, in main
+#  Oct 17 22:19:06 rasp_02_Cumulus python[1168]: camera_down()
+#  Oct 17 22:19:06 rasp_02_Cumulus python[1168]: File "./webcamwatch.py", line 206, in camera_down
+#  Oct 17 22:19:06 rasp_02_Cumulus python[1168]: age = int( age.rstrip() )
+#  Oct 17 22:19:06 rasp_02_Cumulus python[1168]: ValueError: invalid literal for int() with base 10: '<!-- pageok -->\n<!-- managed by puppet -->\n<html>\n<pre>pageok</pre>\n</html>'
+#  Oct 17 22:19:06 rasp_02_Cumulus systemd[1]: wxwatchdog.service: main process exited, code=exited, status=1/FAILURE
+#  Oct 17 22:19:06 rasp_02_Cumulus systemd[1]: Unit wxwatchdog.service entered failed state.
+
 
