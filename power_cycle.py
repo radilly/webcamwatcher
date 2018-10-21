@@ -5,6 +5,14 @@
 #
 #
 # ----------------------------------------------------------------------------------------
+# NOTE: Some pages on shh'ing commands...
+#
+# https://stackoverflow.com/questions/373639/running-interactive-commands-in-paramiko
+# https://stackoverflow.com/questions/3586106/perform-commands-over-ssh-with-python
+# https://stackoverflow.com/questions/1233655/what-is-the-simplest-way-to-ssh-using-python/1233872#1233872
+# https://stackoverflow.com/questions/32476093/native-ssh-in-python
+# https://www.tutorialspoint.com/What-is-the-simplest-way-to-SSH-using-Python
+#
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 # ========================================================================================
 # ========================================================================================
