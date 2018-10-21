@@ -748,6 +748,10 @@ def read_config( config_file ) :
 			log_and_message( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
 
 	if not ftp_OK :
+		log_and_message( "ERROR: Quitting due to FTP error(s) above.  Exiting in 30 seconds ..." )
+		sleep( 30 )
+		log_and_message("  Good bye from " + this_script )
+		log_string( "\n" )
 		exit()
 
 	try:
