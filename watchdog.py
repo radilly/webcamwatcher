@@ -948,7 +948,7 @@ def last_realtime():
 	try :
 		response = urlopen( realtime_URL )
 		content = response.read()
-	except ( URLError, httplib.HTTPException, BadStatusLine ) as err :
+	except ( URLError, Exception ) as err :
 		messager( "ERROR: in last_realtime: {}".format( sys.exc_info()[0] ) )
 		# ------------------------------------------------------------------------
 		#  See https://docs.python.org/2/tutorial/errors.html (~ middle)
