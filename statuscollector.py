@@ -167,9 +167,9 @@ def main():
 
 	python_version = "v " + str(sys.version)
 	python_version = re.sub(r'\n', r', ', python_version )
-	log_and_message( "INFO: Python version: {}".format( python_version ) )
+	logger( "INFO: Python version: {}".format( python_version ) )
 
-	log_and_message( "INFO: initial build of Global msgqueue." )
+	logger( "INFO: initial build of Global msgqueue." )
 	build_msgqueue()
 	
 	# May have to hand-create this file initially...
@@ -177,7 +177,7 @@ def main():
 
 	prev_page = find_prev_page()
 
-	log_and_message( "INFO: Start monitoring." )
+	logger( "INFO: Start monitoring." )
 
 	while True:
 		monitor_dir()
@@ -215,14 +215,14 @@ def build_msgqueue( ) :
 		#  Messages should be named - time.time() + ".txt"
 		# ------------------------------------------------------------------------
 		if not re.match('[0-9]{8,15}\.[0-9]+.txt$', filename, flags=re.I) :
-			log_and_message( "DEBUG: skipping {}".format( filename ) )
+			logger( "DEBUG: skipping {}".format( filename ) )
 			continue
 
 		# ------------------------------------------------------------------------
 		# Strip off the ".txt" and use the first part of the filename as a float.
 		# ------------------------------------------------------------------------
 		ts = float(re.sub(r'\.txt.*', r'', filename))
-#		log_and_message( "DEBUG: ts = {}".format( ts ) )
+#		logger( "DEBUG: ts = {}".format( ts ) )
 
 		try :
 			found_msg = True
@@ -236,11 +236,11 @@ def build_msgqueue( ) :
 			FH.close
 			# NOTE: This will include the newlines in the file.
 			msgqueue[ filename ] = content
-			log_and_message( "DEBUG: {} added to msgqueue #={}  (build_msgqueue)".format( filename, len(msgqueue) ) )
+			logger( "DEBUG: {} added to msgqueue #={}  (build_msgqueue)".format( filename, len(msgqueue) ) )
 
 		last_timestamp = ts
 
-	log_and_message( "DEBUG: Global msgqueue loaded with {} members.".format( len(msgqueue) ) )
+	logger( "DEBUG: Global msgqueue loaded with {} members.".format( len(msgqueue) ) )
 
 
 
@@ -322,15 +322,15 @@ def monitor_dir() :
 	#  
 	# --------------------------------------------------------------------------------
 	image_dir_mtime = stat( work_dir ).st_mtime
-	log_and_message( "DEBUG: image_dir_mtime = {}".format( image_dir_mtime ) )
+	logger( "DEBUG: image_dir_mtime = {}".format( image_dir_mtime ) )
 
-	log_and_message( "INFO: Waiting for a directory change" )
+	logger( "INFO: Waiting for a directory change" )
 	while image_dir_mtime <= last_image_dir_mtime :
 		log_string( "." )
-		sys.stdout.write( "." )
+#############################################################################		sys.stdout.write( "." )
 		dot_counter += 1
 		if ( dot_counter % 60 ) == 0 :
-			log_and_message( "msgqueue #={}".format( len(msgqueue) ) )
+			logger( "msgqueue #={}".format( len(msgqueue) ) )
 #			log_string( "\n" )
 #			sys.stdout.write( "\n" )
 
@@ -385,13 +385,13 @@ def monitor_dir() :
 			content = FH.readlines()
 			FH.close
 			msgqueue[ filename ] = content
-			log_and_message( "DEBUG: {} added to msgqueue #={}".format( filename, len(msgqueue) ) )
+			logger( "DEBUG: {} added to msgqueue #={}".format( filename, len(msgqueue) ) )
 
 			tmp = msgqueue[ filename ][1]
 			tmp.strip( "\n" )
 			log_string( "\n" )
 			sys.stdout.write( "\n" )
-			log_and_message( ">>>>>>> {}".format( tmp ) )
+			logger( ">>>>>>> {}".format( tmp ) )
 #DEBUG#			log_and_message( msgqueue[ filename ] )
 #DEBUG#			for jjj in range( len(msgqueue[ filename ] ) ) :
 #DEBUG#				sys.stdout.write( "{}:  {}".format( jjj, msgqueue[ filename ][jjj] ) )
@@ -412,7 +412,7 @@ def monitor_dir() :
 
 	dot_counter = 0
 
-	log_and_message( "DEBUG: mtime = {} for {}".format( stat( events_page ).st_mtime, events_page ) )
+	logger( "DEBUG: mtime = {} for {}".format( stat( events_page ).st_mtime, events_page ) )
 
 	return
 
@@ -433,7 +433,7 @@ def prune_msgqueue( ) :
 	prevqueue = {}
 	moving = False
 
-	log_and_message( "DEBUG: in prune_msgqueue( )" )
+	logger( "DEBUG: in prune_msgqueue( )" )
 
 	iii = 0
 	for dkey in reversed(sorted(msgqueue.keys())) :
@@ -446,10 +446,10 @@ def prune_msgqueue( ) :
 
 		if moving :
 			prevqueue[ dkey ] = msgqueue.pop( dkey )
-			log_and_message( "DEBUG: prevqueue #={}".format( len(prevqueue) ) )
+			logger( "DEBUG: prevqueue #={}".format( len(prevqueue) ) )
 			unlink( "{}/{}".format( work_dir, dkey ) )
 
-	log_and_message( "DEBUG: Create {} (previous page)".format( new_pp_short ) )
+	logger( "DEBUG: Create {} (previous page)".format( new_pp_short ) )
 	build_events_page( prevqueue, new_prev_page, prev_page )
 
 	push_to_server( new_prev_page, remote_dir, wserver )
@@ -486,11 +486,11 @@ def find_prev_page() :
 		filename = file_list[ iii ]
 		if re.match('[0-9]{8,15}_event_status.html', filename, flags=re.I) :
 			found_prev_page = filename
-			log_and_message( "DEBUG: found_prev_page = \"{}\"".format( found_prev_page ) )
+			logger( "DEBUG: found_prev_page = \"{}\"".format( found_prev_page ) )
 
 
 	prev_page = found_prev_page
-	log_and_message( "DEBUG: Global prev_page now set to {} in find_prev_page()".format( prev_page ) )
+	logger( "DEBUG: Global prev_page now set to {} in find_prev_page()".format( prev_page ) )
 
 
 
@@ -507,14 +507,14 @@ def push_to_server(local_file, remote_path, server) :
 	global ftp_login
 	global ftp_password
 
-	log_and_message( "DEBUG: FTP local_file = \"{}\"   remote_path = \"{}\"   server = \"{}\"".format( local_file, remote_path, server ) )
+	logger( "DEBUG: FTP local_file = \"{}\"   remote_path = \"{}\"   server = \"{}\"".format( local_file, remote_path, server ) )
 
 	if re.search('/', local_file) :
 		local_file_bare = re.sub(r'.*/', r'', local_file)
 	else :
 		local_file_bare = local_file
 
-	log_and_message( "DEBUG: local_file_bare = \"{}\"".format( local_file_bare ) )
+	logger( "DEBUG: local_file_bare = \"{}\"".format( local_file_bare ) )
 
 	# --------------------------------------------------------------------------------
 	#  Ran into a case where the first FTP command failed...
@@ -535,7 +535,7 @@ def push_to_server(local_file, remote_path, server) :
 		if iii > 0 :
 		# Not on first iteration.  The increase the sleep time with each iteration.
 			sleep( iii * 3 )
-			log_and_message( "WARNING: FTP attempt #{}".format( iii ) )
+			logger( "WARNING: FTP attempt #{}".format( iii ) )
 
 		try :
 			# ----------------------------------------------------------------
@@ -681,7 +681,7 @@ def get_stored_ts() :
 	FH.close
 
 	tstamp = str(content[0].strip("\n"))
-	log_and_message( "DEBUG: Stored tstamp = \"{}\" from get_stored_ts()".format( tstamp ) )
+	logger( "DEBUG: Stored tstamp = \"{}\" from get_stored_ts()".format( tstamp ) )
 
 	return float(tstamp)
 
@@ -837,20 +837,20 @@ def read_config( config_file ) :
 
 
 	if not os.path.exists( work_dir ) :
-		log_and_message( "ERROR: work_dir, \"{}\" not found.".format( work_dir ) )
+		logger( "ERROR: work_dir, \"{}\" not found.".format( work_dir ) )
 		exit()
 
 	if not re.match('.+\.jpg$', main_image, flags=re.I) :
-		log_and_message( "ERROR: main_image, \"{}\" not ending in .jpg.".format( main_image ) )
+		logger( "ERROR: main_image, \"{}\" not ending in .jpg.".format( main_image ) )
 		exit()
 
 	if not re.match('.+\.jpg$', thumbnail_image, flags=re.I) :
-		log_and_message( "ERROR: thumbnail_image, \"{}\" not ending in .jpg.".format( main_image ) )
+		logger( "ERROR: thumbnail_image, \"{}\" not ending in .jpg.".format( main_image ) )
 		exit()
 
 
 	if not os.path.isfile( work_dir + "/.ftp.credentials" ) :
-		log_and_message( "ERROR: work_dir, \"{}\" suspect.  {} not found.".format( work_dir + "/.ftp.credentials" ) )
+		logger( "ERROR: work_dir, \"{}\" suspect.  {} not found.".format( work_dir + "/.ftp.credentials" ) )
 		exit()
 
 
@@ -864,21 +864,21 @@ def read_config( config_file ) :
 	try :
 		ftp = FTP( wserver, ftp_login, ftp_password )
 	except Exception as problem :
-		log_and_message( "ERROR: Unexpected ERROR in FTP connect: {}".format( sys.exc_info()[0] ) )
-		log_and_message( "ERROR: FTP (connect): {}".format( problem ) )
+		logger( "ERROR: Unexpected ERROR in FTP connect: {}".format( sys.exc_info()[0] ) )
+		logger( "ERROR: FTP (connect): {}".format( problem ) )
 
 	if len( remote_path ) > 1 :
 		try :
 			ftp.cwd( remote_dir )
 		except :
-			log_and_message( "ERROR: Unexpected ERROR in FTP cwd: {}".format( sys.exc_info()[0] ) )
-			log_and_message( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
+			logger( "ERROR: Unexpected ERROR in FTP cwd: {}".format( sys.exc_info()[0] ) )
+			logger( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
 
 	try :
 		ftp.quit()
 	except :
-		log_and_message( "ERROR: Unexpected ERROR in FTP quit: {}".format( sys.exc_info()[0] ) )
-		log_and_message( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
+		logger( "ERROR: Unexpected ERROR in FTP quit: {}".format( sys.exc_info()[0] ) )
+		logger( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
 		exit()
 
 	try:
@@ -887,8 +887,8 @@ def read_config( config_file ) :
 		response = urlopen( image_age_URL )
 #DEBUG#		logger("DEBUG: image age read from web: \"{}\"".format( age ) )
 	except:
-		log_and_message( "ERROR: Unexpected ERROR in urlopen: {}".format( sys.exc_info()[0] ) )
-		log_and_message( "ERROR: image_age_URL = \"{}\" is likely bad.".format(image_age_URL) )
+		logger( "ERROR: Unexpected ERROR in urlopen: {}".format( sys.exc_info()[0] ) )
+		logger( "ERROR: image_age_URL = \"{}\" is likely bad.".format(image_age_URL) )
 
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	# We could handle these more generally.  If a value contains digits, convert to
