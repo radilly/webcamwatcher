@@ -918,9 +918,9 @@ def server_stalled():
 	##_DEBUG_## ___print "wx/WS_Updates.txt = " + str( unique_count )
 	if unique_count < 3 :
 		data['server_stalled'] = 1
-		return 1
 		messager( "WARNING:  unique_count =" + str(unique_count) + "; expected 12." + \
 			"  realtime.txt data was not updated recently (last 45 mins)." )
+		return 1
 	else:
 		data['server_stalled'] = 0
 		return 0
