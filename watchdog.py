@@ -1786,6 +1786,8 @@ def cmx_svc_runtime():
 	#   Active: active (running) since Sat 2018-06-23 10:10:30 EDT; 4s ago
 	# Main PID: 3364 (mono)
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	#   Active: activating (auto-restart) (Result: signal) since Tue 2018-12-25 09:04:04 EST; 4s ago
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	for iii in range(0, len(lines)):
 		if re.search('Main PID:', lines[iii]) :
 			mono_pid = re.sub('.*Main PID:.', '', lines[iii])
@@ -1801,10 +1803,19 @@ def cmx_svc_runtime():
 			duration = re.sub('min', ' min', duration)
 
 
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	#  Handle case where we DO NOT have a properly formatted date...
+	#   Active: active (running) since Sat 2018-06-23 10:10:30 EDT; 4s ago
+	#   Active: activating (auto-restart) (Result: signal) since Tue 2018-12-25 09:04:04 EST; 4s ago
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	try :
+		timestamp = datetime.datetime.now().strptime(start_time, "%Y-%m-%d %H:%M:%S %Z")
+		start_secs = int(timestamp.strftime("%s"))
+	except :
+		# Set the start time to now so runtime is (near) zero or negative
+		start_secs = int(datetime.datetime.now().strftime("%s")) - 2
 
 
-	timestamp = datetime.datetime.now().strptime(start_time, "%Y-%m-%d %H:%M:%S %Z")
-	start_secs = int(timestamp.strftime("%s"))
 	now_secs = int(datetime.datetime.now().strftime("%s"))
 	secs_running = now_secs - start_secs
 	in_days = float(secs_running) / float( 60*60*24 )
