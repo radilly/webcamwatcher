@@ -16,6 +16,72 @@
 # Start with ...
 #   nohup /usr/bin/python -u /home/pi/webcamimager.py >> /home/pi/webcamimager.log 2>&1 &
 #
+#
+#
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+#
+#
+#  ..........................||  (26)
+#  2018/11/04 03:38:48 INFO: Process /home/pi/N/North/snapshot-2018-11-04-04-38-41.jpg
+#  .......................||  (23)
+#  2018/11/04 03:40:49 INFO: Process /home/pi/N/North/snapshot-2018-11-04-04-40-41.jpg
+#  ..
+# NOTE: Not in Catch-up ....
+#  2018/11/04 03:41:01 INFO: Catch-up mode on
+#  2018/11/04 03:41:01 DEBUG: file 108 of 137 !!!!!! Skip processing snapshot-2018-11-04-03-40-56.jpg (in Catch-up)
+#  .......................2018/11/04 03:43:01 DEBUG: file 110 of 138 !!!!!! Skip processing snapshot-2018-11-04-03-42-56.jpg (in Catch-up)
+#  .......................2018/11/04 03:45:01 DEBUG: file 112 of 139 !!!!!! Skip processing snapshot-2018-11-04-03-44-56.jpg (in Catch-up)
+#  ..................  (66)
+# NOTE: Not down ....
+#  2018/11/04 03:46:36 WARNING: Webcam might be down. More than 330 secs since last update
+#  2018/11/04 03:46:36 WARNING: power-cycling webcam
+#  2018/11/04 03:46:36 ...open relay contacts.
+#  2018/11/04 03:46:41 ...close relay contacts.
+#  ....2018/11/04 03:47:01 DEBUG: file 114 of 140 !!!!!! Skip processing snapshot-2018-11-04-03-46-56.jpg (in Catch-up)
+#
+#
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+#
+# NOTE: It may be desirable to combine messager() and log_event().  The latter is almost
+#       always accompanied by the former, as in the example below.  Generally, when the
+#       string passed to messager() starts with "WARNING:" or "ERROR:" it is an event
+#       we'd want to log.
+#
+# NOTE: If we send a message file to a remote node, it could be written to /tmp.
+#       I think the OS deletes these periodically, or at least on reboot.
+#
+# messager( "WARNING:  CumulusMX reports data_stopped (<#DataStopped> == 1).   (code 101)" )
+# log_event("", "CumulusMX reports data_stopped (<#DataStopped> == 1).", 101 )
+#
+#
+#
+# From "watchdog.py"
+#
+# status_dir =            "/mnt/root/home/pi/status"
+#
+# def log_event(ID, description, code):
+#
+#	status_file = "{}/{}.txt".format( status_dir, time.time() )
+#	FH = open(status_file, "w+")
+#	FH.write( format_str.format( ID, description, bgcolor, code) )
+#	FH.close
+#
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+#
+#
+#
 # ----------------------------------------------------------------------------------------
 #    * NOTE: This should be able to be run as a service. (systemctl)
 # ----------------------------------------------------------------------------------------
@@ -122,6 +188,11 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20181229 RAD Now using ssh to power-cycle the web camera. This requires that
+#              /home/pi/webcamwatcher/power_cycle.py be available. The webcan could
+#              be remote, in which case relay_HOST is set to the IP of the system,
+#              or if local the loopback address is used; 127.0.0.1.
+#
 #     Hacked this change back in .... 20181011 https://github.com/radilly/webcamwatcher/commit/02d2380ec09d1a054934fe8021de508c4ef4d62c#diff-d63b4d59d8d25f5618cb001bf3613c1a
 # 20181005 RAD Had a blip in Internet connectivity which cause this script to restart
 #              by exiting after FTP failed to connect.  This might be a good thing if
@@ -256,8 +327,8 @@ import RPi.GPIO as GPIO
 #     briefly by driving the input pin low.
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 # relay_GPIO = 23
-relay_GPIO = ""
-relay2_GPIO = ""
+relay_GPIO = -1
+relay2_GPIO = -1
 webcam_ON = GPIO.HIGH
 webcam_OFF = GPIO.LOW
 
@@ -296,6 +367,7 @@ sleep_for = 5
 strftime_FMT = "%Y/%m/%d %H:%M:%S"
 wserver = "dillys.org"
 wserver = "50.62.26.1"
+cam_host = "127.0.0.1"
 
 cfg_parameters = [
 	"work_dir",
@@ -304,8 +376,10 @@ cfg_parameters = [
 	"wserver",
 	"remote_dir",
 	"image_age_URL",
+	"cam_host",
 	"relay_GPIO",
 	"relay2_GPIO",
+	"relay_HOST",
 	]
 
 
@@ -338,6 +412,8 @@ def main():
 	log_and_message( "INFO: wserver = \"{}\"".format(wserver) )
 	log_and_message( "INFO: remote_dir = \"{}\"".format(remote_dir) )
 	log_and_message( "INFO: image_age_URL = \"{}\"".format( image_age_URL ) )
+	log_and_message( "INFO: cam_host = \"{}\"".format( cam_host ) )
+	log_and_message( "INFO: relay_HOST = \"{}\"".format( relay_HOST ) )
 	log_and_message( "INFO: relay_GPIO = \"{}\"".format( relay_GPIO ) )
 	log_and_message( "INFO: relay2_GPIO = \"{}\"".format( relay2_GPIO ) )
 	print "."
@@ -541,6 +617,8 @@ def next_image_file() :
 			line += 1
 			continue
 
+###### NOTE: Could check
+###### date +%Z
 		if not catching_up and ( (file_list_len - line) > 2 ) :
 			catching_up = True
 			log_string( "\n" )
@@ -667,7 +745,7 @@ def next_image_file() :
 # ----------------------------------------------------------------------------------------
 def read_config( config_file ) :
 	global work_dir, main_image, thumbnail_image, remote_dir
-	global ftp_login, ftp_password
+	global ftp_login, ftp_password, cam_host, relay_HOST
 	global relay_GPIO, relay2_GPIO, webcam_ON, webcam_OFF
 
 # @@@	# https://docs.python.org/2/library/configparser.html
@@ -767,12 +845,9 @@ def read_config( config_file ) :
 	# We could handle these more generally.  If a value contains digits, convert to
 	# int().  If digits and a '.', use float().
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	if len(relay_GPIO) > 0 :
-		relay_GPIO = int( relay_GPIO )
+	relay_GPIO = int( relay_GPIO )
 
-	if len(relay2_GPIO) > 0 :
-		relay2_GPIO = int( relay2_GPIO )
-
+	relay2_GPIO = int( relay2_GPIO )
 
 
 # ----------------------------------------------------------------------------------------
@@ -783,6 +858,9 @@ def read_config( config_file ) :
 #	"float", so the LED for relay 2 comes on dimly.  This is a little "cleaner."
 # ----------------------------------------------------------------------------------------
 def setup_gpio():
+	# Now we're delegating this task
+	return
+
 	GPIO.setwarnings(False)
 	GPIO.setmode(GPIO.BCM)
 	GPIO.setup(relay_GPIO, GPIO.OUT, initial=webcam_ON)
@@ -795,6 +873,21 @@ def setup_gpio():
 # From a quick test, the (South) RSX-3211 webam seems to take around 32 secs to reboot.
 # ----------------------------------------------------------------------------------------
 def power_cycle( interval ):
+
+	cmd = "ssh {} /home/pi/webcamwatcher/power_cycle.py {}".format( relay_GPIO, relay_HOST )
+
+	process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	output,stderr = process.communicate()
+	status = process.poll()
+	print status
+	print output
+
+
+	return
+
+
+
+
 	logger( '...open relay contacts.')
 	GPIO.output(relay_GPIO, webcam_OFF)
 
@@ -802,6 +895,11 @@ def power_cycle( interval ):
 
 	logger('...close relay contacts.')
 	GPIO.output(relay_GPIO, webcam_ON)
+
+	return
+
+
+
 
 # ----------------------------------------------------------------------------------------
 # Clean up any GPIO configs - typically on exit.
