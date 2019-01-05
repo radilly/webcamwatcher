@@ -34,6 +34,33 @@
 # ========================================================================================
 #      See MXdiags sample at the end of this file
 # ========================================================================================
+# ========================================================================================
+# ========================================================================================
+# ========================================================================================
+# 20181229 RAD Got the following (untrapped) error:
+#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+#                Traceback (most recent call last):
+#                  File "/mnt/root/home/pi/watchdog.py", line 1924, in <module>
+#      
+#                  File "/mnt/root/home/pi/watchdog.py", line 393, in main
+#                    camera_down()
+#                  File "/mnt/root/home/pi/watchdog.py", line 1711, in camera_down
+#                    response = urlopen( image_age_URL )
+#                  File "/usr/lib/python2.7/urllib2.py", line 154, in urlopen
+#                    return opener.open(url, data, timeout)
+#                  File "/usr/lib/python2.7/urllib2.py", line 431, in open
+#                    response = self._open(req, data)
+#                  File "/usr/lib/python2.7/urllib2.py", line 449, in _open
+#                    '_open', req)
+#                    . . . . . . . . . .
+#                  File "/usr/lib/python2.7/httplib.py", line 400, in _read_status
+#                    line = self.fp.readline(_MAXLINE + 1)
+#                  File "/usr/lib/python2.7/socket.py", line 476, in readline
+#                    data = self._sock.recv(self._rbufsize)
+#                socket.error: [Errno 110] Connection timed out
+#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+#              Changed several occurances of "except URLError as err :" to
+#              "except ( URLError, Exception ) as err :".
 # 20181116 RAD WU_Cancels added to count when CMX cancels the WU update. When
 #              this is found in the log, it is now treated as a special case.
 #              We don't yet do anything special, but we count these with the
@@ -877,8 +904,9 @@ def server_stalled():
 		response = urlopen( WS_Updates_URL )
 		content = response.read()
 #@@@#
+	except ( URLError, Exception ) as err :
+	### >>>> except URLError as err :
 	# At one point got "httplib.BadStatusLine: ''" (unhandled) - See below
-	except URLError as err :
 		messager( "ERROR: in server_stalled: {}".format( sys.exc_info()[0] ) )
 		if hasattr(err, 'reason'):
 			messager( 'ERROR: We failed to reach a server.' )
@@ -1711,7 +1739,8 @@ def camera_down():
 		response = urlopen( image_age_URL )
 		age = response.read()
 		age = age.rstrip()
-	except URLError as err :
+	except ( URLError, Exception ) as err :
+	### >>>> except URLError as err :
 		messager( "ERROR: in camera_down: {}".format( sys.exc_info()[0] ) )
 		if hasattr(err, 'reason'):
 			messager( 'ERROR: We failed to reach a server.' )
