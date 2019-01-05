@@ -34,8 +34,10 @@
 # ========================================================================================
 #      See MXdiags sample at the end of this file
 # ========================================================================================
-#              NOTE: Don't necessarily need "Cumulus MX Exception thrown (see above)"
-#                    messages.  Added end message 01/08/2018.
+# 20181116 RAD WU_Cancels added to count when CMX cancels the WU update. When
+#              this is found in the log, it is now treated as a special case.
+#              We don't yet do anything special, but we count these with the
+#              idea that after do many occurances we could, perhaps, reboot?
 # 20180918 RAD Got some confusing log messages tied to a urlopen() failure. See
 #                  NOTE: This doesn't seem like it was handled well.  Messaging ...
 #              near the bottom - a log frament.  Wrapped the same exception
@@ -183,6 +185,7 @@ saved_exception_tstamp = "9999-99-9999:00:00.999:....."
 saved_exception_tstamp = "X"
 
 pcyc_holdoff_time = 0
+WU_Cancels = 0
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 # This is the global data value dictionary.   This is written into by many of
@@ -1246,6 +1249,7 @@ def rf_dropped() :
 	global saved_exception_tstamp
 	global saved_contact_lost
 	global data
+	global WU_Cancels
 	check_lines = 12
 	return_value = 0
 	logger_code =111
@@ -1420,6 +1424,62 @@ def rf_dropped() :
 		#   WeatherCloud update: The Task was canceled
 		#
 		# ------------------------------------------------------------------------
+		# ------------------------------------------------------------------------
+		# ------------------------------------------------------------------------
+		# 20181116 RAD WU_Cancels added
+		# ------------------------------------------------------------------------
+		# ------------------------------------------------------------------------
+		# ------------------------------------------------------------------------
+		#
+		# NOTE:  This caused a 24 hour outage with Weather Underground
+		# NOTE:  This caused a 24 hour outage with Weather Underground
+		# NOTE:  This caused a 24 hour outage with Weather Underground
+		# NOTE:  This caused a 24 hour outage with Weather Underground
+		# NOTE:  This caused a 24 hour outage with Weather Underground
+		# NOTE:  This caused a 24 hour outage with Weather Underground
+		#
+		# 2018/11/15 13:32:56, 0, 0, 0,  24,    0.00, 0,    16, 138936, 14%,   2356,  2%, 38.1c, 100.6f,  63.7f,   0.4%,   17.6674, 0, ,
+		# 2018/11/15 13:33:21, 0, 0, 0,  24,    0.00, 0,    16, 138860, 14%,   2356,  2%, 37.6c,  99.6f,  63.7f,   0.4%,   17.6677, 0, ,
+		# 77265	2018-11-15 13:30:03.554 WeatherCloud Response: OK: 200
+		# 77266	2018-11-15 13:31:00.994 WU Response: OK: success
+		# 77267	
+		# 77268	2018-11-15 13:33:40.825 WU update: The Task was canceled
+		# 2018/11/15 13:33:45 WARNING:   "The Task was canceled"  from  /mnt/root/home/pi/Cumulus_MX/MXdiags/20181028-223154.txt
+		# 
+		#   * * * * *  almost 700 of this in MXdiags  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+		#
+		# 79363	2018-11-16 12:30:02.904 WeatherCloud Response: OK: 200
+		# 79364	2018-11-16 12:31:40.696 WU update: The Task was canceled
+		# 79365	2018-11-16 12:33:40.659 WU update: The Task was canceled
+		# 2018/11/16 12:33:45 WARNING:   "The Task was canceled"  from  /mnt/root/home/pi/Cumulus_MX/MXdiags/20181028-223154.txt
+		#
+		# 2018/11/16 12:33:46, 0, 0, 0,  23,    0.00, 0,    17, 129992, 13%,   2852,  2%, 37.6c,  99.6f,  63.7f,   0.9%,   18.6263, 0, ,
+		# 2018/11/16 12:34:10, 0, 0, 0,   0,    0.30, 0,    12, 146404, 15%,   2780,  2%, 38.6c, 101.5f,  63.7f,  15.5%,    0.0002, 0, ,
+		# 2018/11/16 12:34:35, 0, 0, 0,  45,    0.22, 0,    13, 147356, 15%,   2780,  2%, 38.6c, 101.5f,  63.7f,   1.3%,    0.0005, 0, ,
+		#
+		# ------------------------------------------------------------------------
+		#   The WU handling is a mess.  Some of it is WU and some of it is
+		#   CMX.  The above, almost 24 hour outage was fixed by restarting
+		#   the systemctl cumulusmx process.  It's still spewing a lot of the
+		#   exception errors, but some data is getting through.
+		#
+		#   To handle this case we could keep an array of timestamps of
+		#   times we saw a "WU update: The Task was canceled" - a special
+		#   case of the else test below.  If we keep pruning that array to
+		#   some fixed period, say an hour, and if the array size grows to
+		#   something near 60 members (1 for each minute), we could
+		#   restart CMX.  This doesn't happen often, but I believe we've
+		#   seen it several times.
+		#
+		# ------------------------------------------------------------------------
+		# ------------------------------------------------------------------------
+		# ------------------------------------------------------------------------
+		# ------------------------------------------------------------------------
+		# ------------------------------------------------------------------------
+		elif "WU update: The Task was canceled" in lineList[iii] :
+			WU_Cancels += 1
+			messager( "WARNING:   The WEATHER UNDERGROUND Task was canceled Instance # {}".format( WU_Cancels ) )
+
 		elif "The Task was canceled" in lineList[iii] :
 			# ----------------------------------------------------------------
 			# ----------------------------------------------------------------
@@ -1485,6 +1545,7 @@ def rf_dropped() :
 		# 01/08/18 - Changed that check from -3 to -2
 		# ------------------------------------------------------------------------
 		elif "WU Response: OK: success" in lineList[iii] :
+			WU_Cancels = 0
 		# 	___print "Data OK"
 			if iii < 0 :    #################################################  HACKED -----   ALWAYS TRUE
 				# --------------------------------------------------------
@@ -1725,6 +1786,8 @@ def cmx_svc_runtime():
 	#   Active: active (running) since Sat 2018-06-23 10:10:30 EDT; 4s ago
 	# Main PID: 3364 (mono)
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	#   Active: activating (auto-restart) (Result: signal) since Tue 2018-12-25 09:04:04 EST; 4s ago
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	for iii in range(0, len(lines)):
 		if re.search('Main PID:', lines[iii]) :
 			mono_pid = re.sub('.*Main PID:.', '', lines[iii])
@@ -1740,10 +1803,19 @@ def cmx_svc_runtime():
 			duration = re.sub('min', ' min', duration)
 
 
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	#  Handle case where we DO NOT have a properly formatted date...
+	#   Active: active (running) since Sat 2018-06-23 10:10:30 EDT; 4s ago
+	#   Active: activating (auto-restart) (Result: signal) since Tue 2018-12-25 09:04:04 EST; 4s ago
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	try :
+		timestamp = datetime.datetime.now().strptime(start_time, "%Y-%m-%d %H:%M:%S %Z")
+		start_secs = int(timestamp.strftime("%s"))
+	except :
+		# Set the start time to now so runtime is (near) zero or negative
+		start_secs = int(datetime.datetime.now().strftime("%s")) - 2
 
 
-	timestamp = datetime.datetime.now().strptime(start_time, "%Y-%m-%d %H:%M:%S %Z")
-	start_secs = int(timestamp.strftime("%s"))
 	now_secs = int(datetime.datetime.now().strftime("%s"))
 	secs_running = now_secs - start_secs
 	in_days = float(secs_running) / float( 60*60*24 )
