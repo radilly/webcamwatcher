@@ -1,6 +1,8 @@
 #!/usr/bin/python -u
 # 
-# This script is meant to be c
+# This script is meant to be called from webcamimager.py via ssh so that a remote
+# power cycle can be accomodated.  For a local power cycle, it appears using the
+# loopback ip will work - 127.0.0.1.
 #
 #
 #
@@ -16,6 +18,8 @@
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 # ========================================================================================
 # ========================================================================================
+# 20190216 RAD Didin't seem to work quite right, and no logging occurred.
+#              Took a stab at cleaning this up.
 # 20181020 RAD Hacked webcamimager.py into this simpe script.
 #              .
 #
@@ -121,7 +125,7 @@ def main():
 
 	setup_gpio()
 
-	power_cycle( 5 )
+	power_cycle( 25 )
 
 	exit()
 
@@ -148,12 +152,12 @@ def setup_gpio():
 # From a quick test, the (South) RSX-3211 webam seems to take around 32 secs to reboot.
 # ----------------------------------------------------------------------------------------
 def power_cycle( interval ):
-	logger( '...open relay contacts on BCM pin {}'.format( relay_GPIO ) )
+	log_and_message( '...open relay contacts on BCM pin {}'.format( relay_GPIO ) )
 	GPIO.output(relay_GPIO, webcam_OFF)
 
 	sleep( interval )
 
-	logger('...close relay contacts on BCM pin {}'.format( relay_GPIO ) )
+	log_and_message('...close relay contacts on BCM pin {}'.format( relay_GPIO ) )
 	GPIO.output(relay_GPIO, webcam_ON)
 
 # ----------------------------------------------------------------------------------------
@@ -195,10 +199,6 @@ def fetch_FTP_credentials( ftp_credentials_file ) :
 #	especially if we want to turn this into a service.
 # ----------------------------------------------------------------------------------------
 def logger(message):
-	messager(message)
-	return
-
-
 	timestamp = datetime.datetime.now().strftime(strftime_FMT)
 
 	FH = open(logger_file, "a")
@@ -218,8 +218,16 @@ def messager(message):
 #
 # ----------------------------------------------------------------------------------------
 def log_and_message(message):
-	messager(message)
-	logger(message)
+
+	timestamp = datetime.datetime.now().strftime(strftime_FMT)
+	print "{} {}".format( timestamp, message)
+
+	FH = open(logger_file, "a")
+	FH.write( "{} {}\n".format( timestamp, message) )
+	FH.close
+
+	return
+
 
 # ----------------------------------------------------------------------------------------
 # This prints just a symbol or two - for a progress indicator.
