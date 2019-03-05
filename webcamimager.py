@@ -874,7 +874,7 @@ def setup_gpio():
 # ----------------------------------------------------------------------------------------
 def power_cycle( interval ):
 
-	cmd = "ssh {} /home/pi/webcamwatcher/power_cycle.py {}".format( relay_GPIO, relay_HOST )
+	cmd = "ssh {} /home/pi/webcamwatcher/power_cycle.py {}".format( relay_HOST, relay_GPIO )
 
 	process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 	output,stderr = process.communicate()

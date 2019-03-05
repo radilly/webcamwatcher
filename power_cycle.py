@@ -125,7 +125,7 @@ def main():
 
 	setup_gpio()
 
-	power_cycle( 25 )
+	power_cycle( 5 )
 
 	exit()
 
