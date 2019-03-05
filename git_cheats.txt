@@ -27,6 +27,8 @@ git checkout watchdog.py  (TO ABANDON CHANGES)
 
 SET UP NEW LOCAL REPO
 ------------------------------------------------------------
+
+
 If not installed...
 	sudo apt-get install git
 
@@ -49,6 +51,8 @@ COMMON PI TWEAKS
 ------------------------------------------------------------
 
 # ========================================================================================
+#	sudo apt-get update && sudo apt-get upgrade
+#
 #       sudo apt-get vim
 #
 #
