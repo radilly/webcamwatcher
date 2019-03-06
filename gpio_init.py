@@ -5,6 +5,9 @@
 # This is meant to be hard-wired to inititalize GPIOs we will use on a particular
 # pi - generally at boot-up - so that we take them out of a "floating" state.
 #
+# In crontab, I added:
+#        @reboot /usr/bin/python -u /mnt/root/home/pi/webcamwatcher/gpio_init.py
+#
 # 03/05/19  Since going to a remote power-cycling model for resetting webcams, I
 #           noticed that the LEDs on the relay module are dimly lit after a reboot.
 #           Since we don't touch the releays until a problem is detected (remotely),
@@ -16,8 +19,7 @@
 #
 # NOTE: Not clear we want this to generate any output.  Maybe printing a small
 #       confirmation of task completed would be useful if this is run by systemd.
-#
-#
+#       20190306 - Trying this from crontab using @reboot
 #
 #
 # ========================================================================================
@@ -63,6 +65,9 @@ strftime_FMT = "%Y/%m/%d %H:%M:%S"
 # ----------------------------------------------------------------------------------------
 #
 # Main loop
+#
+#
+# NOTE: This can just be folded into the code at the end of this file....
 #
 # ----------------------------------------------------------------------------------------
 # ========================================================================================
