@@ -12,18 +12,27 @@
 #           it intentionally.
 #
 #
-#     4 - VCC, 5V rail
-#     7 - output to relay 1
-#     9 - ground
-#    11 - output to relay 2
-#    13 - output to relay 3
-#    15 - output to relay 4
+# ========================================================================================
+#
+# NOTE: Not clear we want this to generate any output.  Maybe printing a small
+#       confirmation of task completed would be useful if this is run by systemd.
+#
+#
+#
 #
 # ========================================================================================
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+# Set up the list of GPIOs to initialize.
+# NOTE: this could be a command line list...
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+IO_List = [
+	23,
+	24,
+	]
+
 
 import datetime
 import sys
-# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 import os
 import re
 
@@ -31,13 +40,6 @@ from time import sleep
 import RPi.GPIO as GPIO
 
 
-# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-# For active-low circuits, the thinking is somewhat upside down.
-# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-IO_List = [
-	23,
-	24,
-	]
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 # For active-low circuits, the thinking is somewhat upside down.
@@ -68,38 +70,6 @@ def main():
 
 	setup_gpio()
 
-	exit()
-
-
-
-
-
-
-	sleep(2)
-
-	while True:
-
-		power_cycle( 13, 5 )
-
-		GPIO.output( 7, relay__ON)
-		sleep(2)
-		GPIO.output(11, relay__ON)
-		sleep(2)
-		GPIO.output(13, relay__ON)
-		sleep(2)
-		GPIO.output(15, relay__ON)
-		sleep(2)
-
-		GPIO.output( 7, relay__OFF)
-		sleep(2)
-		GPIO.output(11, relay__OFF)
-		sleep(2)
-		GPIO.output(13, relay__OFF)
-		sleep(2)
-		GPIO.output(15, relay__OFF)
-		sleep(2)
-
-	exit()
 
 
 # ----------------------------------------------------------------------------------------
@@ -114,7 +84,6 @@ def setup_gpio():
 	GPIO.setmode(GPIO.BCM)
 ###	GPIO.setmode(GPIO.BOARD)
 	
-
 	for IO in IO_List :
 		GPIO.setup( IO, GPIO.OUT, initial=relay__OFF)
 
@@ -136,24 +105,6 @@ def power_cycle( relay_GPIO, interval ):
 	logger('...close relay contacts.')
 	GPIO.output(relay_GPIO, relay__OFF)
 
-# ----------------------------------------------------------------------------------------
-# Clean up any GPIO configs - typically on exit.
-#
-# ----------------------------------------------------------------------------------------
-def destroy_gpio():
-##################################################	logger("Shutting down...\n")
-
-	#######################################################################
-	#######################################################################
-	#
-	#   This is probably not needed. The setup should handle.
-	#
-	#######################################################################
-	#######################################################################
-###	for IO in IO_List :
-###		GPIO.output( IO, relay__OFF )
-
-	GPIO.cleanup()
 
 
 
@@ -180,16 +131,18 @@ def messager(message):
 
 
 # ----------------------------------------------------------------------------------------
-# The function main contains a "do forever..." (and is called in a try block here)
+#
+#  Probably not needed for this.
+#
+#
+#
 #
 # This handles the startup and shutdown of the script.
 # ----------------------------------------------------------------------------------------
 if __name__ == '__main__':
 
-##################################################	messager("INFO: Starting {}   PID={}".format( this_script, os.getpid() ) )
-
 	main()
 
-	destroy_gpio()
+	GPIO.cleanup()
 
 	exit()
