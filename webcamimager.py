@@ -416,7 +416,7 @@ def main():
 	log_and_message( "INFO: relay_HOST = \"{}\"".format( relay_HOST ) )
 	log_and_message( "INFO: relay_GPIO = \"{}\"".format( relay_GPIO ) )
 	log_and_message( "INFO: relay2_GPIO = \"{}\"".format( relay2_GPIO ) )
-	print "."
+	log_and_message( "." )
 
 	setup_gpio()
 
@@ -876,12 +876,24 @@ def power_cycle( interval ):
 
 	cmd = "ssh {} /home/pi/webcamwatcher/power_cycle.py {}".format( relay_HOST, relay_GPIO )
 
+	log_and_message( cmd )
+
 	process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 	output,stderr = process.communicate()
 	status = process.poll()
-	print status
-	print output
+	log_and_message( status )
+	log_and_message( output )
 
+	# --------------------------------------------------------------------------------
+	#  NOTE: I ran into this.  Perhaps I changed the code but never restarted it
+	#   sudo journalctl -u webcam_south.service
+	#   Mar 08 11:03:12 raspb_01_Cams python[525]: ssh: connect to host 23 port 22: Invalid argument
+	#   Mar 08 11:05:02 raspb_01_Cams python[525]: 2019/03/08 11:05:02 WARNING: power-cycling webcam
+	#   Mar 08 11:05:02 raspb_01_Cams python[525]: 255
+	#   Mar 08 11:05:02 raspb_01_Cams python[525]: ssh: connect to host 23 port 22: Invalid argument
+	#   Mar 08 11:06:52 raspb_01_Cams python[525]: 2019/03/08 11:06:52 WARNING: power-cycling webcam
+	#   Mar 08 11:06:52 raspb_01_Cams python[525]: 255
+	# --------------------------------------------------------------------------------
 
 	return
 
@@ -1722,9 +1734,9 @@ def push_to_test(source_file, remote_path) :
 			return
 		except socket.error, e :
 			iii += 1
-			print "FTP Socket Error %d: %s" % (e.args[0], e.args[1])
+			log_and_message( "FTP Socket Error %d: %s" % (e.args[0], e.args[1]) )
 			for jjj in range(0, len(e.args) - 1) :
-				print "    {}".format( e.args[jjj] )
+				log_and_message( "    {}".format( e.args[jjj] ) )
 			# Increase the sleep time with each iteration
 			sleep(iii)
 	return
