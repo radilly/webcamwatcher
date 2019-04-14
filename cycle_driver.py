@@ -36,6 +36,8 @@ cmd = "/home/pi/webcamwatcher/power_cycle.py 24"
 cmd = "ssh 192.168.1.10 /sbin/ifconfig"
 cmd = "ssh 192.168.1.10 /home/pi/webcamwatcher/power_cycle.py 24"
 cmd = "ssh 192.168.1.152 /home/pi/webcamwatcher/power_cycle.py 18"
+cmd = "date +%Z"
+cmd = "ssh 127.0.0.1 /sbin/ifconfig"
 
 
 this_script = sys.argv[0]

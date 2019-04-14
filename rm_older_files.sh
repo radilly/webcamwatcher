@@ -27,7 +27,7 @@ if [[ ${DELETE} -gt 0 ]] ; then
 fi
 
 USED_AFTER=`df . | grep -v 'Filesystem' | awk '{print $3}'`
-echo "1K Blcoks recovered = `expr ${USED_BEFORE} '-' ${USED_AFTER}`"
+echo "1K Blocks recovered = `expr ${USED_BEFORE} '-' ${USED_AFTER}`"
 
 exit
 
