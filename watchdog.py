@@ -536,6 +536,8 @@ def mono_threads():
 	global data
 
 	PID = str( data['mono_pid'] )
+	if "DOWN" in PID :
+		return -1
 
 	# --------------------------------------------------------------------------------
 	#  This failed 01/08/18 when I restarted the "cumulusmx" service.  I reordered
@@ -597,9 +599,9 @@ def log_event(ID, description, code):
 
 	format_str = "<TR><TD> {} </TD>\n<TD> {} </TD>\n<{}> {} </TD></TR>\n"
 
-	FH = open(events_page , "a")
-	FH.write( format_str.format( ID, description, bgcolor, code) )
-	FH.close
+#	FH = open(events_page , "a")
+#	FH.write( format_str.format( ID, description, bgcolor, code) )
+#	FH.close
 
 	status_file = "{}/{}.txt".format( status_dir, time.time() )
 	FH = open(status_file, "w+")
