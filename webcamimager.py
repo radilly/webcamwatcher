@@ -454,6 +454,9 @@ def main():
 #  Globals referenced: remote_dir, wserver, work_dir, thumbnail_image
 # ----------------------------------------------------------------------------------------
 def process_new_image( source, target) :
+
+	camera_down()     # TESTING
+
 	logger( "INFO: Process {}".format(source) )
 #DEBUG#	logger( "DEBUG: Called process_new_image(\n\t {},\n\t {} )".format(source, target) )
 
@@ -1694,11 +1697,21 @@ def camera_down():
 #	check_counter += 1
 
 	# ================================================================================
+	# ================================================================================
+	# ================================================================================
+	#   For testing...
+	# ================================================================================
+	# ================================================================================
+	# ================================================================================
+	logger( "DEBUG: Server image age = {}".format(age) )
+	return
+
+	# ================================================================================
 	#
 	# ================================================================================
 	if age > 420 :
 		logger("WARNING: image age: {}".format( age ) )
-		power_cycle(5)
+		power_cycle( 5 )
 #		log_restart( "webcam power-cycled, interval: {}".format( age ) )
 		# Give the cam time to reset, and the webserver crontab to fire.
 		# The camera comes up pretty quickly, but it seems to resynch to
