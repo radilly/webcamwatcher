@@ -29,6 +29,9 @@
 # reducing the output.
 #
 # ========================================================================================
+# 20190414 RAD Occasionally see "ValueError: invalid literal for int() with base 10: ''"
+#              when urlopen( image_age_URL ) returns a null.  Handle that case explicitly
+#              by setting age to 0.
 # 20181018 RAD Turns out using the IP address only works for GoDaddy FTP, but not for
 #              HTTP.  Also moved the weather station receiver to the master bedroom,
 #              because the RF kept dropping. (Now at South webcam.)
@@ -219,6 +222,12 @@ def camera_down():
 	except:
 		age = "0"
 		logger("WARNING: Assumed image age: {}".format( age ) )
+
+	# --------------------------------------------------------------------------------
+	# Avoid ... "ValueError: invalid literal for int() with base 10: ''"
+	# --------------------------------------------------------------------------------
+	if len( age ) < 1 :
+		age = "0"
 
 	age = int( age.rstrip() )
 	##DEBUG## ___print words[0], words[2]
