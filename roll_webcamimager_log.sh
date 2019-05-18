@@ -6,19 +6,24 @@ OLD_FILE=`date +webcamimager.%Y%m%d.log`
 
 
 if [[ -f webcamimager.log ]] ; then
-	echo "INFO: Waiting for last line of log to be an INFO message..."
+	echo "INFO: Waiting for last line of log to be an INFO or DEBUG message..."
 else
 	echo "ERROR: File webcamimager.log not found!"
 	exit
 fi
 
-exit
+# exit
 
 # Wait for last line to be an info message
-while [[ `tail -n 1 webcamimager.log | grep -c INFO:` -lt 1 ]] ; do
+# set -xv
+# while [[ `tail -n 1 webcamimager.log | grep -c INFO:` -lt 1 ]] ; do
+while [[ `tail -n 1 webcamimager.log | egrep -c ' (DEBUG|INFO): '` -lt 1 ]] ; do
+	sleep 1
+	printf "."
 	true
 done
 
+echo "rolling log..."
 mv webcamimager.log ${OLD_FILE}
 tail -n 250 ${OLD_FILE} >> webcamimager.log
 gzip ${OLD_FILE}
