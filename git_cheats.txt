@@ -48,6 +48,12 @@ Add ssh key to https://github.com/settings/keys
 git commit -am "Starting working on webcamimager.py"
 
 COMMON PI TWEAKS
+
+------------------------------------------------------------
+
+Broken link checker...
+https://www.brokenlinkcheck.com/
+
 ------------------------------------------------------------
 
 # ========================================================================================
