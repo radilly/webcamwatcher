@@ -91,6 +91,9 @@ prev_page = ""
 work_dir = ""
 main_image = ""
 remote_dir = "/home/content/b/o/b/bobdilly/html/WX"
+
+remote_dir = "/home/dillwjfq/public_html/wx"
+
 remote_dir = "/var/chroot/home/content/92/3185192/wx"
 remote_dir = ""
 
@@ -115,6 +118,8 @@ sleep_for = 10
 # strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
 # Could not get %Z to work. "empty string if the the object is naive" ... which now() is...
 strftime_FMT = "%Y/%m/%d %H:%M:%S"
+WEB_URL = "http://dilly.family/wx"
+wserver = "dilly.family"
 wserver = "dillys.org"
 
 

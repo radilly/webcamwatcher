@@ -191,13 +191,16 @@ status_dir =            "/mnt/root/home/pi/status"
 logger_file = sys.argv[0]
 logger_file = re.sub('\.py', '.log', logger_file)
 
-WS_Updates_URL = 'http://dillys.org/wx/WS_Updates.txt'
-realtime_URL = 'http://dillys.org/wx/realtime.txt'
+WEB_URL = "http://dillys.org/wx"
+WEB_URL = "http://dilly.family/wx"
+
+WS_Updates_URL = 	WEB_URL + "/WS_Updates.txt"
+realtime_URL = 		WEB_URL + "/realtime.txt"
 
 # NOTE We now have 2 cameras...
-image_age_S_URL = 'http://dillys.org/wx/South/S_age.txt'
-image_age_N_URL = 'http://dillys.org/wx/North/N_age.txt'
-image_age_URL = 'http://dillys.org/wx/North/N_age.txt'
+image_age_S_URL = 	WEB_URL + "/South/S_age.txt"
+image_age_N_URL = 	WEB_URL + "/North/N_age.txt"
+image_age_URL = 	WEB_URL + "/North/N_age.txt"
 # N_Since_Updated_URL = 'http://dillys.org/wx/N_Since_Updated.txt'
 #    Replaced by above
 
@@ -674,7 +677,7 @@ def summarize():
 		":<a href=\"thisyear.htm\">this&nbsp;year</a>:\n" )
 	FH.write( "    <br>:<a href=\"record.htm\">records</a>::<a href=\"monthlyrecord.htm\">monthly&nbsp;records</a>:" + \
 		":<a href=\"trends.htm\">trends</a>::<a TARGET=\"_blank\" HREF=\"http://sandaysoft.com/forum/\">forum</a>:" + \
-		":<a href=\"http://dillys.org/WX/NW_View.html\">webcam</a>:\n" )
+		":<a href=\"" + WEB_URL + "\">webcam</a>:\n" )
 	FH.write( "    <br>:<a TARGET=\"_blank\" HREF=\"https://app.weathercloud.net/d0208473809#current\">Weathercloud</a>:" + \
 		":<a TARGET=\"_blank\" HREF=\"https://www.pwsweather.com/obs/RADILLY.html\">PWS&nbsp;Weather</a>:" + \
 		":<a TARGET=\"_blank\" HREF=\"https://wx.aerisweather.com/local/us/pa/mcmurray\">AerisWeather</a>:" + \

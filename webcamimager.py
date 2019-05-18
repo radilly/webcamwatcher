@@ -368,6 +368,7 @@ sleep_for = 5
 # strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
 # Could not get %Z to work. "empty string if the the object is naive" ... which now() is...
 strftime_FMT = "%Y/%m/%d %H:%M:%S"
+WEB_URL = "http://dilly.family/wx"
 wserver = "dillys.org"
 wserver = "50.62.26.1"
 cam_host = "127.0.0.1"
