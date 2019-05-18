@@ -184,7 +184,7 @@ BASE_DIR =              "/mnt/root/home/pi/Cumulus_MX"
 data_stop_file =        BASE_DIR + "/web/DataStoppedT.txttmp"
 ambient_temp_file =     BASE_DIR + "/web/ambient_tempT.txttmp"
 status_page =           BASE_DIR + "/web/status.html"
-events_page =           BASE_DIR + "/web/events.html"
+events_page =           BASE_DIR + "/web/event_status.html"
 mxdiags_dir =           BASE_DIR + "/MXdiags"
 status_dir =            "/mnt/root/home/pi/status"
 
@@ -670,6 +670,7 @@ def summarize():
 
 	FH.write( "<P> &nbsp;\n" )
 	FH.write( "<center><table style=\"width:100%;border-collapse: collapse; border-spacing: 0;\" >\n" )
+	FH.write( " <!-- FOOTER -->\n" )
   	FH.write( "  <tr>\n" )
 
 	FH.write( "    <td align=\"center\" class=\"td_navigation_bar\">:<a href=\"index.htm\">now</a>::<a href=\"gauges.htm\">gauges</a>:" + \
@@ -684,10 +685,10 @@ def summarize():
 		":<a TARGET=\"_blank\" HREF=\"https://radar.weather.gov/Conus/full_loop.php\">NWS&nbsp;Composite&nbsp;US&nbsp;Radar</a>:\n" + \
 		":<a TARGET=\"_blank\" HREF=\"https://www.windy.com/40.279/-80.089?39.317,-80.089,7,m:eMiadVG\">Windy</a>:\n" )
 	FH.write( "    <br>:<a href=\"status.html\">Pi status</a>:" + \
-		":<a href=\"events.html\">Event&nbsp;Log</a>:\n" + \
+		":<a href=\"event_status.html\">Event&nbsp;Log</a>:\n" + \
 		":<a TARGET=\"_blank\" HREF=\"https://www.wunderground.com/personal-weather-station/dashboard?ID=KPAMCMUR4\">KPAMCMUR4</a>:</td>\n" )
 
-  	FH.write( "  </tr>\n" )
+  	FH.write( "  </tr>\n\n" )
 	FH.write( " </table></center>\n" )
 
 	FH.write( "<P> &nbsp;\n" )
