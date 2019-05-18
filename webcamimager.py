@@ -463,6 +463,7 @@ def process_new_image( source, target) :
 
 	shutil.copy2( source, target )
 	push_to_server( target, remote_dir, wserver )
+	push_to_test( target, remote_dir )
 
 	thumbnail_file = work_dir + '/' + thumbnail_image
 #DEBUG#	logger( "DEBUG: Create thumbnail {} and upload to {}".format(thumbnail_file, remote_dir ) )
@@ -482,6 +483,7 @@ def process_new_image( source, target) :
 		logger( "WARNING: convert returned data: \"" + convert + "\"" )
 
 	push_to_server( thumbnail_file, remote_dir, wserver )
+	push_to_test( thumbnail_file, remote_dir )
 
 
 
@@ -982,6 +984,7 @@ def midnight_process(date_string) :
 	tnf = daily_thumbnail( date_string, work_dir )
 	if len(tnf) > 0 :
 		push_to_server( tnf, remote_dir, wserver )
+		push_to_test( tnf, remote_dir )
 
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	# To make the daylight image, delete most of the dark overnight images.
@@ -995,6 +998,7 @@ def midnight_process(date_string) :
 
 	if not ffmpeg_failed :
 		push_to_server( mp4_file_daylight, remote_dir, wserver )
+		push_to_test( mp4_file_daylight, remote_dir )
 
 
 
@@ -1442,6 +1446,8 @@ def push_to_server(local_file, remote_path, server) :
 	global ftp_password
 	ftp_OK = False
 
+#DEBUG#	logger( "DEBUG: push_to_server( {}, {}, {} )".format( local_file, remote_path, server ) )
+
 	if re.search('/', local_file) :
 		local_file_bare = re.sub(r'.*/', r'', local_file)
 
@@ -1730,15 +1736,16 @@ def camera_down():
 # TEST Support
 #
 #
+# def push_to_server(local_file, remote_path, server) :
 # ----------------------------------------------------------------------------------------
-def push_to_test(source_file, remote_path) :
-#      source_file = work_dir + '/' + file_list[line]
-	server = "192.168.1.152"
-	login = "pi"
-	password = "password"
+def push_to_test(local_file, remote_path) :
+#      local_file = work_dir + '/' + file_list[line]
+	server = "server162.web-hosting.com"
+	login = "camdilly@dilly.family"
+	password = "pad56WOW2goo"
 
-	if re.search('/', source_file) :
-		local_file_bare = re.sub(r'.*/', r'', source_file)
+	if re.search('/', local_file) :
+		local_file_bare = re.sub(r'.*/', r'', local_file)
 
 	# --------------------------------------------------------------------------------
 	#
@@ -1749,7 +1756,7 @@ def push_to_test(source_file, remote_path) :
 			ftp = FTP( server )
 			ftp.login( login, password )
 			ftp.cwd( remote_path )
-			ftp.storbinary('STOR ' +  local_file_bare, open(source_file, 'rb'))
+			ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
 			ftp.quit()
 			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 			# Yes, that's a return that's not at the funtion end
