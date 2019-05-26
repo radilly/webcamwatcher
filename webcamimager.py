@@ -354,6 +354,8 @@ last_image_dir_mtime = 0.0
 
 ftp_login = ""
 ftp_password = ""
+ftp_server = ""
+
 current_filename = ""
 
 last_mtime = 0.0
@@ -408,6 +410,13 @@ def main():
 		exit()
 
 	log_and_message( "INFO: reading \"{}\"".format( config_file ) )
+
+	read_FTP_config( config_file )
+
+	log_and_message( "INFO: ftp_server = \"{}\"".format(ftp_server) )
+	log_and_message( "INFO: ftp_login = \"{}\"".format(ftp_login) )
+	log_and_message( "INFO: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  ftp_password = \"{}\"".format(ftp_password) )
+
 	read_config( config_file )
 
 	log_and_message( "INFO: work_dir = \"{}\"".format(work_dir) )
@@ -464,6 +473,7 @@ def process_new_image( source, target) :
 	shutil.copy2( source, target )
 	push_to_server( target, remote_dir, wserver )
 	push_to_test( target, remote_dir )
+	push_to_test_again( target, "REMOVE_ME/" + remote_dir )
 
 	thumbnail_file = work_dir + '/' + thumbnail_image
 #DEBUG#	logger( "DEBUG: Create thumbnail {} and upload to {}".format(thumbnail_file, remote_dir ) )
@@ -484,6 +494,7 @@ def process_new_image( source, target) :
 
 	push_to_server( thumbnail_file, remote_dir, wserver )
 	push_to_test( thumbnail_file, remote_dir )
+	push_to_test_again( thumbnail_file, "REMOVE_ME/" + remote_dir )
 
 
 
@@ -808,12 +819,13 @@ def read_config( config_file ) :
 	# Check the FTP credentials we read.
 	#
 	#  See push_to_server() which tries this in a loop... To handle GoDaddy outages.
+	#
+	#  NOTE:  See also similar code in def check_FTP_config()
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
 	ftp_OK = False
 
 	try :
-		ftp = FTP( wserver, ftp_login, ftp_password )
+		ftp = FTP( ftp_server, ftp_login, ftp_password )
 		ftp_OK = True
 	except Exception as problem :
 		log_and_message( "ERROR: Unexpected ERROR in FTP connect: {}".format( sys.exc_info()[0] ) )
@@ -985,6 +997,7 @@ def midnight_process(date_string) :
 	if len(tnf) > 0 :
 		push_to_server( tnf, remote_dir, wserver )
 		push_to_test( tnf, remote_dir )
+		push_to_test_again( tnf, "REMOVE_ME/" + remote_dir )
 
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	# To make the daylight image, delete most of the dark overnight images.
@@ -999,6 +1012,7 @@ def midnight_process(date_string) :
 	if not ffmpeg_failed :
 		push_to_server( mp4_file_daylight, remote_dir, wserver )
 		push_to_test( mp4_file_daylight, remote_dir )
+		push_to_test_again( mp4_file_daylight, "REMOVE_ME/" + remote_dir )
 
 
 
@@ -1440,13 +1454,20 @@ def get_stored_filename() :
 #
 #  https://pythonspot.com/en/ftp-client-in-python/
 #  https://docs.python.org/2/library/ftplib.html
+#    NOTE: 
+#    NOTE: 
+#    NOTE: The third argument, server, is no longer needed...
+#    NOTE: 
+#    NOTE: 
 # ----------------------------------------------------------------------------------------
 def push_to_server(local_file, remote_path, server) :
 	global ftp_login
 	global ftp_password
+	global ftp_server
 	ftp_OK = False
 
 #DEBUG#	logger( "DEBUG: push_to_server( {}, {}, {} )".format( local_file, remote_path, server ) )
+#DEBUG#	logger( "DEBUG: push_to_server( {}, {}, {} )".format( local_file, remote_path, ftp_server ) )
 
 	if re.search('/', local_file) :
 		local_file_bare = re.sub(r'.*/', r'', local_file)
@@ -1480,7 +1501,7 @@ def push_to_server(local_file, remote_path, server) :
 			#  Odds are if this works, the remainng commands probably will
 			# ----------------------------------------------------------------
 #DEBUG#			messager( "DEBUG: FTP connect to {}".format( server ) )
-			ftp = FTP( server, ftp_login, ftp_password )
+			ftp = FTP( ftp_server, ftp_login, ftp_password )
 			ftp_OK = True
 			break
 		except Exception as problem :
@@ -1527,9 +1548,12 @@ def push_to_server(local_file, remote_path, server) :
 #  FTP User: camdilly
 #  FTP PWD: /home/content/b/o/b/bobdilly/html/WX
 # ----------------------------------------------------------------------------------------
+#    NOTE:  Now unused
+# ----------------------------------------------------------------------------------------
 def fetch_FTP_credentials( ftp_credentials_file ) :
 	global ftp_login
 	global ftp_password
+	global ftp_server
 
 	FH = open(ftp_credentials_file, "r")
 	response = FH.readlines()
@@ -1537,9 +1561,65 @@ def fetch_FTP_credentials( ftp_credentials_file ) :
 
 	ftp_login = response[0].strip("\n")
 	ftp_password = response[1].strip("\n")
+	ftp_server = response[2].strip("\n")
 
 	###print "DEBUG: ftp_login = " + ftp_login + "    ftp_password = " + ftp_password
 
+# ----------------------------------------------------------------------------------------
+#  Read the ftp_credentials_file and store the credentials for later usage.
+#
+#  FTP User: camdilly
+#  FTP PWD: /home/content/b/o/b/bobdilly/html/WX
+# ----------------------------------------------------------------------------------------
+def read_FTP_config( config_file ) :
+	global ftp_login
+	global ftp_password
+	global ftp_server
+
+# From                              def read_config( config_file ) :
+
+# @@@	# https://docs.python.org/2/library/configparser.html
+	config = ConfigParser.RawConfigParser()
+	# This was necessary to avoid folding variable names to all lowercase.
+	# https://stackoverflow.com/questions/19359556/configparser-reads-capital-keys-and-make-them-lower-case
+	config.optionxform = str
+	config.read( config_file )
+	#print config.getboolean('Settings','bla') # Manual Way to acess them
+
+	# https://stackoverflow.com/questions/924700/best-way-to-retrieve-variable-values-from-a-text-file-python-json
+	parameter=dict(config.items("ftp"))
+	for p in parameter:
+		parameter[p]=parameter[p].split("#",1)[0].strip() # To get rid of inline comments
+
+###		messager( "DEBUG: p = {}".format( p ) )
+###		messager( "DEBUG: parameter[p] = {}".format( parameter[p] ) )
+
+	globals().update(parameter)  #Make them availible globally
+
+	check_FTP_config()
+
+
+# ----------------------------------------------------------------------------------------
+#    NOTE: Relies on globals.
+#
+# ----------------------------------------------------------------------------------------
+def check_FTP_config() :
+	ftp_OK = False
+
+	try :
+		ftp = FTP( ftp_server, ftp_login, ftp_password )
+		ftp_OK = True
+	except Exception as problem :
+		log_and_message( "ERROR: Unexpected ERROR in FTP connect: {}".format( sys.exc_info()[0] ) )
+		log_and_message( "ERROR: FTP (connect): {}".format( problem ) )
+
+	if ftp_OK :
+		try :
+			ftp.quit()
+		except :
+			ftp_OK = False
+			log_and_message( "ERROR: Unexpected ERROR in FTP quit: {}".format( sys.exc_info()[0] ) )
+	return ftp_OK 
 
 
 # ----------------------------------------------------------------------------------------
@@ -1739,6 +1819,9 @@ def camera_down():
 # def push_to_server(local_file, remote_path, server) :
 # ----------------------------------------------------------------------------------------
 def push_to_test(local_file, remote_path) :
+
+	return
+
 #      local_file = work_dir + '/' + file_list[line]
 	server = "server162.web-hosting.com"
 	login = "camdilly@dilly.family"
@@ -1770,6 +1853,59 @@ def push_to_test(local_file, remote_path) :
 			# Increase the sleep time with each iteration
 			sleep(iii)
 	return
+
+
+
+
+
+
+# ----------------------------------------------------------------------------------------
+# TEST Support
+#
+#
+#    wserver = 45.40.166.137
+#    remote_dir = North
+# def push_to_server(local_file, remote_path, server) :
+# ----------------------------------------------------------------------------------------
+def push_to_test_again(local_file, remote_path) :
+#      local_file = work_dir + '/' + file_list[line]
+#			/home/pi/N/North/.ftp.credentials
+#				camdilly
+#				pad56WOW2goo
+	server = "45.40.166.137"
+	login = "camdilly"
+	password = "pad56WOW2goo"
+
+	if re.search('/', local_file) :
+		local_file_bare = re.sub(r'.*/', r'', local_file)
+
+	# --------------------------------------------------------------------------------
+	#
+	# See https://stackoverflow.com/questions/567622/is-there-a-pythonic-way-to-try-something-up-to-a-maximum-number-of-times
+	# --------------------------------------------------------------------------------
+	for iii in range(8) :
+		try :
+			ftp = FTP( server )
+			ftp.login( login, password )
+			ftp.cwd( remote_path )
+			ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
+			ftp.quit()
+			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+			# Yes, that's a return that's not at the funtion end
+			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+			return
+		except socket.error, e :
+			iii += 1
+			log_and_message( "FTP Socket Error %d: %s" % (e.args[0], e.args[1]) )
+			for jjj in range(0, len(e.args) - 1) :
+				log_and_message( "    {}".format( e.args[jjj] ) )
+			# Increase the sleep time with each iteration
+			sleep(iii)
+	return
+
+
+
+
 
 # ----------------------------------------------------------------------------------------
 # The function main contains a "do forever..." (and is called in a try block here)
@@ -1857,7 +1993,8 @@ def do_midnight() :
 		print "Arg #1 is bad.  Use N or S"
 		exit()
 
-	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
+	######################################################## fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
+	read_FTP_config( config_file )
 
 	midnight_process( date_string )
 
