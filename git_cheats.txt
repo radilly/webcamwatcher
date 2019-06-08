@@ -78,5 +78,34 @@ https://www.brokenlinkcheck.com/
 #
 
 
+------------------------------------------------------------
+
+https://medium.com/@danidudas/install-raspbian-jessie-lite-and-setup-wi-fi-without-access-to-command-line-or-using-the-network-97f065af722e
+
+
+/etc/wpa_supplicant/wpa_supplicant.conf
+
+	network={
+		ssid="testing"
+		psk="testingPassword"
+	}
+
+https://www.raspberrypi.org/documentation/configuration/wireless/wireless-cli.md
+
+
+
+/etc/hostname
+/etc/hosts
+
+
+in /boot ...
+touch ssh
+
+
+
+https://medium.com/@aallan/setting-up-a-headless-raspberry-pi-zero-3ded0b83f274
+https://raspberrypi.stackexchange.com/questions/56621/temporarily-disable-expand-filesystem-during-first-boot
+
+
 
 

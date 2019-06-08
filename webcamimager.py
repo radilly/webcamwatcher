@@ -1,29 +1,22 @@
 #!/usr/bin/python -u
-# @@@ ... Restart using...
-# NOTE: There are still some things based on argv[0] (this_script); log, PID, image_data_file...
-#   kill -9 `cat /home/pi/N/webcamimager.PID`
-#   cd /home/pi/N ; nohup /usr/bin/python -u ./webcamimager.py /home/pi/N/North N.jpg N_thumb.jpg North
+# @@@ ... 
+# 
+# This script is started by 2 services - for for north- and south-facing cameras: 
+#	webcam_north.service
+#	webcam_south.service
 #
-#   kill -9 `cat /home/pi/S/webcamimager.PID`
-#   cd /home/pi/S ; nohup /usr/bin/python -u ./webcamimager.py /home/pi/S/South S.jpg S_thumb.jpg South
+# Helpful aliases:
+#	alias camstatus='sudo systemctl status webcam_north webcam_south'
+#	alias ttttn='tail -fn100 /home/pi/N/webcamimager.log'
+#	alias tttts='tail -fn100 /home/pi/S/webcamimager.log'
+#	alias watchthecam='sudo nohup /home/pi/webcamwatch.py &'
+#	alias wxprocs2='ps -ef | egrep "Cumulus|webcamwatch|DataStopped"'
 #
-# To set the reference date back... - - - > > > Pick a recent, unprocessed file...
-#     date +"%s" -r snapshot-2018-05-23-21-45-08.jpg > N/webcamimager__.dat ; echo "snapshot-2018-05-23-21-45-08.jpg" >> N/webcamimager__.dat
-#
-# Stop with ...
-#   kill -9 `cat webcamimager.PID`
-#
-# Start with ...
-#   nohup /usr/bin/python -u /home/pi/webcamimager.py >> /home/pi/webcamimager.log 2>&1 &
-#
-#
+# To see the startup log
+#	sudo journalctl -u webcam_south
 #
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-#
 #
 #  ..........................||  (26)
 #  2018/11/04 03:38:48 INFO: Process /home/pi/N/North/snapshot-2018-11-04-04-38-41.jpg
@@ -43,10 +36,6 @@
 #  2018/11/04 03:46:41 ...close relay contacts.
 #  ....2018/11/04 03:47:01 DEBUG: file 114 of 140 !!!!!! Skip processing snapshot-2018-11-04-03-46-56.jpg (in Catch-up)
 #
-#
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 #
@@ -58,32 +47,15 @@
 # NOTE: If we send a message file to a remote node, it could be written to /tmp.
 #       I think the OS deletes these periodically, or at least on reboot.
 #
+#
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# NOTE: Might consider leveraging a central message consolodator...
 # messager( "WARNING:  CumulusMX reports data_stopped (<#DataStopped> == 1).   (code 101)" )
 # log_event("", "CumulusMX reports data_stopped (<#DataStopped> == 1).", 101 )
 #
 #
-#
-# From "watchdog.py"
-#
-# status_dir =            "/mnt/root/home/pi/status"
-#
-# def log_event(ID, description, code):
-#
-#	status_file = "{}/{}.txt".format( status_dir, time.time() )
-#	FH = open(status_file, "w+")
-#	FH.write( format_str.format( ID, description, bgcolor, code) )
-#	FH.close
-#
 # ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-#
-#
-#
-# ----------------------------------------------------------------------------------------
-#    * NOTE: This should be able to be run as a service. (systemctl)
 # ----------------------------------------------------------------------------------------
 #    * NOTE: Should look more carefully of the use of subprocess
 # ========================================================================================
@@ -104,13 +76,11 @@
 #       mkdir ~/S/South
 #       mkdir ~/S/South/arc_2018
 #
-#       vi S/South/.ftp.credentials
-#       vi N/North/.ftp.credentials
-#
 #       ln -s ~/webcamwatcher/webcamimager.py  ~/N
 #       ln -s ~/webcamwatcher/webcamimager.py  ~/S
-#       ln -s /home/pi/webcamwatcher/north.cfg ~/N
-#       ln -s /home/pi/webcamwatcher/south.cfg ~/S
+#       cp -p /home/pi/webcamwatcher/north.cfg ~/N
+#       cp -p /home/pi/webcamwatcher/south.cfg ~/S
+#		Edit ftp info in .cfg files.
 #
 #       printf "20180523214508\nsnapshot-2018-05-23-21-45-08.jpg\n" > ~/S/webcamimager__.dat
 #       printf "20180523214508\nsnapshot-2018-05-23-21-45-08.jpg\n" > ~/N/webcamimager__.dat
@@ -188,6 +158,9 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20190601 RAD Deleted everything from GoDaddy; push_to_test() started failing.
+# 20190526 RAD Switching over to Namecheap hosting, and using dilly.family as primary.
+#              Took out stuff no longer used.
 # 20190414 RAD Occasionally see "ValueError: invalid literal for int() with base 10: ''"
 #              when urlopen( image_age_URL ) returns a null.  Handle that case explicitly
 #              by setting age to 0.
@@ -318,22 +291,8 @@ import re
 import socket
 import calendar
 
-import RPi.GPIO as GPIO
-# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-#  NOTE: The relay GPIO port should be externalized.  NOW HARD-WIRED FOR South camera.
-#
-#  NOTE: For the SunFounder Relay Module, there's sort of a double negative at work.
-#     It is active low, so by default you might think GPIO.LOW.
-#
-#     But ... We are using the NC contacts of the relay so that, with the module
-#     unpowered, the webcam gets power.  Power-cycling means energizing the relay
-#     briefly by driving the input pin low.
-# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-# relay_GPIO = 23
 relay_GPIO = -1
 relay2_GPIO = -1
-webcam_ON = GPIO.HIGH
-webcam_OFF = GPIO.LOW
 
 work_dir = ""
 main_image = ""
@@ -354,6 +313,8 @@ last_image_dir_mtime = 0.0
 
 ftp_login = ""
 ftp_password = ""
+ftp_server = ""
+
 current_filename = ""
 
 last_mtime = 0.0
@@ -369,15 +330,12 @@ sleep_for = 5
 # Could not get %Z to work. "empty string if the the object is naive" ... which now() is...
 strftime_FMT = "%Y/%m/%d %H:%M:%S"
 WEB_URL = "http://dilly.family/wx"
-wserver = "dillys.org"
-wserver = "50.62.26.1"
 cam_host = "127.0.0.1"
 
 cfg_parameters = [
 	"work_dir",
 	"main_image",
 	"thumbnail_image",
-	"wserver",
 	"remote_dir",
 	"image_age_URL",
 	"cam_host",
@@ -408,12 +366,18 @@ def main():
 		exit()
 
 	log_and_message( "INFO: reading \"{}\"".format( config_file ) )
+
+	read_FTP_config( config_file )
+
+	log_and_message( "INFO: ftp_server = \"{}\"".format(ftp_server) )
+	log_and_message( "INFO: ftp_login = \"{}\"".format(ftp_login) )
+	## log_and_message( "INFO: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  ftp_password = \"{}\"".format(ftp_password) )
+
 	read_config( config_file )
 
 	log_and_message( "INFO: work_dir = \"{}\"".format(work_dir) )
 	log_and_message( "INFO: main_image = \"{}\"".format(main_image) )
 	log_and_message( "INFO: thumbnail_image = \"{}\"".format(thumbnail_image) )
-	log_and_message( "INFO: wserver = \"{}\"".format(wserver) )
 	log_and_message( "INFO: remote_dir = \"{}\"".format(remote_dir) )
 	log_and_message( "INFO: image_age_URL = \"{}\"".format( image_age_URL ) )
 	log_and_message( "INFO: cam_host = \"{}\"".format( cam_host ) )
@@ -421,11 +385,6 @@ def main():
 	log_and_message( "INFO: relay_GPIO = \"{}\"".format( relay_GPIO ) )
 	log_and_message( "INFO: relay2_GPIO = \"{}\"".format( relay2_GPIO ) )
 	log_and_message( "." )
-
-	setup_gpio()
-
-	# Handled by read_config()
-	# fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
 
 	nvers = mono_version()
 	log_and_message("INFO: Mono version: {}" .format( nvers ) )
@@ -452,7 +411,7 @@ def main():
 #  * Make a thumbnail version
 #  * Upload both to the web server
 #
-#  Globals referenced: remote_dir, wserver, work_dir, thumbnail_image
+#  Globals referenced: remote_dir, work_dir, thumbnail_image
 # ----------------------------------------------------------------------------------------
 def process_new_image( source, target) :
 
@@ -462,8 +421,8 @@ def process_new_image( source, target) :
 #DEBUG#	logger( "DEBUG: Called process_new_image(\n\t {},\n\t {} )".format(source, target) )
 
 	shutil.copy2( source, target )
-	push_to_server( target, remote_dir, wserver )
-	push_to_test( target, remote_dir )
+	push_to_server( target, remote_dir )
+	push_to_test( target, "REMOVE_ME/" + remote_dir )
 
 	thumbnail_file = work_dir + '/' + thumbnail_image
 #DEBUG#	logger( "DEBUG: Create thumbnail {} and upload to {}".format(thumbnail_file, remote_dir ) )
@@ -482,8 +441,8 @@ def process_new_image( source, target) :
 	if len(convert) > 0 :
 		logger( "WARNING: convert returned data: \"" + convert + "\"" )
 
-	push_to_server( thumbnail_file, remote_dir, wserver )
-	push_to_test( thumbnail_file, remote_dir )
+	push_to_server( thumbnail_file, remote_dir )
+	push_to_test( thumbnail_file, "REMOVE_ME/" + remote_dir )
 
 
 
@@ -727,11 +686,8 @@ def next_image_file() :
 		line += 1
 
 	# ----------------------------------------------------------------------------------------
+	# ----------------------------------------------------------------------------------------
 	# Here were are past the last file
-	# ----------------------------------------------------------------------------------------
-	# ----------------------------------------------------------------------------------------
-	# ----------------------------------------------------------------------------------------
-	# ----------------------------------------------------------------------------------------
 	# ----------------------------------------------------------------------------------------
 	# ----------------------------------------------------------------------------------------
 
@@ -769,20 +725,12 @@ def read_config( config_file ) :
 	parameter=dict(config.items("webcamimager"))
 	for p in parameter:
 		parameter[p]=parameter[p].split("#",1)[0].strip() # To get rid of inline comments
-###		print p
-###		print parameter[p]
+###		messager( "DEBUG: p = {}".format( p ) )
+###		messager( "DEBUG: parameter[p] = {}".format( parameter[p] ) )
 
 	globals().update(parameter)  #Make them availible globally
 
 
-###	print "."
-###	messager( "INFO: work_dir = \"{}\"".format(work_dir) )
-###	messager( "INFO: main_image = \"{}\"".format(main_image) )
-###	messager( "INFO: thumbnail_image = \"{}\"".format(thumbnail_image) )
-###	messager( "INFO: remote_dir = \"{}\"".format(remote_dir) )
-###	print "."
-###	messager( "INFO: relay_GPIO = \"{}\"".format( relay_GPIO ) )
-###	print "."
 
 
 
@@ -798,22 +746,17 @@ def read_config( config_file ) :
 		log_and_message( "ERROR: thumbnail_image, \"{}\" not ending in .jpg.".format( main_image ) )
 		exit()
 
-
-	if not os.path.isfile( work_dir + "/.ftp.credentials" ) :
-		log_and_message( "ERROR: work_dir, \"{}\" suspect.  {} not found.".format( work_dir + "/.ftp.credentials" ) )
-		exit()
-
-
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	# Check the FTP credentials we read.
 	#
 	#  See push_to_server() which tries this in a loop... To handle GoDaddy outages.
+	#
+	#  NOTE:  See also similar code in def check_FTP_config()
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
 	ftp_OK = False
 
 	try :
-		ftp = FTP( wserver, ftp_login, ftp_password )
+		ftp = FTP( ftp_server, ftp_login, ftp_password )
 		ftp_OK = True
 	except Exception as problem :
 		log_and_message( "ERROR: Unexpected ERROR in FTP connect: {}".format( sys.exc_info()[0] ) )
@@ -860,22 +803,6 @@ def read_config( config_file ) :
 
 
 # ----------------------------------------------------------------------------------------
-# Set up the GPIO.
-# Caller can specify the initial state.
-#
-# NOTE: For the SunFounder module, if we don't set the 2nd GPIO high it seems to
-#	"float", so the LED for relay 2 comes on dimly.  This is a little "cleaner."
-# ----------------------------------------------------------------------------------------
-def setup_gpio():
-	# Now we're delegating this task
-	return
-
-	GPIO.setwarnings(False)
-	GPIO.setmode(GPIO.BCM)
-	GPIO.setup(relay_GPIO, GPIO.OUT, initial=webcam_ON)
-	GPIO.setup(relay2_GPIO, GPIO.OUT, initial=webcam_ON)
-
-# ----------------------------------------------------------------------------------------
 # Cycle the power on the relay / GPIO.
 # The off time can be specified.  Here in secs.
 #
@@ -905,32 +832,6 @@ def power_cycle( interval ):
 	# --------------------------------------------------------------------------------
 
 	return
-
-
-
-
-	logger( '...open relay contacts.')
-	GPIO.output(relay_GPIO, webcam_OFF)
-
-	sleep( interval )
-
-	logger('...close relay contacts.')
-	GPIO.output(relay_GPIO, webcam_ON)
-
-	return
-
-
-
-
-# ----------------------------------------------------------------------------------------
-# Clean up any GPIO configs - typically on exit.
-#
-# ----------------------------------------------------------------------------------------
-def destroy_gpio():
-	logger("Shutting down...\n")
-	GPIO.output(relay_GPIO, webcam_ON)
-	GPIO.cleanup()
-
 
 
 # ----------------------------------------------------------------------------------------
@@ -983,8 +884,8 @@ def midnight_process(date_string) :
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	tnf = daily_thumbnail( date_string, work_dir )
 	if len(tnf) > 0 :
-		push_to_server( tnf, remote_dir, wserver )
-		push_to_test( tnf, remote_dir )
+		push_to_server( tnf, remote_dir )
+		push_to_test( tnf, "REMOVE_ME/" + remote_dir )
 
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	# To make the daylight image, delete most of the dark overnight images.
@@ -997,8 +898,8 @@ def midnight_process(date_string) :
 	ffmpeg_failed = generate_video( date_string, mp4_file_daylight )
 
 	if not ffmpeg_failed :
-		push_to_server( mp4_file_daylight, remote_dir, wserver )
-		push_to_test( mp4_file_daylight, remote_dir )
+		push_to_server( mp4_file_daylight, remote_dir )
+		push_to_test( mp4_file_daylight, "REMOVE_ME/" + remote_dir )
 
 
 
@@ -1440,13 +1341,20 @@ def get_stored_filename() :
 #
 #  https://pythonspot.com/en/ftp-client-in-python/
 #  https://docs.python.org/2/library/ftplib.html
+#    NOTE: 
+#    NOTE: 
+#    NOTE: The third argument, server, is no longer needed...
+#    NOTE: 
+#    NOTE: 
 # ----------------------------------------------------------------------------------------
-def push_to_server(local_file, remote_path, server) :
+def push_to_server(local_file, remote_path) :
 	global ftp_login
 	global ftp_password
+	global ftp_server
 	ftp_OK = False
 
 #DEBUG#	logger( "DEBUG: push_to_server( {}, {}, {} )".format( local_file, remote_path, server ) )
+#DEBUG#	logger( "DEBUG: push_to_server( {}, {}, {} )".format( local_file, remote_path, ftp_server ) )
 
 	if re.search('/', local_file) :
 		local_file_bare = re.sub(r'.*/', r'', local_file)
@@ -1480,7 +1388,7 @@ def push_to_server(local_file, remote_path, server) :
 			#  Odds are if this works, the remainng commands probably will
 			# ----------------------------------------------------------------
 #DEBUG#			messager( "DEBUG: FTP connect to {}".format( server ) )
-			ftp = FTP( server, ftp_login, ftp_password )
+			ftp = FTP( ftp_server, ftp_login, ftp_password )
 			ftp_OK = True
 			break
 		except Exception as problem :
@@ -1520,26 +1428,61 @@ def push_to_server(local_file, remote_path, server) :
 
 
 
-
 # ----------------------------------------------------------------------------------------
-#  Read the ftp_credentials_file and store the credentials for later usage.
+#  Read the [ftp] section of the config file passed as the first argument to this script.
 #
-#  FTP User: camdilly
-#  FTP PWD: /home/content/b/o/b/bobdilly/html/WX
+#
 # ----------------------------------------------------------------------------------------
-def fetch_FTP_credentials( ftp_credentials_file ) :
+def read_FTP_config( config_file ) :
 	global ftp_login
 	global ftp_password
+	global ftp_server
 
-	FH = open(ftp_credentials_file, "r")
-	response = FH.readlines()
-	FH.close
+#	NOTE: Copied from def read_config( config_file )
+#	------------------------------------------------
 
-	ftp_login = response[0].strip("\n")
-	ftp_password = response[1].strip("\n")
+# @@@	# https://docs.python.org/2/library/configparser.html
+	config = ConfigParser.RawConfigParser()
+	# This was necessary to avoid folding variable names to all lowercase.
+	# https://stackoverflow.com/questions/19359556/configparser-reads-capital-keys-and-make-them-lower-case
+	config.optionxform = str
+	config.read( config_file )
+	#print config.getboolean('Settings','bla') # Manual Way to acess them
 
-	###print "DEBUG: ftp_login = " + ftp_login + "    ftp_password = " + ftp_password
+	# https://stackoverflow.com/questions/924700/best-way-to-retrieve-variable-values-from-a-text-file-python-json
+	parameter=dict(config.items("ftp"))
+	for p in parameter:
+		parameter[p]=parameter[p].split("#",1)[0].strip() # To get rid of inline comments
 
+###		messager( "DEBUG: p = {}".format( p ) )
+###		messager( "DEBUG: parameter[p] = {}".format( parameter[p] ) )
+
+	globals().update(parameter)  #Make them availible globally
+
+	check_FTP_config()
+
+
+# ----------------------------------------------------------------------------------------
+#    NOTE: Relies on globals.
+#
+# ----------------------------------------------------------------------------------------
+def check_FTP_config() :
+	ftp_OK = False
+
+	try :
+		ftp = FTP( ftp_server, ftp_login, ftp_password )
+		ftp_OK = True
+	except Exception as problem :
+		log_and_message( "ERROR: Unexpected ERROR in FTP connect: {}".format( sys.exc_info()[0] ) )
+		log_and_message( "ERROR: FTP (connect): {}".format( problem ) )
+
+	if ftp_OK :
+		try :
+			ftp.quit()
+		except :
+			ftp_OK = False
+			log_and_message( "ERROR: Unexpected ERROR in FTP quit: {}".format( sys.exc_info()[0] ) )
+	return ftp_OK 
 
 
 # ----------------------------------------------------------------------------------------
@@ -1732,17 +1675,24 @@ def camera_down():
 
 
 
+
+
+
 # ----------------------------------------------------------------------------------------
 # TEST Support
 #
-#
-# def push_to_server(local_file, remote_path, server) :
+#    NOTE:  For transition to Namecheap hosting.  Post copies to GoDaddy...
 # ----------------------------------------------------------------------------------------
 def push_to_test(local_file, remote_path) :
 #      local_file = work_dir + '/' + file_list[line]
-	server = "server162.web-hosting.com"
-	login = "camdilly@dilly.family"
-	password = "pad56WOW2goo"
+
+	return
+	return
+	return
+
+	server = "45.40.166.137"
+	login = "login"
+	password = "password"
 
 	if re.search('/', local_file) :
 		local_file_bare = re.sub(r'.*/', r'', local_file)
@@ -1771,6 +1721,10 @@ def push_to_test(local_file, remote_path) :
 			sleep(iii)
 	return
 
+
+
+
+
 # ----------------------------------------------------------------------------------------
 # The function main contains a "do forever..." (and is called in a try block here)
 #
@@ -1789,6 +1743,7 @@ if __name__ == '__main__':
 ###	tnf = daily_thumbnail( "2018-07-04", "/home/pi/N/North" )
 ###	if len(tnf) > 0 :
 ###		fetch_FTP_credentials( ".ftp.credentials" )
+###		NOTE:  Use read_FTP_config( config_file )
 ###		push_to_server( tnf, "North", wserver )
 ###	exit()
 ###	wait_ffmpeg()
@@ -1857,7 +1812,7 @@ def do_midnight() :
 		print "Arg #1 is bad.  Use N or S"
 		exit()
 
-	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
+	read_FTP_config( config_file )
 
 	midnight_process( date_string )
 

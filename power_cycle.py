@@ -4,8 +4,6 @@
 # power cycle can be accomodated.  For a local power cycle, it appears using the
 # loopback ip will work - 127.0.0.1.
 #
-#
-#
 # ----------------------------------------------------------------------------------------
 # NOTE: Some pages on shh'ing commands...
 #
@@ -18,6 +16,7 @@
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 # ========================================================================================
 # ========================================================================================
+# 20190601 RAD Minor cleanup of unused stuff.
 # 20190216 RAD Didin't seem to work quite right, and no logging occurred.
 #              Took a stab at cleaning this up.
 # 20181020 RAD Hacked webcamimager.py into this simpe script.
@@ -29,15 +28,11 @@
 import datetime
 from time import sleep
 import sys
-from os import listdir, getpid, stat, unlink, getcwd 
+from os import getpid
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 #
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-import shutil
 import re
-
-import socket
-import calendar
 
 import RPi.GPIO as GPIO
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -59,9 +54,6 @@ if re.match('^\./', this_script) :
 	this_script = "{}/{}".format( getcwd(), re.sub('^\./', '', this_script) )
 
 logger_file = re.sub('\.py', '.log', this_script)
-
-ftp_login = ""
-ftp_password = ""
 
 # strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
 # Could not get %Z to work. "empty string if the the object is naive" ... which now() is...
@@ -168,27 +160,6 @@ def destroy_gpio():
 	logger("Shutting down...\n")
 	GPIO.output(relay_GPIO, webcam_ON)
 	GPIO.cleanup()
-
-
-
-# ----------------------------------------------------------------------------------------
-#  Read the ftp_credentials_file and store the credentials for later usage.
-#
-#  FTP User: camdilly
-#  FTP PWD: /home/content/b/o/b/bobdilly/html/WX
-# ----------------------------------------------------------------------------------------
-def fetch_FTP_credentials( ftp_credentials_file ) :
-	global ftp_login
-	global ftp_password
-
-	FH = open(ftp_credentials_file, "r")
-	response = FH.readlines()
-	FH.close
-
-	ftp_login = response[0].strip("\n")
-	ftp_password = response[1].strip("\n")
-
-	###print "DEBUG: ftp_login = " + ftp_login + "    ftp_password = " + ftp_password
 
 
 
