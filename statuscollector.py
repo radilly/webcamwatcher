@@ -27,6 +27,8 @@
 #
 # ========================================================================================
 # ========================================================================================
+# 20190609 RAD Finished the custover from GoDaddy to Namecheap.  In the process noted
+#              that the log info could be more helpful and added to that for DEBUG:
 # 20180723 RAD Hacked up webcamimager to get a start on this idea.  I have in mind to
 #              collect event messages / records in a directory that can be periodically
 #              stitched into a web page.  Records could be written into the directory
@@ -91,10 +93,10 @@ prev_page = ""
 work_dir = ""
 main_image = ""
 remote_dir = "/home/content/b/o/b/bobdilly/html/WX"
+remote_dir = "/var/chroot/home/content/92/3185192/wx"
 
 remote_dir = "/home/dillwjfq/public_html/wx"
 
-remote_dir = "/var/chroot/home/content/92/3185192/wx"
 remote_dir = ""
 
 this_script = sys.argv[0]
@@ -119,8 +121,8 @@ sleep_for = 10
 # Could not get %Z to work. "empty string if the the object is naive" ... which now() is...
 strftime_FMT = "%Y/%m/%d %H:%M:%S"
 WEB_URL = "http://dilly.family/wx"
-wserver = "dilly.family"
 wserver = "dillys.org"
+wserver = "ftp.dilly.family"
 
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -174,7 +176,6 @@ def main():
 	python_version = re.sub(r'\n', r', ', python_version )
 	logger( "INFO: Python version: {}".format( python_version ) )
 
-	logger( "INFO: initial build of Global msgqueue." )
 	build_msgqueue()
 	
 	# May have to hand-create this file initially...
@@ -205,6 +206,7 @@ def build_msgqueue( ) :
 	global prev_page
 	global last_timestamp
 
+	logger( "INFO: initial build of Global msgqueue.  build_msgqueue()" )
 	# --------------------------------------------------------------------------------
 	#  Scan the files in the work directory.
 	# --------------------------------------------------------------------------------
@@ -212,6 +214,8 @@ def build_msgqueue( ) :
 	file_list_len = len( file_list )
 	file_list.sort()
 
+	logger( "DEBUG: Process all files, skipping any not of the form \"nnnnnnn.nn.txt\"." )
+	logger( "DEBUG: Any of the form nnnnnnn.nn.txt are read into array msgqueue.\n" )
 	for iii in range( file_list_len ) :
 		filename = file_list[ iii ]
 
@@ -245,7 +249,7 @@ def build_msgqueue( ) :
 
 		last_timestamp = ts
 
-	logger( "DEBUG: Global msgqueue loaded with {} members.".format( len(msgqueue) ) )
+	logger( "DEBUG: Global msgqueue loaded with {} members.\n".format( len(msgqueue) ) )
 
 
 
@@ -329,7 +333,7 @@ def monitor_dir() :
 	image_dir_mtime = stat( work_dir ).st_mtime
 	logger( "DEBUG: image_dir_mtime = {}".format( image_dir_mtime ) )
 
-	logger( "INFO: Waiting for a directory change" )
+	logger( "INFO: Waiting for a directory change.  monitor_dir()" )
 	while image_dir_mtime <= last_image_dir_mtime :
 		log_string( "." )
 #############################################################################		sys.stdout.write( "." )
@@ -390,7 +394,7 @@ def monitor_dir() :
 			content = FH.readlines()
 			FH.close
 			msgqueue[ filename ] = content
-			logger( "DEBUG: {} added to msgqueue #={}".format( filename, len(msgqueue) ) )
+			logger( "DEBUG: {} added to msgqueue #={}   monitor_dir()".format( filename, len(msgqueue) ) )
 
 			tmp = msgqueue[ filename ][1]
 			tmp.strip( "\n" )
@@ -549,6 +553,7 @@ def push_to_server(local_file, remote_path, server) :
 			#     FTP([host[, user[, passwd[, acct[, timeout]]]]])
 			# ----------------------------------------------------------------
 #DEBUG#			messager( "DEBUG: FTP connect to {}".format( server ) )
+#DEBUG#			logger( "DEBUG: ftp = FTP( {}, {}, {} )".format( server, ftp_login, ftp_password ) )
 			ftp = FTP( server, ftp_login, ftp_password )
 		except Exception as problem :
 			logger( "ERROR: FTP (connect): {}".format( problem ) )
