@@ -3,10 +3,11 @@
 #
 # Check for a set of expect running processes.
 #
+# Initial input files...
+#    cmx_procs.grep
+#    rasp_cams.grep
 #
 # Hacked from watchdog.py
-#
-#
 #
 #
 # ========================================================================================
@@ -20,7 +21,6 @@ import sys
 import subprocess
 
 infile = ""
-
 
 # ----------------------------------------------------------------------------------------
 #
@@ -39,7 +39,6 @@ def ps_check():
 	for iii in range(0, len(pattern_list)):
 		pattern_list[iii] = pattern_list[iii].rstrip()
 #		print pattern_list[iii]
-
 
 	ps_output = subprocess.check_output( ["/bin/ps", "-ef"] )
 
@@ -72,10 +71,11 @@ def ps_check():
 
 
 # ----------------------------------------------------------------------------------------
+#
+#
+# ----------------------------------------------------------------------------------------
 if __name__ == '__main__':
-###	GPIO_setup()
-	#### if sys.argv[1] = "stop"
-	this_script = sys.argv[0]
+
 	infile = sys.argv[1]
 	ps_check()
 	exit()
