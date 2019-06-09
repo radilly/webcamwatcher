@@ -37,6 +37,19 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20190529 RAD In server_stalled() initialized content = "1" to avoid the following.
+#              Frankly not super-well tought out at 10:30 PM, but I wanted to take
+#              a quick stab at a fix rather tha ignote it.
+#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+#		Traceback (most recent call last):
+#		  File "/mnt/root/home/pi/watchdog.py", line 1970, in <module>
+#		    main()
+#		  File "/mnt/root/home/pi/watchdog.py", line 417, in main
+#		    server_stalled()
+#		  File "/mnt/root/home/pi/watchdog.py", line 936, in server_stalled
+#		    content = content.rstrip()
+#		UnboundLocalError: local variable 'content' referenced before assignment
+#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 # 20181229 RAD Got the following (untrapped) error:
 #                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 #                Traceback (most recent call last):
@@ -902,6 +915,7 @@ def ws_data_stopped():
 # ----------------------------------------------------------------------------------------
 def server_stalled():
 	global data
+	content = "1" # 20190529 - I guess if urlopen() fails, content may not be set...
 	# --------------------------------------------------------------------------------
 	#   2017/10/11 13:01:56 GMT,  0,  0,  0,  24,   0.01,  0,  89248,  9%,  0,  0%,  46.2,  46.160,   115.1,
 	#   free|945512|271656|673856|6796|55352|127056|89248|856264|102396|0|102396

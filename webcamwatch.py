@@ -10,7 +10,7 @@
 # ----------------------------------------------------------------------------------------
 #
 #   The main working routine here, camera_down(), has been copied into webcamimager.py
-#   though it isn't call as of this writing 04/14/2019.
+#   though it isn't called as of this writing 04/14/2019.
 #
 #   Once that is working, we should be able to replace this script with watchdog.py
 #   in wxwatchdog.service.
@@ -97,8 +97,8 @@ check_counter = 0
 # Suggestion of GoDaddy support...
 # image_age_URL = 'http://50.62.26.1/wx/North/N_age.txt'
 # image_age_URL = 'http://dillys.org/wx/North/N_age.txt'
-WEB_URL = "http://dilly.family/wx"
 WEB_URL = "http://dillys.org/wx"
+WEB_URL = "http://dilly.family/wx"
 image_age_URL = WEB_URL + "/South/S_age.txt"
 
 # ----------------------------------------------------------------------------------------
