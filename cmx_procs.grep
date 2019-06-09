@@ -1,0 +1,4 @@
+/usr/bin/mono .*/CumulusMX.exe
+/usr/bin/python .*/watchdog.py
+/usr/bin/python .*/statuscollector.py
+/usr/bin/python .*/watchdog.py
