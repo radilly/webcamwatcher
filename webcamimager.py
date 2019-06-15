@@ -158,6 +158,48 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20190615 RAD The process for the South camera seem to have stopped doing anything but
+#              but was apparently still running.  Seems strange.  Seems systemctl didn't
+#              detect an issue. Offhand, seems another watchdog might be required.
+#              Calls to push_to_test() commented out.  May have hung in process_new_image()
+#
+#       ----------------------------------------------------------------------------------
+#   From the journal  (sudo journalctl -u webcam_south)
+#	2019/06/14 07:53:25 WARNING: power-cycling webcam
+#	2019/06/14 07:53:25 ssh pi@192.168.1.10 /home/pi/webcamwatcher/power_cycle.py 23
+#	2019/06/14 07:53:31 0
+#	2019/06/14 07:53:31 2019/06/14 07:53:26 ...open relay contacts on BCM pin 23
+#	2019/06/14 07:53:31 ...close relay contacts on BCM pin 23
+#	2019/06/15 10:33:01 INFO: Starting /home/pi/S/webcamimager.py   PID=30328
+#       ----------------------------------------------------------------------------------
+#   From the webcamimager.log
+#	..................................................................  (66)
+#	2019/06/14 07:53:25 WARNING: Webcam might be down. More than 330 secs since last update
+#	2019/06/14 07:53:25 WARNING: power-cycling webcam
+#	2019/06/14 07:53:25 ssh pi@192.168.1.10 /home/pi/webcamwatcher/power_cycle.py 23
+#	2019/06/14 07:53:31 0
+#	2019/06/14 07:53:31 2019/06/14 07:53:26 ...open relay contacts on BCM pin 23
+#	2019/06/14 07:53:31 ...close relay contacts on BCM pin 23
+#	.......||  (73)
+#	2019/06/14 07:54:10 DEBUG: Server image age = 271
+#	2019/06/14 07:54:10 INFO: Process /home/pi/S/South/snapshot-2019-06-14-07-54-04.jpg
+#	.......................||  (23)
+#   ... Log continues for another hour, and it appears images were being uploaded.
+#	.......................||  (23)
+#	2019/06/14 18:50:19 DEBUG: Server image age = 119
+#	2019/06/14 18:50:19 INFO: Process /home/pi/S/South/snapshot-2019-06-14-18-50-13.jpg
+#   >>> Gap in the log here; just seemed to stop without any messaging or journal entry...
+#   >>>   and no attempt to restart that I could see, but then both processes appeared to
+#   >>>   be running.  The South one just wasn't doing anything.
+#   >>>		$ procs
+#   >>>		Found "pi   842 1  0 Jun01 ? 00:13:59 /usr/bin/python -u ./webcamimager.py /home/pi/N/north.cfg"
+#   >>>		Found "pi   843 1  0 Jun01 ? 00:13:52 /usr/bin/python -u ./webcamimager.py /home/pi/S/south.cfg"
+#	2019/06/15 10:33:01 INFO: Starting /home/pi/S/webcamimager.py   PID=30328
+#	2019/06/15 10:33:01 INFO: reading "/home/pi/S/south.cfg"
+#       ----------------------------------------------------------------------------------
+#
+#
+#
 # 20190601 RAD Deleted everything from GoDaddy; push_to_test() started failing.
 # 20190526 RAD Switching over to Namecheap hosting, and using dilly.family as primary.
 #              Took out stuff no longer used.
@@ -422,7 +464,7 @@ def process_new_image( source, target) :
 
 	shutil.copy2( source, target )
 	push_to_server( target, remote_dir )
-	push_to_test( target, "REMOVE_ME/" + remote_dir )
+	# push_to_test( target, "REMOVE_ME/" + remote_dir )
 
 	thumbnail_file = work_dir + '/' + thumbnail_image
 #DEBUG#	logger( "DEBUG: Create thumbnail {} and upload to {}".format(thumbnail_file, remote_dir ) )
@@ -442,7 +484,7 @@ def process_new_image( source, target) :
 		logger( "WARNING: convert returned data: \"" + convert + "\"" )
 
 	push_to_server( thumbnail_file, remote_dir )
-	push_to_test( thumbnail_file, "REMOVE_ME/" + remote_dir )
+	# push_to_test( thumbnail_file, "REMOVE_ME/" + remote_dir )
 
 
 
@@ -496,6 +538,11 @@ def next_image_file() :
 		last_mtime = float(get_stored_ts())
 		last_filename = get_stored_filename()
 		last_day_code = int( re.sub(r'snapshot-....-..-(..).*', r'\1', last_filename) )
+		# ------------------------------------------------------------------------
+		#  The logic as of this writing (06/15/19) causes this last-processed
+		#  file to be reprocessed at startup.  Not terrible, but could be
+		#  cleaned up at some point...      possible TODO
+		# ------------------------------------------------------------------------
 
 
 
@@ -885,7 +932,7 @@ def midnight_process(date_string) :
 	tnf = daily_thumbnail( date_string, work_dir )
 	if len(tnf) > 0 :
 		push_to_server( tnf, remote_dir )
-		push_to_test( tnf, "REMOVE_ME/" + remote_dir )
+		# push_to_test( tnf, "REMOVE_ME/" + remote_dir )
 
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	# To make the daylight image, delete most of the dark overnight images.
@@ -899,7 +946,7 @@ def midnight_process(date_string) :
 
 	if not ffmpeg_failed :
 		push_to_server( mp4_file_daylight, remote_dir )
-		push_to_test( mp4_file_daylight, "REMOVE_ME/" + remote_dir )
+		# push_to_test( mp4_file_daylight, "REMOVE_ME/" + remote_dir )
 
 
 
