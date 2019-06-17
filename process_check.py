@@ -9,6 +9,7 @@
 #
 # Hacked from watchdog.py
 #
+# NOTE: Should make sure each "ps" line printed is unique.
 #
 # ========================================================================================
 # 20190609 RAD Started with a bash script but global variables in a loop caused an issue.
@@ -44,6 +45,7 @@ def ps_check():
 
 	process = re.split('\n', ps_output)
 
+	print "UID        PID  PPID  C STIME TTY          TIME CMD"
 	for iii in range(0, len(process)):
 		if iii > 555 :
 			return
@@ -55,10 +57,12 @@ def ps_check():
 
 		for jjj in range(0, len(pattern_list)):
 			if re.search( pattern_list[jjj], process[iii]) :
-				print "Found \"{}\"".format( process[iii] )
+				print "{}".format( process[iii] )
+				token = re.split(' *', process[iii] )
+				PID = token[1]
 				found += 1
 
-	print "\nfound {} of {}".format( found, len(pattern_list) )
+	print "\nfound {} of the expected {} processes".format( found, len(pattern_list) )
 
 	if found != len(pattern_list) :
 		print "ERROR: Missing processes..."
