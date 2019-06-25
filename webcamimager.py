@@ -157,7 +157,18 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
-# ========================================================================================
+#
+#
+# 20190625 RAD Same issue, processes "running" but apparently hung.  So camera_down()
+#              may not be very useful here ... at least for this failure mode. A separate
+#              watchdog may be required.  As noted below process_new_image() is likely
+#              where the hange occurs because immediate afterward the '.' for the next
+#              wait cycle is printed - and I'm not seeing it in the log.
+#              We are seeing the "INFO: Process ..." message logged.
+#              .
+#              If I had to guess, I suspect maybe its hanging in push_to_server()
+#              so I added a couple debug statements to see what I could learn.
+#
 # 20190615 RAD The process for the South camera seem to have stopped doing anything but
 #              but was apparently still running.  Seems strange.  Seems systemctl didn't
 #              detect an issue. Offhand, seems another watchdog might be required.
@@ -481,7 +492,9 @@ def process_new_image( source, target) :
 		# Generally nothing, unless -verbose is used...
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	if len(convert) > 0 :
-		logger( "WARNING: convert returned data: \"" + convert + "\"" )
+		logger( "WARNING: onvert returned data: \"{}\"".format( convert ) )
+	else :
+		logger( "DEBUG: onvert returned data: \"{}\"".format( convert ) )
 
 	push_to_server( thumbnail_file, remote_dir )
 	# push_to_test( thumbnail_file, "REMOVE_ME/" + remote_dir )
@@ -1422,6 +1435,7 @@ def push_to_server(local_file, remote_path) :
 		# Not on first iteration.  Then increase the sleep time with each iteration.
 		#  With a 4 sec multiplier this comes to 112 seconds max...     (28 * 4)
 		if iii > 1 :
+			logger( "DEBUG: in push_to_server() sleep( {} )".format( iii * 4 ) )
 			sleep( iii * 4 )
 
 		try :
@@ -1459,6 +1473,8 @@ def push_to_server(local_file, remote_path) :
 	if ftp_OK :
 		try :
 #DEBUG#			logger( "DEBUG: FTP STOR {} to  {}".format( local_file_bare, local_file) )
+			logger( "DEBUG: FTP STOR {} to  {}".format( local_file_bare, local_file) )
+
 			ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
 		except Exception as problem :
 			logger( "ERROR: in push_to_server() ftp.storbinary {}".format( problem ) )
@@ -1700,7 +1716,7 @@ def camera_down():
 	# ================================================================================
 	# ================================================================================
 	# ================================================================================
-	logger( "DEBUG: Server image age = {}".format(age) )
+	# logger( "DEBUG: Server image age = {}".format(age) )
 	return
 
 	# ================================================================================
