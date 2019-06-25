@@ -727,52 +727,7 @@ def read_cpu_temp():
 	return CPU_Temp / 1000.0
 
 
-# ----------------------------------------------------------------------------------------
-# Copied from the SunFounder example to configure the GPIO ports.
-#
-# ----------------------------------------------------------------------------------------
-def GPIO_setup():
-	GPIO.setmode(GPIO.BCM)
-	GPIO.setup(17, GPIO.OUT, initial=GPIO.HIGH)
-	GPIO.setup(18, GPIO.OUT, initial=GPIO.HIGH)
-	'''
-	print "|=====================================================|"
-	print "|         2-Channel High trigger Relay Sample         |"
-	print "|-----------------------------------------------------|"
-	print "|                                                     |"
-	print "|          Turn 2 channels on off in orders           |"
-	print "|                                                     |"
-	print "|                    17 ===> IN2                      |"
-	print "|                    18 ===> IN1                      |"
-	print "|                                                     |"
-	print "|                                           SunFounder|"
-	print "|=====================================================|"
-	'''
 
-# ----------------------------------------------------------------------------------------
-# This power-cycles the web cam by triggering the rely for a period.
-#
-# ----------------------------------------------------------------------------------------
-def power_cycle():
-	##DEBUG## ___print '...Relay channel %d on' % 1
-	##DEBUG## ___print '...open leftmost pair of connectors.'
-	logger( '...open leftmost pair of connectors.')
-	GPIO.output(17, GPIO.LOW)
-	sleep(5)
-	##DEBUG## ___print '...Relay channel %d off' % 1
-	##DEBUG## ___print '...close leftmost pair of connectors.'
-	logger('...close leftmost pair of connectors.')
-	GPIO.output(17, GPIO.HIGH)
-
-# ----------------------------------------------------------------------------------------
-# Clean up the GPIO configure on exit
-#
-# ----------------------------------------------------------------------------------------
-def destroy():
-	##DEBUG## ___print "\nShutting down..."
-	logger("Shutting down...\n")
-	GPIO.output(17, GPIO.HIGH)
-	GPIO.cleanup()
 
 
 # ----------------------------------------------------------------------------------------
@@ -1965,7 +1920,6 @@ def mono_version():
 # This handles the startup and shutdown of the script.
 # ----------------------------------------------------------------------------------------
 if __name__ == '__main__':
-###	GPIO_setup()
 	#### if sys.argv[1] = "stop"
 	this_script = sys.argv[0]
 
