@@ -168,6 +168,7 @@
 #              .
 #              If I had to guess, I suspect maybe its hanging in push_to_server()
 #              so I added a couple debug statements to see what I could learn.
+#              NOTE: We store a generic-named image and a thumbnail.
 #
 # 20190615 RAD The process for the South camera seem to have stopped doing anything but
 #              but was apparently still running.  Seems strange.  Seems systemctl didn't
@@ -492,9 +493,9 @@ def process_new_image( source, target) :
 		# Generally nothing, unless -verbose is used...
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	if len(convert) > 0 :
-		logger( "WARNING: onvert returned data: \"{}\"".format( convert ) )
+		logger( "WARNING: convert returned data: \"{}\"".format( convert ) )
 	else :
-		logger( "DEBUG: onvert returned data: \"{}\"".format( convert ) )
+		logger( "DEBUG: convert returned data: \"{}\"".format( convert ) )
 
 	push_to_server( thumbnail_file, remote_dir )
 	# push_to_test( thumbnail_file, "REMOVE_ME/" + remote_dir )
@@ -1472,8 +1473,8 @@ def push_to_server(local_file, remote_path) :
 
 	if ftp_OK :
 		try :
-#DEBUG#			logger( "DEBUG: FTP STOR {} to  {}".format( local_file_bare, local_file) )
-			logger( "DEBUG: FTP STOR {} to  {}".format( local_file_bare, local_file) )
+#DEBUG#			logger( "DEBUG: FTP STOR {} from  {}".format( local_file_bare, local_file) )
+			logger( "DEBUG: FTP STOR {} from  {}".format( local_file_bare, local_file) )
 
 			ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
 		except Exception as problem :
