@@ -8,6 +8,13 @@
 #   Takes 1 argument - the path to the directory to monitor for new messages.
 #
 # ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+#    NOTE:
+#    NOTE: Should replace FTP with SCP - after passwordless login is set up.
+#    NOTE:
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
 #  * NOTE: Lots of unused code to clean up...
 #  * NOTE: Need forward links???
 #
@@ -27,6 +34,23 @@
 #
 # ========================================================================================
 # ========================================================================================
+# 20190609 RAD This seemed to hang indefinately doing an FPT. I had already been
+#              thinking about SCP, and webcamimager.py has addition debug logging
+#              to try to trap the problem. I do see this error, even though we are quitting ftp
+#                       421 Too many connections (8) from this IP
+#
+#	....2019/06/25 05:53:45 DEBUG: 1561456422.38.txt added to msgqueue #=151   monitor_dir()
+#
+#	2019/06/25 05:53:45 >>>>>>> <TD>  Webcam image update stalled. </TD>
+#
+#	2019/06/25 05:53:45 DEBUG: FTP local_file = "/mnt/root/home/pi/status/event_status.html"   remote_path = ""   server = "ftp.dilly.family"
+#	2019/06/25 05:53:45 DEBUG: local_file_bare = "event_status.html"
+#  >>>  2019/06/25 05:53:45 ERROR: FTP (connect): 421 Too many connections (8) from this IP
+#	2019/06/25 05:53:48 WARNING: FTP attempt #1
+#  < < < < G A P > > > >
+#	2019/07/03 14:38:26 INFO: Starting ./statuscollector.py   PID=30862
+#
+#
 # 20190609 RAD Finished the custover from GoDaddy to Namecheap.  In the process noted
 #              that the log info could be more helpful and added to that for DEBUG:
 # 20180723 RAD Hacked up webcamimager to get a start on this idea.  I have in mind to
@@ -143,8 +167,6 @@ thumbnail_image = ""
 image_age_URL = ""
 
 # ========================================================================================
-
-# ========================================================================================
 # ----------------------------------------------------------------------------------------
 #
 # Main loop
@@ -167,6 +189,7 @@ def main():
 
 	log_and_message( "INFO: monitoring directory \"{}\"".format( work_dir ) )
 
+	#    NOTE: Should replace FTP with SCP - after passwordless login is set up.
 	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
 
 ###	nvers = mono_version()
@@ -190,9 +213,6 @@ def main():
 		sleep(sleep_for)
 
 	exit()
-
-
-
 
 
 
@@ -544,7 +564,7 @@ def push_to_server(local_file, remote_path, server) :
 		if iii > 0 :
 		# Not on first iteration.  The increase the sleep time with each iteration.
 			sleep( iii * 3 )
-			logger( "WARNING: FTP attempt #{}".format( iii ) )
+			logger( "WARNING: in push_to_server() FTP attempt #{}".format( iii ) )
 
 		try :
 			# ----------------------------------------------------------------
@@ -556,7 +576,7 @@ def push_to_server(local_file, remote_path, server) :
 #DEBUG#			logger( "DEBUG: ftp = FTP( {}, {}, {} )".format( server, ftp_login, ftp_password ) )
 			ftp = FTP( server, ftp_login, ftp_password )
 		except Exception as problem :
-			logger( "ERROR: FTP (connect): {}".format( problem ) )
+			logger( "ERROR: in push_to_server() FTP (connect): {}".format( problem ) )
 			continue
 
 #DEBUG#		log_and_message( "DEBUG: remote_path = {}".format( remote_path ) )
@@ -566,23 +586,25 @@ def push_to_server(local_file, remote_path, server) :
 #DEBUG#				logger( "DEBUG: FTP remote cd to {}".format( remote_path ) )
 				ftp.cwd( remote_path )
 			except Exception as problem :
-				logger( "ERROR: ftp.cwd {}".format( problem ) )
+				logger( "ERROR: in push_to_server() ftp.cwd {}".format( problem ) )
 				continue
 
 		try :
 #DEBUG#			logger( "DEBUG: FTP STOR {} to  {}".format( local_file_bare, local_file) )
 			ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
 		except Exception as problem :
-			logger( "ERROR: ftp.storbinary {}".format( problem ) )
+			logger( "ERROR: in push_to_server() ftp.storbinary {}".format( problem ) )
 			continue
 
-		ftp.quit()
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		# Yes, that's a return that's not at the funtion end.
-		# 08/04/2018 - I think replacing it with a break may be cleaner...
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-###		return
+		try :
+			ftp.quit()
+		except Exception as problem :
+			logger( "ERROR: in push_to_server() ftp.quit {}".format( problem ) )
+			ftp.close()
+
+
 		break
+
 	return
 
 
@@ -696,228 +718,6 @@ def get_stored_ts() :
 	return float(tstamp)
 
 
-
-
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-#
-#
-#      NOTE:    Here for reference ... for the moment...
-#
-#
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-
-
-
-# ----------------------------------------------------------------------------------------
-#  This handles the tar of a daily set of image snapshots
-#
-#  Example argument:   2018-05-23
-# ----------------------------------------------------------------------------------------
-def tar_dailies(date_string) :
-	tar_size = -1
-	tar_failed = True
-
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	#  Tinkered with a few ideas for tar.
-	#  Could not get --directory to work as I expected from the man page.
-	#  I am also a little concerned about using a wildcard with the tar command.
-	#  Seems like it might be safer to build a table of files, and the -T option
-	#   (as I have been doing on the hosted server).  daily_image_list() builds it.
-	#
-	#   tar -c -zf South/arc_2018/arc-2018-06-01.tgz -T South/arc_2018/index-2018-06-01.txt
-	#   tar tzvf South/arc_2018/arc-2018-06-01.tgz | less
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-
-	yyyy = re.sub(r'(....).*', r'\1', date_string)
-	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
-	arc_dir = work_dir + '/arc_' + yyyy
-	image_index = arc_dir + '/index-' + date_string + ".txt"
-	tar_file = arc_dir + "/arc-" + date_string + ".tgz"
-	tar_file = arc_dir + "/" + date_stamp + "_arc.tgz"
-
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	#  NOTE: This is a bit draconian ... Need to think through a kinder, gentler approach
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	if os.path.isfile( tar_file ) :
-		logger( "ERROR: {} already exists.  Quitting tar process.".format( tar_file ) )
-		return tar_size
-
-	#
-	#  The --directory flag would be elegant, if I could get it to work...
-	#
-	current_directory = os.getcwd()
-	os.chdir( work_dir )
-
-	#  Creats a list like South/arc_2018/index-2018-06-01.txt for use with -T
-	nnn = daily_image_list(date_string, '.' )
-	if ( nnn < 50 ) :
-		logger( "WARNING: Index list looks short with {} items.".format( nn ) )
-	else :
-		tar_cmd = "tar -c -T " + image_index + " -zf " + tar_file
-
-		logger( "DEBUG: Creating tar file with: " + tar_cmd )
-		try:
-			subprocess.check_call(tar_cmd, shell=True)
-			tar_failed = False
-			unlink( image_index )
-		except :
-			logger( "ERROR: Unexpected ERROR in tar: {}".format( sys.exc_info()[0] ) )
-
-	try:
-		tar_size = stat( tar_file ).st_size
-	except :
-		logger( "ERROR: Unexpected ERROR in stat: {}".format( sys.exc_info()[0] ) )
-		tar_size = -1
-
-	logger( "DEBUG: tar file size = {}".format( tar_size ) )
-
-	os.chdir( current_directory )
-
-	##### if not tar_failed :
-
-	return tar_size
-
-
-
-# ----------------------------------------------------------------------------------------
-#  Fetch the version of mono
-#
-# ----------------------------------------------------------------------------------------
-def mono_version():
-###	global data
-
-	try :
-		response = subprocess.check_output(["/usr/bin/mono", "-V"])
-		line = re.split('\n', response)
-		tok = re.split(' *', line[0])
-		version = tok[4]
-	except:
-		logger( "WARNING: From mono version check: {}".format( sys.exc_info()[0] ) )
-		version = "Not found"
-
-###	data['mono_version'] = version
-	return version
-
-
-# ----------------------------------------------------------------------------------------
-# Read the config file, and set global variables based on it.
-#
-# NOTE: While the flexibility to override any global may have some benefits, it's not
-#       clear this shouldn't be limited to specific variables.  We do some verification
-#       of the values, and in fact some of these are required or we fail to run.
-# ----------------------------------------------------------------------------------------
-def read_config( config_file ) :
-	global work_dir, main_image, thumbnail_image, remote_dir
-	global ftp_login, ftp_password
-	global relay_GPIO, relay2_GPIO
-
-# 	# https://docs.python.org/2/library/configparser.html
-	config = ConfigParser.RawConfigParser()
-	# This was necessary to avoid folding variable names to all lowercase.
-	# https://stackoverflow.com/questions/19359556/configparser-reads-capital-keys-and-make-them-lower-case
-	config.optionxform = str
-	config.read( config_file )
-	#print config.getboolean('Settings','bla') # Manual Way to acess them
-
-	# https://stackoverflow.com/questions/924700/best-way-to-retrieve-variable-values-from-a-text-file-python-json
-	parameter=dict(config.items("webcamimager"))
-	for p in parameter:
-		parameter[p]=parameter[p].split("#",1)[0].strip() # To get rid of inline comments
-###		print p
-###		print parameter[p]
-
-	globals().update(parameter)  #Make them availible globally
-
-
-###	print "."
-###	messager( "INFO: work_dir = \"{}\"".format(work_dir) )
-###	messager( "INFO: main_image = \"{}\"".format(main_image) )
-###	messager( "INFO: thumbnail_image = \"{}\"".format(thumbnail_image) )
-###	messager( "INFO: remote_dir = \"{}\"".format(remote_dir) )
-###	print "."
-###	messager( "INFO: relay_GPIO = \"{}\"".format( relay_GPIO ) )
-###	print "."
-
-
-
-	if not os.path.exists( work_dir ) :
-		logger( "ERROR: work_dir, \"{}\" not found.".format( work_dir ) )
-		exit()
-
-	if not re.match('.+\.jpg$', main_image, flags=re.I) :
-		logger( "ERROR: main_image, \"{}\" not ending in .jpg.".format( main_image ) )
-		exit()
-
-	if not re.match('.+\.jpg$', thumbnail_image, flags=re.I) :
-		logger( "ERROR: thumbnail_image, \"{}\" not ending in .jpg.".format( main_image ) )
-		exit()
-
-
-	if not os.path.isfile( work_dir + "/.ftp.credentials" ) :
-		logger( "ERROR: work_dir, \"{}\" suspect.  {} not found.".format( work_dir + "/.ftp.credentials" ) )
-		exit()
-
-
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	# Check the FTP credentials we read.
-	#
-	#  See push_to_server() which tries this in a loop... To handle GoDaddy outages.
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
-
-	try :
-		ftp = FTP( wserver, ftp_login, ftp_password )
-	except Exception as problem :
-		logger( "ERROR: Unexpected ERROR in FTP connect: {}".format( sys.exc_info()[0] ) )
-		logger( "ERROR: FTP (connect): {}".format( problem ) )
-
-	if len( remote_path ) > 1 :
-		try :
-			ftp.cwd( remote_dir )
-		except :
-			logger( "ERROR: Unexpected ERROR in FTP cwd: {}".format( sys.exc_info()[0] ) )
-			logger( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
-
-	try :
-		ftp.quit()
-	except :
-		logger( "ERROR: Unexpected ERROR in FTP quit: {}".format( sys.exc_info()[0] ) )
-		logger( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
-		exit()
-
-	try:
-
-#DEBUG#		logger("DEBUG: reading: \"{}\"".format( image_age_URL ) )
-		response = urlopen( image_age_URL )
-#DEBUG#		logger("DEBUG: image age read from web: \"{}\"".format( age ) )
-	except:
-		logger( "ERROR: Unexpected ERROR in urlopen: {}".format( sys.exc_info()[0] ) )
-		logger( "ERROR: image_age_URL = \"{}\" is likely bad.".format(image_age_URL) )
-
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	# We could handle these more generally.  If a value contains digits, convert to
-	# int().  If digits and a '.', use float().
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	if len(relay_GPIO) > 0 :
-		relay_GPIO = int( relay_GPIO )
-
-	if len(relay2_GPIO) > 0 :
-		relay2_GPIO = int( relay2_GPIO )
-
-
-
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
 
 
 # ----------------------------------------------------------------------------------------

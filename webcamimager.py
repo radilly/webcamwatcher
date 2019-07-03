@@ -1486,6 +1486,7 @@ def push_to_server(local_file, remote_path) :
 		ftp.quit()
 	except Exception as problem :
 		logger( "ERROR: in push_to_server() ftp.quit {}".format( problem ) )
+		ftp.close()
 
 
 	return
