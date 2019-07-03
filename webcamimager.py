@@ -1632,6 +1632,7 @@ def mono_version():
 # ----------------------------------------------------------------------------------------
 def wait_ffmpeg() :
 	delay_secs = 10
+	delay_secs = 5
 	# Total wait approximately delay_secs * range() below.
 
 	for iii in range(35) :
