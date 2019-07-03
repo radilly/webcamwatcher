@@ -699,6 +699,7 @@ def summarize():
 		":<a TARGET=\"_blank\" HREF=\"https://www.windy.com/40.279/-80.089?39.317,-80.089,7,m:eMiadVG\">Windy</a>:\n" )
 	FH.write( "    <br>:<a href=\"status.html\">Pi status</a>:" + \
 		":<a href=\"event_status.html\">Event&nbsp;Log</a>:\n" + \
+		":<a href=\"procs.html\">Check&nbsp;Procs</a>:\n" + \
 		":<a TARGET=\"_blank\" HREF=\"https://www.wunderground.com/personal-weather-station/dashboard?ID=KPAMCMUR4\">KPAMCMUR4</a>:</td>\n" )
 
   	FH.write( "  </tr>\n\n" )
