@@ -15,7 +15,7 @@
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
-#  * NOTE: Lots of unused code to clean up...
+#
 #  * NOTE: Need forward links???
 #
 # ----------------------------------------------------------------------------------------
@@ -30,11 +30,12 @@
 # 2018/07/17 02:35:30 DEBUG: Copy /home/pi/N/North/snapshot-2018-07-17-02-35-37.jpg as N.jpg
 # 2018/07/17 02:35:31 FTP Socket Error 113: No route to host
 #
-# ----------------------------------------------------------------------------------------
-#
 # ========================================================================================
 # ========================================================================================
-# 20190609 RAD This seemed to hang indefinately doing an FPT. I had already been
+# 20190716 RAD Been running a month using scp so it looks good. Can apply this elsewhere
+#              but for now will check this in even though you'll see 'T E S T' in a few
+#              places.
+# 20190610 RAD This seemed to hang indefinately doing an FPT. I had already been
 #              thinking about SCP, and webcamimager.py has addition debug logging
 #              to try to trap the problem. I do see this error, even though we are quitting ftp
 #                       421 Too many connections (8) from this IP
@@ -121,7 +122,7 @@ remote_dir = "/var/chroot/home/content/92/3185192/wx"
 
 remote_dir = "/home/dillwjfq/public_html/wx"
 
-remote_dir = ""
+remote_dir = ""    # This is for ftp to camdilly@dilly.family
 
 this_script = sys.argv[0]
 logger_file = re.sub('\.py', '.log', this_script)
@@ -437,7 +438,8 @@ def monitor_dir() :
 
 	build_events_page( msgqueue, events_page, prev_page )
 
-	push_to_server( events_page, remote_dir, wserver )
+	# push_to_server( events_page, remote_dir, wserver )
+	push_to_server_via_scp( events_page, remote_dir, wserver )
 
 	dot_counter = 0
 
@@ -481,7 +483,8 @@ def prune_msgqueue( ) :
 	logger( "DEBUG: Create {} (previous page)".format( new_pp_short ) )
 	build_events_page( prevqueue, new_prev_page, prev_page )
 
-	push_to_server( new_prev_page, remote_dir, wserver )
+	# push_to_server( new_prev_page, remote_dir, wserver )
+	push_to_server_via_scp( new_prev_page, remote_dir, wserver )
 
 	prev_page = new_pp_short
 
@@ -521,6 +524,44 @@ def find_prev_page() :
 	prev_page = found_prev_page
 	logger( "DEBUG: Global prev_page now set to {} in find_prev_page()".format( prev_page ) )
 
+
+
+
+
+# ----------------------------------------------------------------------------------------
+#  T E S T
+#  T E S T
+#  T E S T
+#  T E S T
+#  T E S T
+#
+#  References:
+#   https://stackoverflow.com/questions/68335/how-to-copy-a-file-to-a-remote-server-in-python-using-scp-or-ssh
+#   https://stackoverflow.com/questions/250283/how-to-scp-in-python
+#
+#   https://stackoverflow.com/questions/68335/how-to-copy-a-file-to-a-remote-server-in-python-using-scp-or-ssh
+#   https://stackoverflow.com/questions/68335/how-to-copy-a-file-to-a-remote-server-in-python-using-scp-or-ssh
+#
+# @@@
+# ----------------------------------------------------------------------------------------
+def push_to_server_via_scp(local_file, remote_path, server) :
+	remote_path = "public_html/wx"
+#      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+#	destination = "user@remotehost:remotepath"
+	destination = "dillwjfq@server162.web-hosting.com:" + remote_path
+
+	try :
+		output = subprocess.check_output(["scp", "-q", "-P", "21098", local_file, destination])
+		lines = re.split('\n', output)
+	except :
+		messager( "ERROR: scp: {}".format( sys.exc_info()[0] ) )
+
+	if len(lines) > 1 :
+		for jjj in range( len(lines) ) :
+			print "DEBUG: #{} \"{}\"".format( jjj, lines[jjj] )
+	
+	return
 
 
 # ----------------------------------------------------------------------------------------
@@ -701,7 +742,6 @@ def store_file_data(tstamp) :
 	FH = open( stored_dir_mtime, "w" )
 	FH.write( str(tstamp) + "\n" )
 	FH.close
-# @@@
 
 # ----------------------------------------------------------------------------------------
 #
