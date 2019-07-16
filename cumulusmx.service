@@ -20,7 +20,7 @@ Description=CumulusMX Service
 # -------------------------------------------------------
 [Service]
 # https://stackoverflow.com/questions/18464295/degraded-allocation-consider-increasing-nursery-size-if-the-warning-persists
-Environment=MONO_GC_PARAMS=nursery-size=8m
+Environment=MONO_GC_PARAMS=nursery-size=16m
 ### Type=forking
 Type=simple
 # User=pi
