@@ -37,6 +37,8 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20190722 RAD Added system_uptime.  Already issuing the command- just had to parse
+#              out that portion.
 # 20190529 RAD In server_stalled() initialized content = "1" to avoid the following.
 #              Frankly not super-well tought out at 10:30 PM, but I wanted to take
 #              a quick stab at a fix rather tha ignote it.
@@ -247,6 +249,7 @@ data_keys = [
 	"watcher_pid",
 	"last_restarted",
 	"cmx_svc_runtime",
+	"system_uptime",
 	"server_stalled",
 	"ws_data_stopped",
 	"rf_dropped",
@@ -282,6 +285,7 @@ data_format = [
 	"{}",
 	"{}",
 	"{}",
+	"{}",
 	"{} sec",
 	"{:5.1f}%",
 	"{:7.2f}",
@@ -300,6 +304,7 @@ data_format = [
 	]
 
 thresholds = [
+	-1,
 	-1,
 	-1,
 	-1,
@@ -1074,6 +1079,9 @@ def last_realtime():
 def proc_load():
 	global data
 	load = subprocess.check_output('/usr/bin/uptime')
+	uptime = re.sub('.*up *', '', load)
+	uptime = re.sub(',.*', '', uptime)
+
 	load = re.sub('.*average: *', '', load)
 	load = load.rstrip()
 	# messager( "DEBUG: uptime data: \"" + load + "\"" )
@@ -1091,6 +1099,7 @@ def proc_load():
 			"\t\t 1 minute load average = " + str(cur_proc_load) )
 	data['proc_load'] = cur_proc_load
 	data['proc_load_5m'] = proc_load_5m
+	data['system_uptime'] = uptime
 	return cur_proc_load
 
 
