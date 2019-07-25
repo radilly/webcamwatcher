@@ -1393,6 +1393,50 @@ def get_stored_filename() :
 
 
 
+
+
+
+
+
+
+# ----------------------------------------------------------------------------------------
+#  T E S T
+#  T E S T
+#  T E S T
+#  T E S T
+#  T E S T
+#
+#  References:
+#   https://stackoverflow.com/questions/68335/how-to-copy-a-file-to-a-remote-server-in-python-using-scp-or-ssh
+#   https://stackoverflow.com/questions/250283/how-to-scp-in-python
+#
+#   https://stackoverflow.com/questions/68335/how-to-copy-a-file-to-a-remote-server-in-python-using-scp-or-ssh
+#   https://stackoverflow.com/questions/68335/how-to-copy-a-file-to-a-remote-server-in-python-using-scp-or-ssh
+#
+# @@@
+# ----------------------------------------------------------------------------------------
+def push_to_server_via_scp(local_file, remote_path) :
+	remote_path = "public_html/wx"
+#      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+#	destination = "user@remotehost:remotepath"
+	destination = "dillwjfq@server162.web-hosting.com:" + remote_path
+
+	try :
+		output = subprocess.check_output(["scp", "-q", "-P", "21098", local_file, destination])
+		lines = re.split('\n', output)
+	except :
+		messager( "ERROR: scp: {}".format( sys.exc_info()[0] ) )
+
+	if len(lines) > 1 :
+		for jjj in range( len(lines) ) :
+			print "DEBUG: #{} \"{}\"".format( jjj, lines[jjj] )
+	
+	return
+
+
+
+
 # ----------------------------------------------------------------------------------------
 #  This pushes the specified file to the (hosted) web server via FTP.
 #
