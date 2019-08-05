@@ -1802,9 +1802,9 @@ def read_cpu_temp():
 #		data['effective_used'] = effective_used 
 #		data['mem_pct'] = mem_pct
 #
-#   0   MemTotal:         949444 kB
+#   0   MemTotal:         949444 kB   <---
 #   .   MemFree:           94228 kB
-#   .   MemAvailable:     791532 kB
+#   .   MemAvailable:     791532 kB   <---
 #   4   Buffers:           63852 kB
 #   5   Cached:           686676 kB
 #   .   SwapCached:            0 kB
@@ -1816,8 +1816,8 @@ def read_cpu_temp():
 #   .   Inactive(file):   355576 kB
 #   .   Unevictable:           0 kB
 #   .   Mlocked:               0 kB
-#   8   SwapTotal:        102396 kB
-#  10   SwapFree:         102396 kB
+#   8   SwapTotal:        102396 kB   <---
+#  10   SwapFree:         102396 kB   <---
 #
 #		data['swap_used'] = SwapTotal - SwapFree
 #		data['swap_pct'] = 100 * (SwapTotal - SwapFree) / SwapTotal
