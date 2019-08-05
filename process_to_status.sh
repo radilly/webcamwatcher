@@ -5,46 +5,61 @@
 # KEEP controls how many we keep, typically a mulitple of 3
 
 
-STAT_FILE="/mnt/root/home/pi/Cumulus_MX/web/status.html"
 STAT_FILE="/mnt/root/home/pi/Cumulus_MX/web/procs.html"
+WORK_FILE="/mnt/root/home/pi/Cumulus_MX/web/procs.html.PARTIAL"
 
-echo "<HEAD><TITLE>" > ${STAT_FILE}
-echo "Raspberry Pi Expected Processes" >> ${STAT_FILE}
-echo "</TITLE></HEAD><BODY BGCOLOR="#555555" TEXT="#FFFFFF" LINK="#FFFF00" VLINK="#FFBB00" ALINK="#FFAAFF"><H1 ALIGN=center>" >> ${STAT_FILE}
-echo "Raspberry Pi Expected Processes" >> ${STAT_FILE}
-echo "</H1>" >> ${STAT_FILE}
-echo "" >> ${STAT_FILE}
-echo "<CENTER>" >> ${STAT_FILE}
-echo "<TABLE>" >> ${STAT_FILE}
-echo "<TR><TD>" >> ${STAT_FILE}
+echo "<HEAD><TITLE>" > ${WORK_FILE}
+echo "Raspberry Pi Expected Processes" >> ${WORK_FILE}
+echo "</TITLE></HEAD><BODY BGCOLOR="#555555" TEXT="#FFFFFF" LINK="#FFFF00" VLINK="#FFBB00" ALINK="#FFAAFF"><H1 ALIGN=center>" >> ${WORK_FILE}
+echo "Raspberry Pi Expected Processes" >> ${WORK_FILE}
+echo "</H1>" >> ${WORK_FILE}
+echo "" >> ${WORK_FILE}
+echo "<CENTER>" >> ${WORK_FILE}
+echo "<TABLE>" >> ${WORK_FILE}
+echo "<TR><TD>" >> ${WORK_FILE}
 
-echo "<P> &nbsp;" >> ${STAT_FILE}
-echo "<BR> Local on `hostname` <BR>" >> ${STAT_FILE}
-echo "</TD></TR>" >> ${STAT_FILE}
-echo "<TR><TD>" >> ${STAT_FILE}
-echo "<PRE>" >> ${STAT_FILE}
+echo "<P> &nbsp;" >> ${WORK_FILE}
+echo "<BR> Local on `hostname` <BR>" >> ${WORK_FILE}
+echo "</TD></TR>" >> ${WORK_FILE}
+echo "<TR><TD>" >> ${WORK_FILE}
+echo "<PRE>" >> ${WORK_FILE}
 
-~/bin/process_check.py ~/expected_procs.grep  >> ${STAT_FILE}
+~/bin/process_check.py ~/expected_procs.grep  >> ${WORK_FILE}
 
-echo "</PRE>" >> ${STAT_FILE}
-echo "</TD></TR>" >> ${STAT_FILE}
-echo "<TR><TD>" >> ${STAT_FILE}
-echo "<P> &nbsp;" >> ${STAT_FILE}
-echo "<BR> ssh pi@raspb_01_cams <BR>" >> ${STAT_FILE}
-echo "</TD></TR>" >> ${STAT_FILE}
-echo "<TR><TD>" >> ${STAT_FILE}
-echo "<PRE>" >> ${STAT_FILE}
+echo "</PRE>" >> ${WORK_FILE}
+echo "</TD></TR>" >> ${WORK_FILE}
+echo "<TR><TD>" >> ${WORK_FILE}
+echo "<P> &nbsp;" >> ${WORK_FILE}
+echo "<BR> ssh pi@raspb_01_cams <BR>" >> ${WORK_FILE}
+echo "</TD></TR>" >> ${WORK_FILE}
+echo "<TR><TD>" >> ${WORK_FILE}
+echo "<PRE>" >> ${WORK_FILE}
 
-ssh pi@raspb_01_cams ~/bin/process_check.py ~/expected_procs.grep  >> ${STAT_FILE}
+ssh pi@raspb_01_cams ~/bin/process_check.py ~/expected_procs.grep  >> ${WORK_FILE}
 
-echo "</PRE>" >> ${STAT_FILE}
-echo "</TD></TR>" >> ${STAT_FILE}
-echo "</TABLE>" >> ${STAT_FILE}
+echo "</PRE>" >> ${WORK_FILE}
+echo "</TD></TR>" >> ${WORK_FILE}
+echo "</TABLE>" >> ${WORK_FILE}
 
-echo "<P> &nbsp;" >> ${STAT_FILE}
-echo "<P> &nbsp;" >> ${STAT_FILE}
-echo "<P><FONT SIZE=-1> `date +'%x %X %Z'` </FONT>" >> ${STAT_FILE}
+echo "<P> &nbsp;" >> ${WORK_FILE}
+echo "<P> &nbsp;" >> ${WORK_FILE}
+echo "<P><FONT SIZE=-1> `date +'%x %X %Z'` </FONT>" >> ${WORK_FILE}
+
+
+echo "<P ALIGN=center><a href=\"procs.html\">Check Procs</a>" >> ${WORK_FILE}
+echo "&nbsp; &nbsp; &nbsp; - &nbsp; &nbsp; &nbsp;" >> ${WORK_FILE}
+echo "<a href=\"event_status.html\">Pi Events</a>" >> ${WORK_FILE}
+echo "&nbsp; &nbsp; &nbsp; - &nbsp; &nbsp; &nbsp;" >> ${WORK_FILE}
+echo "<a href=\"status.html\">Pi Status</a>" >> ${WORK_FILE}
+
+
+
 # sleep 35
+
+
+mv -f ${WORK_FILE} ${STAT_FILE}
+
+
 
 exit
 exit
