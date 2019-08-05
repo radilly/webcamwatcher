@@ -77,7 +77,23 @@ https://www.brokenlinkcheck.com/
 #
 #
 
+------------------------------------------------------------
+APACHE2
 
+  762  vi update_upgrade_notes.txt
+  763  ls -altr
+  765  sudo apt-get update
+  767  sudo apt-get upgrade
+  768  sudo apt-get update
+  769  sudo apt-get install apache2
+  771  ifconfig
+  772  sudo vi /var/www/html/index.html
+  773  ls -al /usr/lib/cgi-bin/
+  775  ls -al /etc/apache2/conf-enabled/
+  776  ls -al /etc/apache2/conf-available/
+  778  sudo vi /etc/apache2/conf-available/serve-cgi-bin.conf 
+  780  sudo echo "AddHandler cgi-script .py          #https://www.raspberrypi.org/forums/viewtopic.php?t=155229" >> /etc/apache2/conf-available/serve-cgi-bin.conf 
+  781  sudo echo "AddHandler cgi-script .py          #https://www.raspberrypi.org/forums/viewtopic.php?t=155229" >> /etc/apache2/conf-available/serve-cgi-bin.conf.xxx 
 ------------------------------------------------------------
 
 https://medium.com/@danidudas/install-raspbian-jessie-lite-and-setup-wi-fi-without-access-to-command-line-or-using-the-network-97f065af722e
@@ -109,3 +125,4 @@ https://raspberrypi.stackexchange.com/questions/56621/temporarily-disable-expand
 
 
 
+------------------------------------------------------------
