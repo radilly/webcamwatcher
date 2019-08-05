@@ -1795,6 +1795,7 @@ def read_cpu_temp():
 def mem_usage():
 	global data
 	free = subprocess.check_output('/usr/bin/free')
+	print free
 	#                       Remove all the text portions - we want just the numbers
 	free = re.sub('.*total *used *free *shared *buffers *cached\n.*Mem: *', '', free)
 	free = re.sub('\n.*buffers/cache: *', ' ', free)
@@ -1811,6 +1812,10 @@ def mem_usage():
 
 	### for iii in range(0, len(words)):
 	### 	___print str(iii) + "  " + words[iii]
+	for iii in range(0, len(words)):
+		print str(iii) + "  " + words[iii]
+
+
 
 	mem_total = int(words[0])
 	mem_used = int(words[1])

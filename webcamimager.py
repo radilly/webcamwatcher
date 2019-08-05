@@ -1416,11 +1416,12 @@ def get_stored_filename() :
 # @@@
 # ----------------------------------------------------------------------------------------
 def push_to_server_via_scp(local_file, remote_path) :
-	remote_path = "public_html/wx"
+########################################################################	remote_path = "public_html/wx"
 #      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+#		scp -P "21098" do_midnight.log dillwjfq@server162.web-hosting.com:public_html/wx/North
 #	destination = "user@remotehost:remotepath"
-	destination = "dillwjfq@server162.web-hosting.com:" + remote_path
+	destination = "dillwjfq@server162.web-hosting.com:public_html/wx/" + remote_path
 
 	try :
 		output = subprocess.check_output(["scp", "-q", "-P", "21098", local_file, destination])
