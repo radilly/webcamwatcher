@@ -10,8 +10,10 @@
 #   nohup /usr/bin/python -u /mnt/root/home/pi/watchdog.py >> /mnt/root/home/pi/watchdog.log 2>&1 &
 #
 # ========================================================================================
-# 20190722 RAD Copied watchdog.py. It is generating
-#              out that portion.
+# 20190722 RAD Hacked up mem_usage() because I found 2 versions of Raspbian were
+#              generating rather different output fo the free command.
+# 20190722 RAD Copied watchdog.py. Wanted a separate status tool for Pi in general
+#              which could be access via a web server.
 # ========================================================================================
 #
 #
@@ -118,7 +120,7 @@ status_page =           "/mnt/root/home/pi/pi_health.html"
 status_page =           "/mnt/root/home/pi/pi_health.html"
 status_page =           "/mnt/root/home/pi/pi_health.html"
 status_page =           "/mnt/root/home/pi/pi_health.html"
-status_page =           "/mnt/root/home/pi/pi_health.html"
+status_page =           "/home/pi/pi_health.html"
 
 logger_file = sys.argv[0]
 logger_file = re.sub('\.py', '.log', logger_file)
@@ -1775,27 +1777,168 @@ def read_cpu_temp():
 #   -/+ buffers/cache:      95060     850452
 #   Swap:       102396          0     102396
 #
-#   0  945512
-#   1  311232
-#   2  634280
-#   3  6768
-#   4  83880
-#   5  128100
-#   6  99252
-#   7  846260
-#   8  102396
-#   9  0
-#   10  102396
+# From raspberrypi_03 . . . . . .
+#                 total        used        free      shared  buff/cache   available
+#   Mem:         949444       42700       97504       48112      809240      793092
+#   Swap:        102396           0      102396
+# 20190805 - On this system the '-/+ buffers/cache:' lines was missing, and maybe
+#            rolled into the line above in some way.
+#
+#   0   945512 mem_total	# - Referenced
+#   1   311232 mem_used		# -
+#   2   634280 mem_free		# -
+#   3     6768 shared		# -
+#   4    83880 buffers		# -
+#   5   128100 cached		# -
+#   6    99252 bu_ca_used	# -
+#   7   846260 bu_ca_free	# - Referenced
+#   8   102396 swap_total	# - Referenced
+#   9        0 swap_used	# - Referenced
+#  10   102396 swap_free	# -
+#
+#		swap_pct = 100 * swap_used / swap_total
+#		effective_used = mem_total - bu_ca_free
+#		mem_pct = 100 * effective_used / mem_total
+#		data['swap_used'] = swap_used
+#		data['swap_pct'] = swap_pct
+#		data['effective_used'] = effective_used 
+#		data['mem_pct'] = mem_pct
+#
+#   0   MemTotal:         949444 kB   <---
+#   .   MemFree:           94228 kB
+#   .   MemAvailable:     791532 kB   <---
+#   4   Buffers:           63852 kB
+#   5   Cached:           686676 kB
+#   .   SwapCached:            0 kB
+#   .   Active:           360448 kB
+#   .   Inactive:         408048 kB
+#   .   Active(anon):      13604 kB
+#   .   Inactive(anon):    52472 kB
+#   .   Active(file):     346844 kB
+#   .   Inactive(file):   355576 kB
+#   .   Unevictable:           0 kB
+#   .   Mlocked:               0 kB
+#   8   SwapTotal:        102396 kB   <---
+#  10   SwapFree:         102396 kB   <---
+#
+#		data['swap_used'] = SwapTotal - SwapFree
+#		data['swap_pct'] = 100 * (SwapTotal - SwapFree) / SwapTotal
+#		data['effective_used'] = MemTotal - MemAvailable
+#		data['mem_pct'] = 100 * (MemTotal - MemAvailable) / MemTotal
 #
 # See:
 #   http://www.linuxatemyram.com/http://www.linuxatemyram.com/
 #   http://www.linuxnix.com/find-ram-size-in-linuxunix/
 #
 # ----------------------------------------------------------------------------------------
+#   Distributor ID: Raspbian
+#   Description:    Raspbian GNU/Linux 9.9 (stretch)
+#   Release:        9.9
+#   Codename:       stretch
+#
+#   DEBUG: --->
+#                 total        used        free      shared  buff/cache   available
+#   Mem:         949444       44524       94176       48112      810744      791276
+#   Swap:        102396           0      102396
+#
+#   DEBUG:    0
+#   DEBUG:    1 total
+#   DEBUG:    2 used
+#   DEBUG:    3 free
+#   DEBUG:    4 shared
+#   DEBUG:    5 buff/cache
+#   DEBUG:    6 available
+#   Mem:
+#   DEBUG:    7 949444
+#   DEBUG:    8 44524
+#   DEBUG:    9 94176
+#   DEBUG:   10 48112
+#   DEBUG:   11 810744
+#   DEBUG:   12 791276
+#   Swap:
+#   DEBUG:   13 102396
+#   DEBUG:   14 0
+#   DEBUG:   15 102396
+# ----------------------------------------------------------------------------------------
+#   Distributor ID: Raspbian
+#   Description:    Raspbian GNU/Linux 8.0 (jessie)
+#   Release:        8.0
+#   Codename:       jessie
+#
+#   DEBUG: --->
+#                total       used       free     shared    buffers     cached
+#   Mem:        945512     905728      39784      48996     303816     135856
+#   -/+ buffers/cache:     466056     479456
+#   Swap:       102396      35860      66536
+#
+#   DEBUG:    0
+#   DEBUG:    1 total
+#   DEBUG:    2 used
+#   DEBUG:    3 free
+#   DEBUG:    4 shared
+#   DEBUG:    5 buffers
+#   DEBUG:    6 cached
+#   Mem:
+#   DEBUG:    7 945512
+#   DEBUG:    8 906364
+#   DEBUG:    9 39148
+#   DEBUG:   10 48996
+#   DEBUG:   11 304104
+#   DEBUG:   12 135864
+#   -/+
+#   DEBUG:   13 buffers/cache:
+#   DEBUG:   14 466396
+#   DEBUG:   15 479116
+#   Swap:
+#   DEBUG:   16 102396
+#   DEBUG:   17 35860
+#   DEBUG:   18 66536
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+#    https://blog.sleeplessbeastie.eu/2018/01/31/how-to-parse-free-output-to-display-available-memory/
+#    https://www.thegeekdiary.com/understanding-proc-meminfo-file-analyzing-memory-utilization-in-linux/
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+#   cat /proc/meminfo
+#   MemTotal:         949444 kB
+#   MemFree:           97448 kB
+#   MemAvailable:     794576 kB
+#   Buffers:           63852 kB
+#   Cached:           686600 kB
+#   SwapCached:            0 kB
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
 def mem_usage():
 	global data
-	free = subprocess.check_output('/usr/bin/free')
-	print free
+
+	free = subprocess.check_output(["/usr/bin/lsb_release", "-a"])
+	print "DEBUG: --->\n{}".format( free )
+
+	free = subprocess.check_output(["/usr/bin/free", "-V"])
+	print "DEBUG: --->\n{}".format( free )
+
+	free = subprocess.check_output(["/usr/bin/free"])
+
+	print "DEBUG: --->\n{}".format( free )
+
+	words = re.split(' +', free)
+	for iii in range(0, len(words)):
+		print "DEBUG: {:4d} {}".format( iii, words[iii])
+
+	meminfoarray = dict()
+	meminfo = subprocess.check_output(["/bin/cat", "/proc/meminfo"])
+	print "DEBUG: --->\n{}".format( meminfo )
+	line = re.split("\n", meminfo )
+	for iii in range(0, len(line)):
+#		print line[iii]
+		tok = re.split("[: ]*", line[iii])
+#		for jjj in range(0, len(tok)):
+#			print "{:5d} {}".format(jjj, tok[jjj])
+#		print "len = {}".format( len(tok) )
+		if len(tok) == 3 :
+			meminfoarray[ tok[0] ] = tok[1]
+	print meminfoarray
+
 	#                       Remove all the text portions - we want just the numbers
 	free = re.sub('.*total *used *free *shared *buffers *cached\n.*Mem: *', '', free)
 	free = re.sub('\n.*buffers/cache: *', ' ', free)
@@ -1812,26 +1955,23 @@ def mem_usage():
 
 	### for iii in range(0, len(words)):
 	### 	___print str(iii) + "  " + words[iii]
-	for iii in range(0, len(words)):
-		print str(iii) + "  " + words[iii]
-
 
 
 	mem_total = int(words[0])
-	mem_used = int(words[1])
-	mem_free = int(words[2])
+	mem_used = int(words[1])	# Not referenced
+	mem_free = int(words[2])	# Not referenced
 
-	shared = words[3]
-	buffers = words[4]
-	cached = words[5]
+	shared = words[3]		# Not referenced
+	buffers = words[4]		# Not referenced
+	cached = words[5]		# Not referenced
 
-	bu_ca_used = int(words[6])
+	bu_ca_used = int(words[6])	# Not referenced
 	bu_ca_free = int(words[7])
 
 	swap_total = int(words[8])
 	swap_used = int(words[9])
 	data['swap_used'] = swap_used
-	swap_free = int(words[10])
+	swap_free = int(words[10])	# Not referenced
 
 	swap_pct = 100 * swap_used / swap_total
 	data['swap_pct'] = swap_pct
