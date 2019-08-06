@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# @@@
 #
 # Restart using...
 #                                           kill -9 `cat /mnt/root/home/pi/watchdog.PID` ; nohup /usr/bin/python -u /mnt/root/home/pi/watchdog.py >> /mnt/root/home/pi/watchdog.log 2>&1 &
@@ -10,9 +11,11 @@
 #   nohup /usr/bin/python -u /mnt/root/home/pi/watchdog.py >> /mnt/root/home/pi/watchdog.log 2>&1 &
 #
 # ========================================================================================
-# 20190722 RAD Hacked up mem_usage() because I found 2 versions of Raspbian were
+# 20190805 RAD Output both a web page file, and the content to stdout which should work
+#              for cgi-bin.
+# 20190805 RAD Hacked up mem_usage() because I found 2 versions of Raspbian were
 #              generating rather different output fo the free command.
-# 20190722 RAD Copied watchdog.py. Wanted a separate status tool for Pi in general
+# 20190804 RAD Copied watchdog.py. Wanted a separate status tool for Pi in general
 #              which could be access via a web server.
 # ========================================================================================
 #
@@ -119,8 +122,10 @@ status_dir =            "/mnt/root/home/pi/status"
 status_page =           "/mnt/root/home/pi/pi_health.html"
 status_page =           "/mnt/root/home/pi/pi_health.html"
 status_page =           "/mnt/root/home/pi/pi_health.html"
-status_page =           "/mnt/root/home/pi/pi_health.html"
 status_page =           "/home/pi/pi_health.html"
+status_page =           "/mnt/root/home/pi/Cumulus_MX/interface/pi_health.html"
+
+
 
 logger_file = sys.argv[0]
 logger_file = re.sub('\.py', '.log', logger_file)
@@ -215,9 +220,13 @@ data_keys = [
 	"proc_load",
 	"proc_load_5m",
 	"effective_used",
+	"effective_used_xx",
 	"mem_pct",
+	"mem_pct_xx",
 	"swap_used",
+	"swap_used_xx",
 	"swap_pct",
+	"swap_pct_xx",
 	"cpu_temp_c",
 	"cpu_temp_f",
 	"python_version",
@@ -229,13 +238,17 @@ data_keys = [
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 # https://pyformat.info/
 data_format = [
-	"{} ago",
+	"{}",
 	"{:5.1f}%",
 	"{:7.2f}",
 	"{:7.2f}",
 	"{} bytes",
+	"{} bytes",
+	"{}&percnt;",
 	"{}&percnt;",
 	"{} bytes",
+	"{} bytes",
+	"{}&percnt;",
 	"{}&percnt;",
 	"{:6.1f} &deg;C",
 	"{:6.1f} &deg;F",
@@ -248,12 +261,15 @@ thresholds = [
 	4.0,
 	4.0,
 	-1,
+	-1,
+	15,
 	15,
 	1024,
+	1024,
+	1,
 	1,
 	55,
 	131,
-	100,
 	-1,
 	]
 	# amb_temp   {}
@@ -658,7 +674,7 @@ def server_stalled():
 	try:
 		response = urlopen( WS_Updates_URL )
 		content = response.read()
-#@@@#
+##
 	except ( URLError, Exception ) as err :
 	### >>>> except URLError as err :
 	# At one point got "httplib.BadStatusLine: ''" (unhandled) - See below
@@ -1028,7 +1044,7 @@ def rf_dropped() :
 #WU# This whole if block is never executed if saved_exception_tstamp never changes
 #WU#					logger_code =110
 #WU#					saved_exception_tstamp = exception_tstamp 
-#@@@#					pass
+##					pass
 					pass
 				else :
 					logger_code =111
@@ -1661,7 +1677,7 @@ def summarize():
 	FH.write( "Raspberry Pi Health\n" )
 	FH.write( "</H1>\n\n" )
 	# FH.write( "<P> &nbsp;\n\n" )
-	
+
 	FH.write( "<CENTER>\n")
 	FH.write( "<TABLE CELLPADDING=7><TR><TD VALIGN=\"TOP\">\n\n")
 
@@ -1675,12 +1691,12 @@ def summarize():
 			# print "   data {}  threshold {}".format( data[data_keys[iii]], thresholds[iii] )
 			if data[data_keys[iii]] > thresholds[iii] :
 				bgcolor = " BGCOLOR=\"red\""
-		
+
 		# format_str = "<TR><TD> {} </TD><TD ALIGN=right> " + data_format[iii]  + " </TD></TR>\n"
 		# FH.write( format_str.format( data_keys[iii], data[ data_keys[iii] ] ) )
 		# thresholds
 		format_str = "<TR><TD{}> {} </TD><TD ALIGN=right{}> " + data_format[iii]  + " </TD><TD ALIGN=right{}> {} </TD></TR>\n"
-#@@@
+#
 #		print " - - - - - - "
 #		print iii
 #		print data_format[iii]
@@ -1700,41 +1716,95 @@ def summarize():
 	# This is how often the page updates locally, but only to the web server every 5 minutes.
 	# FH.write( "<P ALIGN=center><FONT SIZE=-3> Updated every {} secs </FONT>".format( sleep_for * summary_stride ) )
 
-	FH.write( "<P> &nbsp;\n" )
-	FH.write( "<A HREF=\"Dilly_WX_Indoor.jpg\"><IMG SRC=\"Dilly_WX_Indoor_050.jpg\"></A>\n")
-	FH.write( "<BR><FONT SIZE=-3>CLICK TO ENLARGE</FONT>\n")
-	FH.write( "</CENTER>\n\n")
-	FH.write( "</TD></TR></TABLE>\n")
-	FH.write( "</CENTER>\n\n")
+#	FH.write( "<P> &nbsp;\n" )
+#	FH.write( "<A HREF=\"Dilly_WX_Indoor.jpg\"><IMG SRC=\"Dilly_WX_Indoor_050.jpg\"></A>\n")
+#	FH.write( "<BR><FONT SIZE=-3>CLICK TO ENLARGE</FONT>\n")
+#	FH.write( "</CENTER>\n\n")
+#	FH.write( "</TD></TR></TABLE>\n")
+#	FH.write( "</CENTER>\n\n")
 
-	FH.write( "<P> &nbsp;\n" )
-	FH.write( "<center><table style=\"width:100%;border-collapse: collapse; border-spacing: 0;\" >\n" )
-	FH.write( " <!-- FOOTER -->\n" )
-  	FH.write( "  <tr>\n" )
+#	FH.write( "<P> &nbsp;\n" )
+#	FH.write( "<center><table style=\"width:100%;border-collapse: collapse; border-spacing: 0;\" >\n" )
+#	FH.write( " <!-- FOOTER -->\n" )
+#  	FH.write( "  <tr>\n" )
 
-	FH.write( "    <td align=\"center\" class=\"td_navigation_bar\">:<a href=\"index.htm\">now</a>::<a href=\"gauges.htm\">gauges</a>:" + \
-		":<a href=\"today.htm\">today</a>::<a href=\"yesterday.htm\">yesterday</a>::<a href=\"thismonth.htm\">this&nbsp;month</a>:" + \
-		":<a href=\"thisyear.htm\">this&nbsp;year</a>:\n" )
-	FH.write( "    <br>:<a href=\"record.htm\">records</a>::<a href=\"monthlyrecord.htm\">monthly&nbsp;records</a>:" + \
-		":<a href=\"trends.htm\">trends</a>::<a TARGET=\"_blank\" HREF=\"http://sandaysoft.com/forum/\">forum</a>:" + \
-		":<a href=\"" + WEB_URL + "\">webcam</a>:\n" )
-	FH.write( "    <br>:<a TARGET=\"_blank\" HREF=\"https://app.weathercloud.net/d0208473809#current\">Weathercloud</a>:" + \
-		":<a TARGET=\"_blank\" HREF=\"https://www.pwsweather.com/obs/RADILLY.html\">PWS&nbsp;Weather</a>:" + \
-		":<a TARGET=\"_blank\" HREF=\"https://wx.aerisweather.com/local/us/pa/mcmurray\">AerisWeather</a>:" + \
-		":<a TARGET=\"_blank\" HREF=\"https://radar.weather.gov/Conus/full_loop.php\">NWS&nbsp;Composite&nbsp;US&nbsp;Radar</a>:\n" + \
-		":<a TARGET=\"_blank\" HREF=\"https://www.windy.com/40.279/-80.089?39.317,-80.089,7,m:eMiadVG\">Windy</a>:\n" )
-	FH.write( "    <br>:<a href=\"status.html\">Pi status</a>:" + \
-		":<a href=\"event_status.html\">Event&nbsp;Log</a>:\n" + \
-		":<a href=\"procs.html\">Check&nbsp;Procs</a>:\n" + \
-		":<a TARGET=\"_blank\" HREF=\"https://www.wunderground.com/personal-weather-station/dashboard?ID=KPAMCMUR4\">KPAMCMUR4</a>:</td>\n" )
+#	FH.write( "    <td align=\"center\" class=\"td_navigation_bar\">:<a href=\"index.htm\">now</a>::<a href=\"gauges.htm\">gauges</a>:" + \
+#		":<a href=\"today.htm\">today</a>::<a href=\"yesterday.htm\">yesterday</a>::<a href=\"thismonth.htm\">this&nbsp;month</a>:" + \
+#		":<a href=\"thisyear.htm\">this&nbsp;year</a>:\n" )
+#	FH.write( "    <br>:<a href=\"record.htm\">records</a>::<a href=\"monthlyrecord.htm\">monthly&nbsp;records</a>:" + \
+#		":<a href=\"trends.htm\">trends</a>::<a TARGET=\"_blank\" HREF=\"http://sandaysoft.com/forum/\">forum</a>:" + \
+#		":<a href=\"" + WEB_URL + "\">webcam</a>:\n" )
+#	FH.write( "    <br>:<a TARGET=\"_blank\" HREF=\"https://app.weathercloud.net/d0208473809#current\">Weathercloud</a>:" + \
+#		":<a TARGET=\"_blank\" HREF=\"https://www.pwsweather.com/obs/RADILLY.html\">PWS&nbsp;Weather</a>:" + \
+#		":<a TARGET=\"_blank\" HREF=\"https://wx.aerisweather.com/local/us/pa/mcmurray\">AerisWeather</a>:" + \
+#		":<a TARGET=\"_blank\" HREF=\"https://radar.weather.gov/Conus/full_loop.php\">NWS&nbsp;Composite&nbsp;US&nbsp;Radar</a>:\n" + \
+#		":<a TARGET=\"_blank\" HREF=\"https://www.windy.com/40.279/-80.089?39.317,-80.089,7,m:eMiadVG\">Windy</a>:\n" )
+#	FH.write( "    <br>:<a href=\"status.html\">Pi status</a>:" + \
+#		":<a href=\"event_status.html\">Event&nbsp;Log</a>:\n" + \
+#		":<a href=\"procs.html\">Check&nbsp;Procs</a>:\n" + \
+#		":<a TARGET=\"_blank\" HREF=\"https://www.wunderground.com/personal-weather-station/dashboard?ID=KPAMCMUR4\">KPAMCMUR4</a>:</td>\n" )
 
-  	FH.write( "  </tr>\n\n" )
-	FH.write( " </table></center>\n" )
+#  	FH.write( "  </tr>\n\n" )
+#	FH.write( " </table></center>\n" )
 
-	FH.write( "<P> &nbsp;\n" )
-	FH.write( "<P ALIGN=CENTER> Last updated: " + timestamp + " UTC\n" )
+#	FH.write( "<P> &nbsp;\n" )
+#	FH.write( "<P ALIGN=CENTER> Last updated: " + timestamp + " UTC\n" )
 
 	FH.close
+
+
+
+
+# ----------------------------------------------------------------------------------------
+# This generates a Raspberry Pi Status page, which Cumulus MX ftp's to the server.
+# It is mostly an HTML table.
+#
+# ----------------------------------------------------------------------------------------
+def status_table():
+
+	FH = open(status_page , "w")
+
+	print ( "<HEAD><TITLE>\n" )
+	print ( "Raspberry Pi Health\n" )
+	print ( "</TITLE></HEAD><BODY BGCOLOR=\"#555555\" TEXT=\"#FFFFFF\" LINK=\"#FFFF00\" VLINK=\"#FFBB00\" ALINK=\"#FFAAFF\"><H1 ALIGN=center>\n" )
+	print ( "Raspberry Pi Health\n" )
+	print ( "</H1>\n\n" )
+	# print ( "<P> &nbsp;\n\n" )
+
+	print ( "<CENTER>\n")
+	print ( "<TABLE CELLPADDING=7><TR><TD VALIGN=\"TOP\">\n\n")
+
+	print ( "<CENTER>\n")
+	print ( "<TABLE BORDER=1>\n" )
+	print ( "<TR><TH> Parameter </TH><TH> Current Value </TH><TH> Threshold </TH</TR>\n" )
+	# NOTE: We may not choose to print everything in data[]
+	for iii in range(0, len(data_keys)):
+		bgcolor = ""
+		if thresholds[iii] > -1 :
+			# print "   data {}  threshold {}".format( data[data_keys[iii]], thresholds[iii] )
+			if data[data_keys[iii]] > thresholds[iii] :
+				bgcolor = " BGCOLOR=\"red\""
+
+		# format_str = "<TR><TD> {} </TD><TD ALIGN=right> " + data_format[iii]  + " </TD></TR>\n"
+		# print ( format_str.format( data_keys[iii], data[ data_keys[iii] ] ) )
+		# thresholds
+		format_str = "<TR><TD{}> {} </TD><TD ALIGN=right{}> " + data_format[iii]  + " </TD><TD ALIGN=right{}> {} </TD></TR>\n"
+#
+#		print " - - - - - - "
+#		print iii
+#		print data_format[iii]
+#		print bgcolor
+#		print data_keys[iii]
+#		print data[data_keys[iii]]
+#		print thresholds[iii]
+		print ( format_str.format( bgcolor, data_keys[iii], bgcolor, data[data_keys[iii]], bgcolor, thresholds[iii] ) )
+
+	print ( "<TR><TD COLSPAN=3 ALIGN=center><FONT SIZE=-1>\n" )
+	print ( datetime.datetime.utcnow().strftime(strftime_FMT) + " GMT" )
+	print ( "<BR> " + datetime.datetime.now().strftime(strftime_FMT) + " Local" )
+	print ( "</FONT></TD></TR>\n" )
+
+	print ( "</TABLE>\n" )
 
 
 
@@ -1756,7 +1826,112 @@ def read_cpu_temp():
 
 
 
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+#               CURRENTLY RETURNS A STRING RATHER THAN A BINARY
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# NOTE: Data is stored into the data[] array, so this could be converted to returning
+#       a binary return code.
+#
+# Examine the output from the free command - particularly focusing on swap usage.
+# Could also read /proc/meminfo
+#
+# Empirically, after running about a month, it seems we start using swap a little
+# at a time.  Literally a few bytes a day or half-day are added - far less than 1%
+# after a week perhaps.
+#
+#                total       used       free     shared    buffers     cached
+#   Mem:        945512     307040     638472       6768      83880     128100
+#   -/+ buffers/cache:      95060     850452
+#   Swap:       102396          0     102396
+#
+#   0  945512
+#   1  311232
+#   2  634280
+#   3  6768
+#   4  83880
+#   5  128100
+#   6  99252
+#   7  846260
+#   8  102396
+#   9  0
+#   10  102396
+#
+# See:
+#   http://www.linuxatemyram.com/http://www.linuxatemyram.com/
+#   http://www.linuxnix.com/find-ram-size-in-linuxunix/
+#
+# ----------------------------------------------------------------------------------------
+def mem_usage():
+	global data
+	free = subprocess.check_output('/usr/bin/free')
+	#                       Remove all the text portions - we want just the numbers
+	free = re.sub('.*total *used *free *shared *buffers *cached\n.*Mem: *', '', free)
+	free = re.sub('\n.*buffers/cache: *', ' ', free)
+	free = re.sub('Swap: *', ' ', free)
+	free = re.sub('\n', ' ', free)                    # Remove any newline which might be left
+	free = re.sub(' +', ' ', free)                    # Reduce multiple spaces to 1
+	free = re.sub(' $', '', free)                     # Trim any trailing blank
+	words = re.split(' +', free)
 
+	# free|945512|908692|36820|3732|244416|226828|437448|508064|102396|3064|99332
+
+	if (len(words)) < 11 :
+		messager( "WARNING:  Expecting 11 tokens from \"free\", but got " + str(mem_pct)  )
+
+	### for iii in range(0, len(words)):
+	### 	___print str(iii) + "  " + words[iii]
+
+	mem_total = int(words[0])
+	mem_used = int(words[1])
+	mem_free = int(words[2])
+
+	shared = words[3]
+	buffers = words[4]
+	cached = words[5]
+
+	bu_ca_used = int(words[6])
+	bu_ca_free = int(words[7])
+
+	swap_total = int(words[8])
+	swap_used = int(words[9])
+	data['swap_used'] = swap_used
+	swap_free = int(words[10])
+
+	swap_pct = 100 * swap_used / swap_total
+	data['swap_pct'] = swap_pct
+	effective_used = mem_total - bu_ca_free
+	data['effective_used'] = effective_used
+	mem_pct = 100 * effective_used / mem_total
+	data['mem_pct'] = mem_pct
+	# This was misleading...
+	# mem_pct = 100 * mem_used / mem_total
+	if mem_pct > mem_usage_lim :
+		messager( "WARNING:  " + str(mem_pct) + "% mem in use" )
+
+	# free = re.sub(' ', '|', free)                     # Replace each blank with a |
+
+	cpu_temp = read_cpu_temp()
+	data['cpu_temp_c'] = cpu_temp
+	cpu_temp_f = ( cpu_temp * 1.8 ) + 32
+	data['cpu_temp_f'] = cpu_temp_f
+
+	return " {:6d}, {:2d}%, {:6d}, {:2d}%, {:4.1f}c, {:5.1f}f,".format(effective_used, mem_pct, swap_used, swap_pct, \
+		cpu_temp, cpu_temp_f )
+
+
+# @@@
+
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+#              T  E  S  T  I  N  G             T  E  S  T  I  N  G
+#              T  E  S  T  I  N  G             T  E  S  T  I  N  G
+#              T  E  S  T  I  N  G             T  E  S  T  I  N  G
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 #               CURRENTLY RETURNS A STRING RATHER THAN A BINARY
@@ -1908,26 +2083,26 @@ def read_cpu_temp():
 #   SwapCached:            0 kB
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
-def mem_usage():
+def mem_usage_xx():
 	global data
 
-	free = subprocess.check_output(["/usr/bin/lsb_release", "-a"])
-	print "DEBUG: --->\n{}".format( free )
+#	free = subprocess.check_output(["/usr/bin/lsb_release", "-a"])
+#	print "DEBUG: --->\n{}".format( free )
 
-	free = subprocess.check_output(["/usr/bin/free", "-V"])
-	print "DEBUG: --->\n{}".format( free )
+#	free = subprocess.check_output(["/usr/bin/free", "-V"])
+#	print "DEBUG: --->\n{}".format( free )
 
 	free = subprocess.check_output(["/usr/bin/free"])
 
-	print "DEBUG: --->\n{}".format( free )
+#	print "DEBUG: --->\n{}".format( free )
 
-	words = re.split(' +', free)
-	for iii in range(0, len(words)):
-		print "DEBUG: {:4d} {}".format( iii, words[iii])
+#	words = re.split(' +', free)
+#	for iii in range(0, len(words)):
+#		print "DEBUG: {:4d} {}".format( iii, words[iii])
 
 	meminfoarray = dict()
 	meminfo = subprocess.check_output(["/bin/cat", "/proc/meminfo"])
-	print "DEBUG: --->\n{}".format( meminfo )
+#	print "DEBUG: --->\n{}".format( meminfo )
 	line = re.split("\n", meminfo )
 	for iii in range(0, len(line)):
 #		print line[iii]
@@ -1937,62 +2112,23 @@ def mem_usage():
 #		print "len = {}".format( len(tok) )
 		if len(tok) == 3 :
 			meminfoarray[ tok[0] ] = tok[1]
-	print meminfoarray
-
-	#                       Remove all the text portions - we want just the numbers
-	free = re.sub('.*total *used *free *shared *buffers *cached\n.*Mem: *', '', free)
-	free = re.sub('\n.*buffers/cache: *', ' ', free)
-	free = re.sub('Swap: *', ' ', free)
-	free = re.sub('\n', ' ', free)                    # Remove any newline which might be left
-	free = re.sub(' +', ' ', free)                    # Reduce multiple spaces to 1
-	free = re.sub(' $', '', free)                     # Trim any trailing blank
-	words = re.split(' +', free)
-
-	# free|945512|908692|36820|3732|244416|226828|437448|508064|102396|3064|99332
-
-	if (len(words)) < 11 :
-		messager( "WARNING:  Expecting 11 tokens from \"free\", but got " + str(mem_pct)  )
-
-	### for iii in range(0, len(words)):
-	### 	___print str(iii) + "  " + words[iii]
+#	print meminfoarray
 
 
-	mem_total = int(words[0])
-	mem_used = int(words[1])	# Not referenced
-	mem_free = int(words[2])	# Not referenced
+	data['swap_used_xx'] = int( meminfoarray["SwapTotal"] ) - int( meminfoarray["SwapFree"] )
+	data['swap_pct_xx'] = 100 * (int( meminfoarray["SwapTotal"] ) - int( meminfoarray["SwapFree"] )) / int( meminfoarray["SwapTotal"] )
+	data['effective_used_xx'] = int( meminfoarray["MemTotal"] ) - int( meminfoarray["MemAvailable"] )
+	data['mem_pct_xx'] = 100 * (int( meminfoarray["MemTotal"] ) - int( meminfoarray["MemAvailable"] )) / int( meminfoarray["MemTotal"] )
 
-	shared = words[3]		# Not referenced
-	buffers = words[4]		# Not referenced
-	cached = words[5]		# Not referenced
 
-	bu_ca_used = int(words[6])	# Not referenced
-	bu_ca_free = int(words[7])
-
-	swap_total = int(words[8])
-	swap_used = int(words[9])
-	data['swap_used'] = swap_used
-	swap_free = int(words[10])	# Not referenced
-
-	swap_pct = 100 * swap_used / swap_total
-	data['swap_pct'] = swap_pct
-	effective_used = mem_total - bu_ca_free
-	data['effective_used'] = effective_used 
-	mem_pct = 100 * effective_used / mem_total
-	data['mem_pct'] = mem_pct
-	# This was misleading...
-	# mem_pct = 100 * mem_used / mem_total
-	if mem_pct > mem_usage_lim :
-		messager( "WARNING:  " + str(mem_pct) + "% mem in use" )
-
-	# free = re.sub(' ', '|', free)                     # Replace each blank with a |
 
 	cpu_temp = read_cpu_temp()
 	data['cpu_temp_c'] = cpu_temp
 	cpu_temp_f = ( cpu_temp * 1.8 ) + 32
 	data['cpu_temp_f'] = cpu_temp_f
 
-	return " {:6d}, {:2d}%, {:6d}, {:2d}%, {:4.1f}c, {:5.1f}f,".format(effective_used, mem_pct, swap_used, swap_pct, \
-		cpu_temp, cpu_temp_f )
+###	return " {:6d}, {:2d}%, {:6d}, {:2d}%, {:4.1f}c, {:5.1f}f,".format(effective_used_xx, mem_pct_xx, swap_used_xx, swap_pct_xx, \
+###		cpu_temp, cpu_temp_f )
 
 
 
@@ -2056,7 +2192,9 @@ def make_page() :
 	proc_load()
 	proc_pct()
 	mem_usage()
+	mem_usage_xx()
 
+	status_table()
 	summarize()
 
 	exit()
