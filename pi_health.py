@@ -122,8 +122,10 @@ status_dir =            "/mnt/root/home/pi/status"
 status_page =           "/mnt/root/home/pi/pi_health.html"
 status_page =           "/mnt/root/home/pi/pi_health.html"
 status_page =           "/mnt/root/home/pi/pi_health.html"
-status_page =           "/home/pi/pi_health.html"
+status_page =           "/mnt/root/home/pi/pi_health.html"
+status_page =           "/mnt/root/home/pi/pi_health.html"
 status_page =           "/mnt/root/home/pi/Cumulus_MX/interface/pi_health.html"
+status_page =           "/home/pi/pi_health.html"
 
 
 
@@ -1762,8 +1764,7 @@ def summarize():
 # ----------------------------------------------------------------------------------------
 def status_table():
 
-	FH = open(status_page , "w")
-
+        print ( "Content-type: text/html\n\n\n\n" )
 	print ( "<HEAD><TITLE>\n" )
 	print ( "Raspberry Pi Health\n" )
 	print ( "</TITLE></HEAD><BODY BGCOLOR=\"#555555\" TEXT=\"#FFFFFF\" LINK=\"#FFFF00\" VLINK=\"#FFBB00\" ALINK=\"#FFAAFF\"><H1 ALIGN=center>\n" )
@@ -1883,32 +1884,37 @@ def mem_usage():
 	### for iii in range(0, len(words)):
 	### 	___print str(iii) + "  " + words[iii]
 
-	mem_total = int(words[0])
-	mem_used = int(words[1])
-	mem_free = int(words[2])
+#	mem_total = int(words[0])
+#	mem_used = int(words[1])
+#	mem_free = int(words[2])
 
-	shared = words[3]
-	buffers = words[4]
-	cached = words[5]
+#	shared = words[3]
+#	buffers = words[4]
+#	cached = words[5]
 
-	bu_ca_used = int(words[6])
-	bu_ca_free = int(words[7])
+#	bu_ca_used = int(words[6])
+#	bu_ca_free = int(words[7])
 
-	swap_total = int(words[8])
-	swap_used = int(words[9])
-	data['swap_used'] = swap_used
-	swap_free = int(words[10])
+#	swap_total = int(words[8])
+#	swap_used = int(words[9])
+#	data['swap_used'] = swap_used
+#	swap_free = int(words[10])
 
-	swap_pct = 100 * swap_used / swap_total
-	data['swap_pct'] = swap_pct
-	effective_used = mem_total - bu_ca_free
-	data['effective_used'] = effective_used
-	mem_pct = 100 * effective_used / mem_total
-	data['mem_pct'] = mem_pct
+#	swap_pct = 100 * swap_used / swap_total
+#	data['swap_pct'] = swap_pct
+#	effective_used = mem_total - bu_ca_free
+#	data['effective_used'] = effective_used
+#	mem_pct = 100 * effective_used / mem_total
+#	data['mem_pct'] = mem_pct
 	# This was misleading...
 	# mem_pct = 100 * mem_used / mem_total
-	if mem_pct > mem_usage_lim :
-		messager( "WARNING:  " + str(mem_pct) + "% mem in use" )
+#	if mem_pct > mem_usage_lim :
+#		messager( "WARNING:  " + str(mem_pct) + "% mem in use" )
+
+	data['swap_used'] = 0
+	data['swap_pct'] = 0
+	data['effective_used'] = 0
+	data['mem_pct'] = 0
 
 	# free = re.sub(' ', '|', free)                     # Replace each blank with a |
 
@@ -1916,6 +1922,10 @@ def mem_usage():
 	data['cpu_temp_c'] = cpu_temp
 	cpu_temp_f = ( cpu_temp * 1.8 ) + 32
 	data['cpu_temp_f'] = cpu_temp_f
+	effective_used = 0
+	mem_pct = 0
+	swap_used = 0
+	swap_pct = 0
 
 	return " {:6d}, {:2d}%, {:6d}, {:2d}%, {:4.1f}c, {:5.1f}f,".format(effective_used, mem_pct, swap_used, swap_pct, \
 		cpu_temp, cpu_temp_f )
@@ -2195,7 +2205,7 @@ def make_page() :
 	mem_usage_xx()
 
 	status_table()
-	summarize()
+#	summarize()
 
 	exit()
 	exit()
