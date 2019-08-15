@@ -1,16 +1,16 @@
 #!/usr/bin/python
 # @@@
 #
-# Restart using...
-#                                           kill -9 `cat /mnt/root/home/pi/watchdog.PID` ; nohup /usr/bin/python -u /mnt/root/home/pi/watchdog.py >> /mnt/root/home/pi/watchdog.log 2>&1 &
+#  This is intended to be run as a cgi-bin script.
+#  It collects some information about the state of the system and renders a web page.
+#  If copied to apache folder /usr/lib/cgi-bin/pi_health.py it can be accessed as
+#      http://192.168.1.172/cgi-bin/pi_health.py  -  for example...
 #
-# Stop with ... 
-#   kill -9 `cat watchdog.PID`
-#
-# Start with ...
-#   nohup /usr/bin/python -u /mnt/root/home/pi/watchdog.py >> /mnt/root/home/pi/watchdog.log 2>&1 &
 #
 # ========================================================================================
+# 20190815 RAD Tested as a cgi-bin page.  Added the ability to have yellow and red-shaded
+#              rows to indicate the severity of the paramemter.  Still has a lot of junk
+#              and dead code but it's working well enough to deploy across my Pis.
 # 20190805 RAD Output both a web page file, and the content to stdout which should work
 #              for cgi-bin.
 # 20190805 RAD Hacked up mem_usage() because I found 2 versions of Raspbian were
@@ -19,38 +19,52 @@
 #              which could be access via a web server.
 # ========================================================================================
 #
+#  On Installing and Configuring Apache2
+#      sudo apt-get update && sudo apt-get upgrade
+#      sudo apt-get install apache2
+#      ifconfig
+#
+#   If you have trouble copying and pasting into edited file...
+#      sudo ls -al /root
+#      sudo cp /home/pi/.vimrc /root
+#      sudo vi /etc/apache2/conf-available/serve-cgi-bin.conf
+#   Insert line "AddHandler cgi-script .py" above </Directory> as shown...
+#             <IfDefine ENABLE_USR_LIB_CGI_BIN>
+#                     ScriptAlias /cgi-bin/ /usr/lib/cgi-bin/
+#                     <Directory "/usr/lib/cgi-bin">
+#                             AllowOverride None
+#                             Options +ExecCGI -MultiViews +SymLinksIfOwnerMatch
+#                             Require all granted
+#                             AddHandler cgi-script .py          #https://www.raspberrypi.org/forums/viewtopic.php?t=155229
+#                     </Directory>
+#             </IfDefine>
+#
+#   This did not work...
+#      sudo ln -s /home/pi/webcamwatcher/pi_health.py  /usr/lib/cgi-bin/
+#      ls -la /usr/lib/cgi-bin/
+#
+#   Check error log...
+#      less /var/log/apache2/error.log
+#
+#   May not be necessary...
+#      sudo reboot
+#
+#      sudo a2enmod cgi
+#      sudo systemctl -l restart apache2
+#
+#      sudo ln -s /home/pi/webcamwatcher/pi_health.py  /usr/lib/cgi-bin/
+#   Did not work
+#      sudo rm /usr/lib/cgi-bin/pi_health.py 
+#      sudo cp /home/pi/webcamwatcher/pi_health.py  /usr/lib/cgi-bin/
+#   Worked!!
+#
+#   Check... (without browser)
+#      curl localhost/cgi-bin/pi_health.py
 #
 #
-#   NOTE: It would be interesting to see if we could log any "significant"
-#         change to a parameter being tracked.  mono_threads comes to mind.
-#         It seems to change in "jumps."  Link more than 2X in a few minutes.
-#
-#
-# This is a first hack to see if I can prove the concept of, basically a
-# watchdog running on a Pi that will detect when images stopped uploading
-# from my webcam, and then power-cycle the sucker.
-#
-# Posted on this to http://sandaysoft.com/forum/viewtopic.php?f=27&t=16448
-#
-# Invoke with ...  python -u ./webcamwatch.py 2>&1 | tee -a webcamwatch.txt
-#       The -u should bypass any I/O caching
-#
-# https://stackoverflow.com/questions/22676/how-do-i-download-a-file-over-http-using-python
-# Inverted signals to use the NC side of the relay...
-#
-# https://stackoverflow.com/questions/21662783/linux-tee-is-not-working-with-python
-# The -u option works fine.  However, sys.stdout.flush() wouldn't depend on
-# the command line.  My concern though, on a Pi, is that without buffering
-# you're going to hammer the SD Card over time.  Buffering might help, or
-# reducing the output.
-# ========================================================================================
-# ========================================================================================
-#
-#
-#
-#  https://stackoverflow.com/questions/21535467/querying-process-load-in-python
-#
-#  I noticed 10-12 active processes at one point when Cumulus was sluggish...
+#      systemctl -l status apache2
+#      ls -al /var/log/apache2/
+#      ls -la /usr/lib/cgi-bin/
 #
 #
 # ========================================================================================
@@ -257,6 +271,7 @@ data_format = [
 	"{}",
 	]
 
+
 thresholds = [
 	-1,
 	10.0,
@@ -274,7 +289,25 @@ thresholds = [
 	131,
 	-1,
 	]
-	# amb_temp   {}
+
+# https://snakify.org/en/lessons/two_dimensional_lists_arrays/
+threshold_matrix = [
+	[     -1,    -1  ],    # "system_uptime",
+	[   10.0,  10.0  ],    # "proc_pct",
+	[    4.0,   4.0  ],    # "proc_load",
+	[    4.0,   4.0  ],    # "proc_load_5m",
+	[     -1,    -1  ],    # "effective_used",
+	[     -1,    -1  ],    # "effective_used_xx",
+	[     15,    25  ],    # "mem_pct",
+	[     15,    25  ],    # "mem_pct_xx",
+	[   1024,  2048  ],    # "swap_used",
+	[   1024,  2048  ],    # "swap_used_xx",
+	[      1,     5  ],    # "swap_pct",
+	[      1,     5  ],    # "swap_pct_xx",
+	[     50,    55  ],    # "cpu_temp_c",
+	[    122,   131  ],    # "cpu_temp_f",
+	[     -1,    -1  ],    # "python_version",
+	]
 
 
 # ----------------------------------------------------------------------------------------
@@ -1685,14 +1718,25 @@ def summarize():
 
 	FH.write( "<CENTER>\n")
 	FH.write( "<TABLE BORDER=1>\n" )
-	FH.write( "<TR><TH> Parameter </TH><TH> Current Value </TH><TH> Threshold </TH</TR>\n" )
+	FH.write( "<TR><TH> Parameter </TH><TH> Current Value </TH><TH> Thresholds </TH</TR>\n" )
 	# NOTE: We may not choose to print everything in data[]
 	for iii in range(0, len(data_keys)):
 		bgcolor = ""
 		if thresholds[iii] > -1 :
 			# print "   data {}  threshold {}".format( data[data_keys[iii]], thresholds[iii] )
-			if data[data_keys[iii]] > thresholds[iii] :
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
+			#if data[data_keys[iii]] > thresholds[iii] :
+			#	bgcolor = " BGCOLOR=\"red\""
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
+			if data[data_keys[iii]] > threshold_matrix[iii][1] :
 				bgcolor = " BGCOLOR=\"red\""
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
 
 		# format_str = "<TR><TD> {} </TD><TD ALIGN=right> " + data_format[iii]  + " </TD></TR>\n"
 		# FH.write( format_str.format( data_keys[iii], data[ data_keys[iii] ] ) )
@@ -1783,13 +1827,36 @@ def status_table():
 		bgcolor = ""
 		if thresholds[iii] > -1 :
 			# print "   data {}  threshold {}".format( data[data_keys[iii]], thresholds[iii] )
-			if data[data_keys[iii]] > thresholds[iii] :
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
+			#if data[data_keys[iii]] > thresholds[iii] :
+			#	bgcolor = " BGCOLOR=\"red\""
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
+			if data[data_keys[iii]] > threshold_matrix[iii][1] :
 				bgcolor = " BGCOLOR=\"red\""
+				bgcolor = " BGCOLOR=\"#DD000\""
+			elif data[data_keys[iii]] > threshold_matrix[iii][0] :
+				bgcolor = " BGCOLOR=\"yellow\""
+				bgcolor = " BGCOLOR=\"#BBBB00\""
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
 
 		# format_str = "<TR><TD> {} </TD><TD ALIGN=right> " + data_format[iii]  + " </TD></TR>\n"
 		# print ( format_str.format( data_keys[iii], data[ data_keys[iii] ] ) )
 		# thresholds
 		format_str = "<TR><TD{}> {} </TD><TD ALIGN=right{}> " + data_format[iii]  + " </TD><TD ALIGN=right{}> {} </TD></TR>\n"
+		format_str = "<TR><TD{}> {} </TD><TD ALIGN=right{}> " + data_format[iii]  + " </TD><TD ALIGN=right{}> {}, {} </TD></TR>\n"
 #
 #		print " - - - - - - "
 #		print iii
@@ -1798,7 +1865,14 @@ def status_table():
 #		print data_keys[iii]
 #		print data[data_keys[iii]]
 #		print thresholds[iii]
-		print ( format_str.format( bgcolor, data_keys[iii], bgcolor, data[data_keys[iii]], bgcolor, thresholds[iii] ) )
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
+#		print ( format_str.format( bgcolor, data_keys[iii], bgcolor, data[data_keys[iii]], bgcolor, thresholds[iii] ) )
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
+			# ----------------------------------------------------------------------
+		print ( format_str.format( bgcolor, data_keys[iii], bgcolor, data[data_keys[iii]], bgcolor, threshold_matrix[iii][0], threshold_matrix[iii][1] ) )
 
 	print ( "<TR><TD COLSPAN=3 ALIGN=center><FONT SIZE=-1>\n" )
 	print ( datetime.datetime.utcnow().strftime(strftime_FMT) + " GMT" )
