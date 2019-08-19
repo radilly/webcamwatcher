@@ -8,6 +8,8 @@
 #
 #
 # ========================================================================================
+# 20190819 RAD Added hostname(). Tinkered with colors a little. Working, but still has
+#              dead code.
 # 20190815 RAD Tested as a cgi-bin page.  Added the ability to have yellow and red-shaded
 #              rows to indicate the severity of the paramemter.  Still has a lot of junk
 #              and dead code but it's working well enough to deploy across my Pis.
@@ -231,6 +233,7 @@ data['camera_down'] = 0
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 #
 data_keys = [
+	"hostname",
 	"system_uptime",
 	"proc_pct",
 	"proc_load",
@@ -255,6 +258,7 @@ data_keys = [
 # https://pyformat.info/
 data_format = [
 	"{}",
+	"{}",
 	"{:5.1f}%",
 	"{:7.2f}",
 	"{:7.2f}",
@@ -274,6 +278,7 @@ data_format = [
 
 thresholds = [
 	-1,
+	-1,
 	10.0,
 	4.0,
 	4.0,
@@ -292,16 +297,17 @@ thresholds = [
 
 # https://snakify.org/en/lessons/two_dimensional_lists_arrays/
 threshold_matrix = [
+	[     -1,    -1  ],    # "hostname",
 	[     -1,    -1  ],    # "system_uptime",
 	[   10.0,  10.0  ],    # "proc_pct",
-	[    4.0,   4.0  ],    # "proc_load",
+	[    1.0,   2.0  ],    # "proc_load",
 	[    4.0,   4.0  ],    # "proc_load_5m",
 	[     -1,    -1  ],    # "effective_used",
 	[     -1,    -1  ],    # "effective_used_xx",
 	[     15,    25  ],    # "mem_pct",
-	[     15,    25  ],    # "mem_pct_xx",
+	[     20,    25  ],    # "mem_pct_xx",
 	[   1024,  2048  ],    # "swap_used",
-	[   1024,  2048  ],    # "swap_used_xx",
+	[    512,  2048  ],    # "swap_used_xx",
 	[      1,     5  ],    # "swap_pct",
 	[      1,     5  ],    # "swap_pct_xx",
 	[     50,    55  ],    # "cpu_temp_c",
@@ -891,6 +897,20 @@ def last_realtime():
 
 
 # ----------------------------------------------------------------------------------------
+# hostname - get the bane of the system
+#
+#
+# ----------------------------------------------------------------------------------------
+def hostname():
+	global data
+	name = subprocess.check_output('/bin/hostname')
+	data['hostname'] = name.rstrip()
+
+
+
+
+
+# ----------------------------------------------------------------------------------------
 # uptime  gives  a one line display of the following information.  The current time,
 # how long the system has been running, how many users are currently logged on,  and
 # the system load averages for the past 1, 5, and 15 minutes.
@@ -924,7 +944,7 @@ def proc_load():
 			"\t\t 1 minute load average = " + str(cur_proc_load) )
 	data['proc_load'] = cur_proc_load
 	data['proc_load_5m'] = proc_load_5m
-	data['system_uptime'] = uptime
+	data['system_uptime'] = uptime.rstrip()
 	return cur_proc_load
 
 
@@ -1708,7 +1728,7 @@ def summarize():
 
 	FH.write( "<HEAD><TITLE>\n" )
 	FH.write( "Raspberry Pi Health\n" )
-	FH.write( "</TITLE></HEAD><BODY BGCOLOR=\"#555555\" TEXT=\"#FFFFFF\" LINK=\"#FFFF00\" VLINK=\"#FFBB00\" ALINK=\"#FFAAFF\"><H1 ALIGN=center>\n" )
+	FH.write( "</TITLE></HEAD><BODY BGCOLOR=\"#BBBBBB\" TEXT=\"#000000\" LINK=\"#FFFF00\" VLINK=\"#FFBB00\" ALINK=\"#FFAAFF\"><H1 ALIGN=center>\n" )
 	FH.write( "Raspberry Pi Health\n" )
 	FH.write( "</H1>\n\n" )
 	# FH.write( "<P> &nbsp;\n\n" )
@@ -1811,7 +1831,7 @@ def status_table():
         print ( "Content-type: text/html\n\n\n\n" )
 	print ( "<HEAD><TITLE>\n" )
 	print ( "Raspberry Pi Health\n" )
-	print ( "</TITLE></HEAD><BODY BGCOLOR=\"#555555\" TEXT=\"#FFFFFF\" LINK=\"#FFFF00\" VLINK=\"#FFBB00\" ALINK=\"#FFAAFF\"><H1 ALIGN=center>\n" )
+	print ( "</TITLE></HEAD><BODY BGCOLOR=\"#BBBBBB\" TEXT=\"#010101\" LINK=\"#FFFF00\" VLINK=\"#FFBB00\" ALINK=\"#FFAAFF\"><H1 ALIGN=center>\n" )
 	print ( "Raspberry Pi Health\n" )
 	print ( "</H1>\n\n" )
 	# print ( "<P> &nbsp;\n\n" )
@@ -1821,7 +1841,8 @@ def status_table():
 
 	print ( "<CENTER>\n")
 	print ( "<TABLE BORDER=1>\n" )
-	print ( "<TR><TH> Parameter </TH><TH> Current Value </TH><TH> Threshold </TH</TR>\n" )
+	print ( "<TR><TH> Parameter </TH><TH> Current Value </TH><TH> Thresholds </TH</TR>\n" )
+	print ( "<TR><TH> &nbsp; </TH><TH> &nbsp; </TH><TH> yellow, red </TH</TR>\n" )
 	# NOTE: We may not choose to print everything in data[]
 	for iii in range(0, len(data_keys)):
 		bgcolor = ""
@@ -1843,8 +1864,8 @@ def status_table():
 				bgcolor = " BGCOLOR=\"red\""
 				bgcolor = " BGCOLOR=\"#DD000\""
 			elif data[data_keys[iii]] > threshold_matrix[iii][0] :
-				bgcolor = " BGCOLOR=\"yellow\""
 				bgcolor = " BGCOLOR=\"#BBBB00\""
+				bgcolor = " BGCOLOR=\"yellow\" FGCOLOR=\"black\""
 			# ----------------------------------------------------------------------
 			# ----------------------------------------------------------------------
 			# ----------------------------------------------------------------------
@@ -1856,6 +1877,8 @@ def status_table():
 		# print ( format_str.format( data_keys[iii], data[ data_keys[iii] ] ) )
 		# thresholds
 		format_str = "<TR><TD{}> {} </TD><TD ALIGN=right{}> " + data_format[iii]  + " </TD><TD ALIGN=right{}> {} </TD></TR>\n"
+		format_str = "<TR><TD{}> {} </TD><TD ALIGN=right{}> <B><FONT COLOR=\"black\"> " + data_format[iii]  + " </TD><TD ALIGN=right{}> {}, {} </TD></TR>\n"
+
 		format_str = "<TR><TD{}> {} </TD><TD ALIGN=right{}> " + data_format[iii]  + " </TD><TD ALIGN=right{}> {}, {} </TD></TR>\n"
 #
 #		print " - - - - - - "
@@ -2273,6 +2296,7 @@ def make_page() :
 	#   messager("INFO: Python version: " + str(sys.version))
 	data['python_version'] = python_version
 
+	hostname()
 	proc_load()
 	proc_pct()
 	mem_usage()
