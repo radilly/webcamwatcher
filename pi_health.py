@@ -8,35 +8,9 @@
 #      http://192.168.1.172/cgi-bin/pi_health.py  -  for example...
 #
 # ----------------------------------------------------------------------------------------
-# 	main():
-# proc_pct() :
-# 	mono_threads():
-# 	log_event(ID, description, code):
-# 	ws_data_stopped():
-# 	server_stalled():
-# 	last_realtime():
-# hostname():
-# proc_load():
-# 	WX_RF_Restored(cur_line, lineList):
-# 	rf_dropped() :
-# 	camera_down():
-# 	cmx_svc_runtime():
-# 	webcamwatch_down():
-# 	amb_temp():
-# logger(message):
-# messager(message):
-# log_and_message(message):
-# 	write_pid_file():
-# 	summarize():
-# status_table():
-# read_cpu_temp():
-# mem_usage():
-# mem_usage_xx():
-# make_page() :
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
 #
 # ========================================================================================
+# 20190820 RAD Added a bgcolor to every tracked row.  Removed a little more commentary.
 # 20190820 RAD Cleaned out most of the dead code.
 # 20190819 RAD Added hostname(). Tinkered with colors a little. Working, but still has
 #              dead code.
@@ -129,18 +103,6 @@ import subprocess
 proc_load_lim = 4.0         # NOTE: This should be removed...
 
 
-
-BASE_DIR =              "/mnt/root/home/pi/Cumulus_MX"
-status_page =           BASE_DIR + "/web/status.html"
-status_page =           "/mnt/root/home/pi/pi_health.html"
-status_page =           "/mnt/root/home/pi/pi_health.html"
-status_page =           "/mnt/root/home/pi/pi_health.html"
-status_page =           "/mnt/root/home/pi/pi_health.html"
-status_page =           "/mnt/root/home/pi/pi_health.html"
-status_page =           "/mnt/root/home/pi/Cumulus_MX/interface/pi_health.html"
-status_page =           "/home/pi/pi_health.html"
-
-
 proc_stat_busy = -1		# Sentinal value
 proc_stat_idle = -1
 proc_stat_hist = []		# Holds last proc_stat_hist_n samples
@@ -196,15 +158,17 @@ data_format = [
 
 
 # https://snakify.org/en/lessons/two_dimensional_lists_arrays/
+# I considered how to externalize this, but haven't come up with anything clever
+# when running under apache
 threshold_matrix = [
 	[     -1,    -1  ],    # "hostname",
 	[     -1,    -1  ],    # "system_uptime",
-	[   10.0,  10.0  ],    # "proc_pct",
+	[    8.0,  16.0  ],    # "proc_pct",
 	[    1.0,   2.0  ],    # "proc_load",
 	[    4.0,   4.0  ],    # "proc_load_5m",
 	[     -1,    -1  ],    # "effective_used",
 	[     15,    25  ],    # "mem_pct",
-	[   1024,  2048  ],    # "swap_used",
+	[   1024,  4096  ],    # "swap_used",
 	[      1,     5  ],    # "swap_pct",
 	[     50,    55  ],    # "cpu_temp_c",
 	[    122,   131  ],    # "cpu_temp_f",
@@ -245,24 +209,25 @@ def proc_pct() :
 	idle = int(tok[4]) + int(tok[5])
 	busy = int(tok[1]) + int(tok[2]) + int(tok[3]) + int(tok[6]) + int(tok[7]) + int(tok[8])
 
-	if proc_stat_busy < 0 :
-		### print "Since last boot:  {} * 100 / {}".format( busy, idle+busy )
-		### print "{:6.3f}%".format( float(busy * 100) / float(idle + busy) )
-		### print "========"
-		pct_util = float(busy * 100) / float(idle + busy)
-
-	else :
-		delta_busy = busy - proc_stat_busy 
-		delta_idle = idle - proc_stat_idle
-		timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-		pct_util = float(delta_busy * 100) / float(delta_idle + delta_busy)
-		### print "{} {:6.3f}%".format( timestamp, pct_util )
-		# ------------------------------------------------------------------------
-		# Unused for now.  Here in case we want to look at a rolling average...
-		# ------------------------------------------------------------------------
-		if len(proc_stat_hist) > (proc_stat_hist_n -1) :
-			proc_stat_hist = proc_stat_hist[1:]
-		proc_stat_hist.append( pct_util )
+	pct_util = float(busy * 100) / float(idle + busy)
+#	if proc_stat_busy < 0 :
+#		### print "Since last boot:  {} * 100 / {}".format( busy, idle+busy )
+#		### print "{:6.3f}%".format( float(busy * 100) / float(idle + busy) )
+#		### print "========"
+#		pct_util = float(busy * 100) / float(idle + busy)
+#
+#	else :
+#		delta_busy = busy - proc_stat_busy 
+#		delta_idle = idle - proc_stat_idle
+#		timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+#		pct_util = float(delta_busy * 100) / float(delta_idle + delta_busy)
+#		### print "{} {:6.3f}%".format( timestamp, pct_util )
+#		# ------------------------------------------------------------------------
+#		# Unused for now.  Here in case we want to look at a rolling average...
+#		# ------------------------------------------------------------------------
+#		if len(proc_stat_hist) > (proc_stat_hist_n -1) :
+#			proc_stat_hist = proc_stat_hist[1:]
+#		proc_stat_hist.append( pct_util )
 
 	proc_stat_busy = busy
 	proc_stat_idle = idle
@@ -400,6 +365,7 @@ def status_table():
 	# NOTE: We may not choose to print everything in data[]
 	for iii in range(0, len(data_keys)):
 		bgcolor = ""
+		thresholds = " {}, &nbsp; &nbsp;  {}".format( threshold_matrix[iii][0], threshold_matrix[iii][1] )
 		if threshold_matrix[iii][1] > -1 :
 			if data[data_keys[iii]] >= threshold_matrix[iii][1] :
 				bgcolor = " BGCOLOR=\"red\""
@@ -407,10 +373,18 @@ def status_table():
 			elif data[data_keys[iii]] >= threshold_matrix[iii][0] :
 				bgcolor = " BGCOLOR=\"#BBBB00\""
 				bgcolor = " BGCOLOR=\"yellow\" FGCOLOR=\"black\""
-		format_str = "<TR><TD{}> {} </TD><TD ALIGN=right{}> " + data_format[iii]  + " </TD><TD ALIGN=right{}> {} </TD></TR>\n"
-		format_str = "<TR><TD{}> {} </TD><TD ALIGN=right{}> <B><FONT COLOR=\"black\"> " + data_format[iii]  + " </TD><TD ALIGN=right{}> {}, {} </TD></TR>\n"
+			else :
+				bgcolor = " BGCOLOR=\"green\""
+				bgcolor = " BGCOLOR=\"#11BB11\""
+		else: 
+			thresholds = "&nbsp;"
+			thresholds = "<FONT SIZE=-2> reference </FONT>"
 
-		format_str = "<TR><TD{}> {} </TD><TD ALIGN=right{}> " + data_format[iii]  + " </TD><TD ALIGN=right{}> {}, {} </TD></TR>\n"
+#		format_str = "<TR><TD{}> {} </TD><TD ALIGN=right{}> " + data_format[iii]  + " </TD><TD ALIGN=right{}> {} </TD></TR>\n"
+#		format_str = "<TR><TD{}> {} </TD><TD ALIGN=right{}> <B><FONT COLOR=\"black\"> " + data_format[iii]  + " </TD><TD ALIGN=right{}> {}, {} </TD></TR>\n"
+
+#		format_str = "<TR><TD{}> {} </TD><TD ALIGN=right{}> " + data_format[iii]  + " </TD><TD ALIGN=right{}> {}, {} </TD></TR>\n"
+		format_str = "<TR><TD{}> {} </TD><TD ALIGN=right{}> " + data_format[iii]  + " </TD><TD ALIGN=center{}> {} </TD></TR>\n"
 #
 #		print " - - - - - - "
 #		print iii
@@ -419,7 +393,8 @@ def status_table():
 #		print data_keys[iii]
 #		print data[data_keys[iii]]
 
-		print ( format_str.format( bgcolor, data_keys[iii], bgcolor, data[data_keys[iii]], bgcolor, threshold_matrix[iii][0], threshold_matrix[iii][1] ) )
+#		print ( format_str.format( bgcolor, data_keys[iii], bgcolor, data[data_keys[iii]], bgcolor, threshold_matrix[iii][0], threshold_matrix[iii][1] ) )
+		print ( format_str.format( bgcolor, data_keys[iii], bgcolor, data[data_keys[iii]], bgcolor, thresholds ) )
 
 	print ( "<TR><TD COLSPAN=3 ALIGN=center><FONT SIZE=-1>\n" )
 	print ( datetime.datetime.utcnow().strftime(strftime_FMT) + " GMT" )
@@ -564,13 +539,7 @@ def mem_usage():
 
 
 
-
 # ----------------------------------------------------------------------------------------
-#
-#
-#
-#
-#
 #
 #
 #
