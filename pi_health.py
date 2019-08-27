@@ -100,13 +100,13 @@ import datetime
 import subprocess
 
 
-proc_load_lim = 4.0         # NOTE: This should be removed...
+### proc_load_lim = 4.0         # NOTE: This should be removed...
 
 
-proc_stat_busy = -1		# Sentinal value
-proc_stat_idle = -1
-proc_stat_hist = []		# Holds last proc_stat_hist_n samples
-proc_stat_hist_n = 10		# Control length of history array to keep
+### proc_stat_busy = -1		# Sentinal value
+### proc_stat_idle = -1
+### proc_stat_hist = []		# Holds last proc_stat_hist_n samples
+### proc_stat_hist_n = 10		# Control length of history array to keep
 
 # strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
 strftime_FMT = "%Y/%m/%d %H:%M:%S"
@@ -126,7 +126,7 @@ data_keys = [
 	"hostname",
 	"system_uptime",
 	"proc_pct",
-	"proc_load",
+	"proc_load_1m",
 	"proc_load_5m",
 	"effective_used",
 	"mem_pct",
@@ -145,8 +145,8 @@ data_format = [
 	"{}",
 	"{}",
 	"{:5.1f}%",
-	"{:7.2f}",
-	"{:7.2f}",
+	"{:7.2f} procs",
+	"{:7.2f} procs",
 	"{} bytes",
 	"{}&percnt;",
 	"{} bytes",
@@ -164,8 +164,8 @@ threshold_matrix = [
 	[     -1,    -1  ],    # "hostname",
 	[     -1,    -1  ],    # "system_uptime",
 	[    8.0,  16.0  ],    # "proc_pct",
-	[    1.0,   2.0  ],    # "proc_load",
-	[    4.0,   4.0  ],    # "proc_load_5m",
+	[    1.0,   2.0  ],    # "proc_load_1m",
+	[    4.0,   8.0  ],    # "proc_load_5m",
 	[     -1,    -1  ],    # "effective_used",
 	[     15,    25  ],    # "mem_pct",
 	[   1024,  4096  ],    # "swap_used",
@@ -188,9 +188,9 @@ threshold_matrix = [
 #
 # ----------------------------------------------------------------------------------------
 def proc_pct() :
-	global proc_stat_busy
-	global proc_stat_idle
-	global proc_stat_hist
+###	global proc_stat_busy
+###	global proc_stat_idle
+###	global proc_stat_hist
 	global data
 
 	# --------------------------------------------------------------------------------
@@ -229,8 +229,8 @@ def proc_pct() :
 #			proc_stat_hist = proc_stat_hist[1:]
 #		proc_stat_hist.append( pct_util )
 
-	proc_stat_busy = busy
-	proc_stat_idle = idle
+###	proc_stat_busy = busy
+###	proc_stat_idle = idle
 	data['proc_pct'] = pct_util
 	return pct_util
 
@@ -282,22 +282,22 @@ def proc_load():
 	cur_proc_load = float(words[0])
 	proc_load_5m = float(words[1])
 
-	if cur_proc_load > proc_load_lim :
-		messager( "WARNING: \t" + \
-			"proc_load_lim = " + str(proc_load_lim) + \
-			"\t\t 1 minute load average = " + str(cur_proc_load) )
-	data['proc_load'] = cur_proc_load
+###	if cur_proc_load > proc_load_lim :
+###		messager( "WARNING: \t" + \
+###			"proc_load_lim = " + str(proc_load_lim) + \
+###			"\t\t 1 minute load average = " + str(cur_proc_load) )
+	data['proc_load_1m'] = cur_proc_load
 	data['proc_load_5m'] = proc_load_5m
 	data['system_uptime'] = uptime.rstrip()
 	return cur_proc_load
 
 
-	if cur_proc_load > proc_load_lim :
-		messager( "WARNING: 1 minute load average = " + str(cur_proc_load) + \
-			";  proc_load_lim = " + str(proc_load_lim) )
-		return 1
-	else:
-		return 0
+###	if cur_proc_load > proc_load_lim :
+###		messager( "WARNING: 1 minute load average = " + str(cur_proc_load) + \
+###			";  proc_load_lim = " + str(proc_load_lim) )
+###		return 1
+###	else:
+###		return 0
 
 
 
@@ -373,6 +373,7 @@ def status_table():
 			elif data[data_keys[iii]] >= threshold_matrix[iii][0] :
 				bgcolor = " BGCOLOR=\"#BBBB00\""
 				bgcolor = " BGCOLOR=\"yellow\" FGCOLOR=\"black\""
+				bgcolor = " BGCOLOR=\"yellow\""
 			else :
 				bgcolor = " BGCOLOR=\"green\""
 				bgcolor = " BGCOLOR=\"#11BB11\""
