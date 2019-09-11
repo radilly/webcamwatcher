@@ -58,8 +58,6 @@
 #      sudo a2enmod cgi
 #      sudo systemctl -l restart apache2
 #
-#      sudo ln -s /home/pi/webcamwatcher/pi_health.py  /usr/lib/cgi-bin/
-#   Did not work
 #      sudo rm /usr/lib/cgi-bin/pi_health.py 
 #      sudo cp /home/pi/webcamwatcher/pi_health.py  /usr/lib/cgi-bin/
 #   Worked!!
@@ -77,6 +75,7 @@
 #
 #
 #  EXTERNALIZING LOCAL SETTINGS:
+#    NOTE: If we wanted to externalize threshold_matrix[]
 #
 #  exec()
 #  https://docs.python.org/2.0/ref/exec.html
@@ -93,24 +92,47 @@
 #
 # ========================================================================================
 
-
 import sys
 import re
 import datetime
 import subprocess
 
+# https://snakify.org/en/lessons/two_dimensional_lists_arrays/
+# I considered how to externalize this, but haven't come up with anything clever
+# when running under apache
+threshold_matrix = [
+	[     -1,    -1  ],    # "hostname",
+	[     -1,    -1  ],    # "system_uptime",
+	[    8.0,  16.0  ],    # "proc_pct",
+	[    1.0,   2.0  ],    # "proc_load_1m",
+	[    4.0,   8.0  ],    # "proc_load_5m",
+	[     -1,    -1  ],    # "effective_used",
+	[     20,    30  ],    # "mem_pct",
+	[   1024,  5120  ],    # "swap_used",
+	[      1,     5  ],    # "swap_pct",
+	[     50,    55  ],    # "cpu_temp_c",
+	[    122,   131  ],    # "cpu_temp_f",
+	[     -1,    -1  ],    # "python_version",
+	]
 
-### proc_load_lim = 4.0         # NOTE: This should be removed...
-
-
-### proc_stat_busy = -1		# Sentinal value
-### proc_stat_idle = -1
-### proc_stat_hist = []		# Holds last proc_stat_hist_n samples
-### proc_stat_hist_n = 10		# Control length of history array to keep
-
-# strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
-strftime_FMT = "%Y/%m/%d %H:%M:%S"
-
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+# For HTML Table-style output lines
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+# https://pyformat.info/
+data_format = [
+	"{}",
+	"{}",
+	"{:5.1f}%",
+	"{:7.2f} procs",
+	"{:7.2f} procs",
+	"{} bytes",
+	"{}&percnt;",
+	"{} bytes",
+	"{}&percnt;",
+	"{:6.1f} &deg;C",
+	"{:6.1f} &deg;F",
+	"{}",
+	]
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 # This is the global data value dictionary.   This is written into by many of
@@ -137,46 +159,29 @@ data_keys = [
 	"python_version",
 	]
 
-# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-# For HTML Table-style output lines
-# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-# https://pyformat.info/
-data_format = [
-	"{}",
-	"{}",
-	"{:5.1f}%",
-	"{:7.2f} procs",
-	"{:7.2f} procs",
-	"{} bytes",
-	"{}&percnt;",
-	"{} bytes",
-	"{}&percnt;",
-	"{:6.1f} &deg;C",
-	"{:6.1f} &deg;F",
-	"{}",
-	]
+strftime_FMT = "%Y/%m/%d %H:%M:%S"
 
 
-# https://snakify.org/en/lessons/two_dimensional_lists_arrays/
-# I considered how to externalize this, but haven't come up with anything clever
-# when running under apache
-threshold_matrix = [
-	[     -1,    -1  ],    # "hostname",
-	[     -1,    -1  ],    # "system_uptime",
-	[    8.0,  16.0  ],    # "proc_pct",
-	[    1.0,   2.0  ],    # "proc_load_1m",
-	[    4.0,   8.0  ],    # "proc_load_5m",
-	[     -1,    -1  ],    # "effective_used",
-	[     20,    30  ],    # "mem_pct",
-	[   1024,  5120  ],    # "swap_used",
-	[      1,     5  ],    # "swap_pct",
-	[     50,    55  ],    # "cpu_temp_c",
-	[    122,   131  ],    # "cpu_temp_f",
-	[     -1,    -1  ],    # "python_version",
-	]
+# ----------------------------------------------------------------------------------------
+# Main routine
+#
+# ----------------------------------------------------------------------------------------
+def main() :
+	global data
 
+	python_version = "v " + str(sys.version)
+	python_version = re.sub(' *\n *', '<BR>', python_version )
+	python_version = re.sub(' *\(', '<BR>(', python_version )
 
+	#   messager("INFO: Python version: " + str(sys.version))
+	data['python_version'] = python_version
 
+	hostname()
+	proc_load()
+	proc_pct()
+	mem_usage()
+
+	status_table()
 
 
 # ----------------------------------------------------------------------------------------
@@ -188,9 +193,6 @@ threshold_matrix = [
 #
 # ----------------------------------------------------------------------------------------
 def proc_pct() :
-###	global proc_stat_busy
-###	global proc_stat_idle
-###	global proc_stat_hist
 	global data
 
 	# --------------------------------------------------------------------------------
@@ -210,33 +212,9 @@ def proc_pct() :
 	busy = int(tok[1]) + int(tok[2]) + int(tok[3]) + int(tok[6]) + int(tok[7]) + int(tok[8])
 
 	pct_util = float(busy * 100) / float(idle + busy)
-#	if proc_stat_busy < 0 :
-#		### print "Since last boot:  {} * 100 / {}".format( busy, idle+busy )
-#		### print "{:6.3f}%".format( float(busy * 100) / float(idle + busy) )
-#		### print "========"
-#		pct_util = float(busy * 100) / float(idle + busy)
-#
-#	else :
-#		delta_busy = busy - proc_stat_busy 
-#		delta_idle = idle - proc_stat_idle
-#		timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-#		pct_util = float(delta_busy * 100) / float(delta_idle + delta_busy)
-#		### print "{} {:6.3f}%".format( timestamp, pct_util )
-#		# ------------------------------------------------------------------------
-#		# Unused for now.  Here in case we want to look at a rolling average...
-#		# ------------------------------------------------------------------------
-#		if len(proc_stat_hist) > (proc_stat_hist_n -1) :
-#			proc_stat_hist = proc_stat_hist[1:]
-#		proc_stat_hist.append( pct_util )
 
-###	proc_stat_busy = busy
-###	proc_stat_idle = idle
 	data['proc_pct'] = pct_util
 	return pct_util
-
-
-
-
 
 
 
@@ -249,8 +227,6 @@ def hostname():
 	global data
 	name = subprocess.check_output('/bin/hostname')
 	data['hostname'] = name.rstrip()
-
-
 
 
 
@@ -292,18 +268,6 @@ def proc_load():
 	return cur_proc_load
 
 
-###	if cur_proc_load > proc_load_lim :
-###		messager( "WARNING: 1 minute load average = " + str(cur_proc_load) + \
-###			";  proc_load_lim = " + str(proc_load_lim) )
-###		return 1
-###	else:
-###		return 0
-
-
-
-
-
-
 
 # ----------------------------------------------------------------------------------------
 # Write message to the log file with a leading timestamp.
@@ -333,10 +297,6 @@ def messager(message):
 def log_and_message(message):
 	messager(message)
 	logger(message)
-
-
-
-
 
 
 # ----------------------------------------------------------------------------------------
@@ -535,41 +495,13 @@ def mem_usage():
 	data['cpu_temp_f'] = cpu_temp_f
 
 
-
-
-
-
-
-# ----------------------------------------------------------------------------------------
-#
-#
-#
-# ----------------------------------------------------------------------------------------
-def make_page() :
-	global data
-
-	python_version = "v " + str(sys.version)
-	python_version = re.sub(' *\n *', '<BR>', python_version )
-	python_version = re.sub(' *\(', '<BR>(', python_version )
-
-	#   messager("INFO: Python version: " + str(sys.version))
-	data['python_version'] = python_version
-
-	hostname()
-	proc_load()
-	proc_pct()
-	mem_usage()
-
-	status_table()
-
-
 # ----------------------------------------------------------------------------------------
 # The function main contains a "do forever..." (and is called in a try block here)
 #
 # This handles the startup and shutdown of the script.
 # ----------------------------------------------------------------------------------------
 if __name__ == '__main__':
-	make_page()
+	main()
 
 # ----------------------------------------------------------------------------------------
 #   2.7.9 (default, Sep 17 2016, 20:26:04)
