@@ -4,6 +4,9 @@
 #
 #
 # ========================================================================================
+# 20190914 RAD Switched for SSR to old sytle JBtek 4 Channel DC 5V Relay Module which
+#              is active low. Inverted the signals, and added several GPIO.setup()
+#              calls for the 2 other relays which are connected - but unused.
 # 20190716 RAD Cleaned up and checked into git.
 #
 # 20180728 RAD Hacked webcamimager.py 
@@ -34,8 +37,9 @@ import RPi.GPIO as GPIO
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
 relay_GPIO = 18
-webcam_ON = GPIO.HIGH
-webcam_OFF = GPIO.LOW
+relay_GPIO = 22
+webcam_ON = GPIO.LOW
+webcam_OFF = GPIO.HIGH
 
 this_script = sys.argv[0]
 logger_file = re.sub('\.py', '.log', this_script)
@@ -58,7 +62,10 @@ strftime_FMT = "%Y/%m/%d %H:%M:%S"
 def setup_gpio():
 	GPIO.setwarnings(False)
 	GPIO.setmode(GPIO.BCM)
-	GPIO.setup(relay_GPIO, GPIO.OUT, initial=webcam_ON)
+
+	GPIO.setup(relay_GPIO, GPIO.OUT, initial=webcam_OFF)
+	GPIO.setup(17, GPIO.OUT, initial=webcam_OFF)
+	GPIO.setup(27, GPIO.OUT, initial=webcam_OFF)
 
 
 
