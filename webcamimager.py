@@ -475,7 +475,8 @@ def process_new_image( source, target) :
 #DEBUG#	logger( "DEBUG: Called process_new_image(\n\t {},\n\t {} )".format(source, target) )
 
 	shutil.copy2( source, target )
-	push_to_server( target, remote_dir )
+#@@@	push_to_server( target, remote_dir )
+	push_to_server_via_scp( target, remote_dir )
 	# push_to_test( target, "REMOVE_ME/" + remote_dir )
 
 	thumbnail_file = work_dir + '/' + thumbnail_image
@@ -497,7 +498,8 @@ def process_new_image( source, target) :
 	else :
 		logger( "DEBUG: convert returned data: \"{}\"".format( convert ) )
 
-	push_to_server( thumbnail_file, remote_dir )
+#@@@	push_to_server( thumbnail_file, remote_dir )
+	push_to_server_via_scp( thumbnail_file, remote_dir )
 	# push_to_test( thumbnail_file, "REMOVE_ME/" + remote_dir )
 
 
@@ -946,6 +948,7 @@ def midnight_process(date_string) :
 	tnf = daily_thumbnail( date_string, work_dir )
 	if len(tnf) > 0 :
 		push_to_server( tnf, remote_dir )
+#@@@		push_to_server_via_scp( tnf, remote_dir )
 		# push_to_test( tnf, "REMOVE_ME/" + remote_dir )
 
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -960,6 +963,7 @@ def midnight_process(date_string) :
 
 	if not ffmpeg_failed :
 		push_to_server( mp4_file_daylight, remote_dir )
+#@@@		push_to_server_via_scp( mp4_file_daylight, remote_dir )
 		# push_to_test( mp4_file_daylight, "REMOVE_ME/" + remote_dir )
 
 
