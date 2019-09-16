@@ -22,7 +22,7 @@ Type=simple
 User=pi
 Group=pi
 WorkingDirectory=/home/pi/S
-ExecStart=/usr/bin/python -u ./webcamimager.py /home/pi/S/south.cfg
+ExecStart=/usr/bin/python -u /home/pi/S/webcamimager.py /home/pi/S/south.cfg
 # ExecStart=/usr/bin/python -u ./webcamimager.py /home/pi/S/South S.jpg S_thumb.jpg South
 
 Restart=always

@@ -1,5 +1,11 @@
 #!/usr/bin/python -u
 # @@@ ... 
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE: At some point, remove push_to_server()
+#    NOTE:
+#    NOTE:
 # 
 # This script is started by 2 services - for for north- and south-facing cameras: 
 #	webcam_north.service
@@ -159,6 +165,18 @@
 # ========================================================================================
 #
 #
+# 20190907 RAD Looks like this script, or perhaps CumulusMX caused a locking up of
+#              our virtual server IP address.  This error was logged at the time of failure:
+#                ERROR: in push_to_server() FTP (connect): 530 Login authentication failed
+#              Namecheap support was pretty adamant that it wasn't their issue. Logically
+#              I find it difficult to understand how this script could be at fault,
+#              since the credentials are read at startup and should never change while
+#              running ... unless something very surgical wacked some memory. I did
+#              comment out or remove these three from some "global" statements:
+#                      ftp_server, ftp_login, ftp_password
+#              They should only be allowed to be set by read_FTP_config(). I also
+#              log the FTP credentials in push_to_server() if the connect fails and
+#              and "authentication" is found in the error message.
 # 20190625 RAD Same issue, processes "running" but apparently hung.  So camera_down()
 #              may not be very useful here ... at least for this failure mode. A separate
 #              watchdog may be required.  As noted below process_new_image() is likely
@@ -833,7 +851,7 @@ def check_log_age( ) :
 # ----------------------------------------------------------------------------------------
 def read_config( config_file ) :
 	global work_dir, main_image, thumbnail_image, remote_dir
-	global ftp_login, ftp_password, cam_host, relay_HOST
+	global cam_host, relay_HOST
 	global relay_GPIO, relay2_GPIO, webcam_ON, webcam_OFF
 	global mon_log, mon_max_age
 
@@ -1016,8 +1034,8 @@ def midnight_process(date_string) :
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	tnf = daily_thumbnail( date_string, work_dir )
 	if len(tnf) > 0 :
-		push_to_server( tnf, remote_dir )
-#@@@		push_to_server_via_scp( tnf, remote_dir )
+#@@@		push_to_server( tnf, remote_dir )
+		push_to_server_via_scp( tnf, remote_dir )
 		# push_to_test( tnf, "REMOVE_ME/" + remote_dir )
 
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -1031,8 +1049,8 @@ def midnight_process(date_string) :
 	ffmpeg_failed = generate_video( date_string, mp4_file_daylight )
 
 	if not ffmpeg_failed :
-		push_to_server( mp4_file_daylight, remote_dir )
-#@@@		push_to_server_via_scp( mp4_file_daylight, remote_dir )
+#@@@		push_to_server( mp4_file_daylight, remote_dir )
+		push_to_server_via_scp( mp4_file_daylight, remote_dir )
 		# push_to_test( mp4_file_daylight, "REMOVE_ME/" + remote_dir )
 
 
@@ -1527,9 +1545,6 @@ def push_to_server_via_scp(local_file, remote_path) :
 #    NOTE: 
 # ----------------------------------------------------------------------------------------
 def push_to_server(local_file, remote_path) :
-	global ftp_login
-	global ftp_password
-	global ftp_server
 	ftp_OK = False
 
 #DEBUG#	logger( "DEBUG: push_to_server( {}, {}, {} )".format( local_file, remote_path, server ) )
@@ -1573,7 +1588,34 @@ def push_to_server(local_file, remote_path) :
 			break
 		except Exception as problem :
 			logger( "ERROR: in push_to_server() FTP (connect): {}".format( problem ) )
+			if "authentication" in problem :
+				logger( "DEBUG: FTP credentials: s=\"{}\" l=\"{}\" p=\"{}\"".format( ftp_server, ftp_login, ftp_password ) )
 
+		# ----------------------------------------------------------------------------------------
+		# ----------------------------------------------------------------------------------------
+		#   ......................||  (22)
+		#   2019/09/06 04:48:39 INFO: Process /home/pi/N/North/snapshot-2019-09-06-04-48-38.jpg
+		#   2019/09/06 04:48:53 ERROR: in push_to_server() FTP (connect): 530 Login authentication failed
+		#   2019/09/06 04:49:08 ERROR: in push_to_server() FTP (connect): 530 Login authentication failed
+		#   2019/09/06 04:49:08 DEBUG: in push_to_server() sleep( 8 )
+		#   2019/09/06 04:49:31 ERROR: in push_to_server() FTP (connect): 530 Login authentication failed
+		#   2019/09/06 04:49:31 DEBUG: in push_to_server() sleep( 12 )
+		#   2019/09/06 04:49:58 ERROR: in push_to_server() FTP (connect): 530 Login authentication failed
+		#   2019/09/06 04:49:58 DEBUG: in push_to_server() sleep( 16 )
+		#   2019/09/06 04:50:30 ERROR: in push_to_server() FTP (connect): 530 Login authentication failed
+		#   2019/09/06 04:50:30 DEBUG: in push_to_server() sleep( 20 )
+		#   2019/09/06 04:53:01 ERROR: in push_to_server() FTP (connect): [Errno 110] Connection timed out
+		#   2019/09/06 04:53:01 DEBUG: in push_to_server() sleep( 24 )
+		#   2019/09/06 04:55:34 ERROR: in push_to_server() FTP (connect): [Errno 110] Connection timed out
+		#   2019/09/06 04:55:34 DEBUG: in push_to_server() sleep( 28 )
+		#   2019/09/06 04:58:13 ERROR: in push_to_server() FTP (connect): [Errno 110] Connection timed out
+		#
+		#
+		#
+		#
+		#   2019/09/06 04:59:13 INFO: Starting /home/pi/N/webcamimager.py   PID=26365
+		# ----------------------------------------------------------------------------------------
+		# ----------------------------------------------------------------------------------------
 		# ----------------------------------------------------------------------------------------
 		#.......................||  (23)
 		#  2019/07/24 09:13:03 INFO: Process /home/pi/S/South/snapshot-2019-07-24-09-12-57.jpg
@@ -1639,6 +1681,28 @@ def push_to_server(local_file, remote_path) :
 	else:
 		exit()
 
+
+	# --------------------------------------------------------------------------------
+	# NOTE: It looks like this might be a temporary condition and a retry might
+	#       might be in order...
+	#       I would expect this is the previous use of the socket was busy.
+	#       I suppose it could be 2 instances of this trying to ftp files concurrently.
+	#
+	#  https://stackoverflow.com/questions/6176445/problem-socket-error-address-already-in-use-in-python-selenium
+	#  https://stackoverflow.com/questions/41423642/python-socket-server-address-already-in-use
+	#
+	# --------------------------------------------------------------------------------
+	#  2019/09/10 17:36:36 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
+	#  2019/09/10 19:28:36 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
+	#  2019/09/11 01:30:38 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
+	#  2019/09/11 04:06:42 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
+	#  2019/09/11 08:40:45 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
+	#  2019/09/11 11:06:42 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
+	#  2019/09/11 11:44:47 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
+	#  2019/09/11 11:58:47 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
+	#  2019/09/11 12:26:47 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
+	#  2019/09/11 13:12:50 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
+	# --------------------------------------------------------------------------------
 
 	if ftp_OK :
 		try :
@@ -2032,7 +2096,7 @@ def do_midnight() :
 		print "Too few arguments"
 		exit()
 
-	print "{} arguments".format(len(sys.argv))
+	print "{} arguments".format(len(sys.argv)-1)
 
 	date_string = sys.argv[2]
 
