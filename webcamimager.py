@@ -212,6 +212,10 @@
 #
 #
 #
+# 20190831 RAD Added check_log_age(). This is imcomplete as it only logs (multiple times)
+#              that the monitored log of the other instance of this script appears
+#              to be stalled. I can not figure out why it stalls, but this routine
+#              could eventually restart the other instance.
 # 20190601 RAD Deleted everything from GoDaddy; push_to_test() started failing.
 # 20190526 RAD Switching over to Namecheap hosting, and using dilly.family as primary.
 #              Took out stuff no longer used.
@@ -345,6 +349,10 @@ import re
 import socket
 import calendar
 
+mon_log = ""
+mon_max_age = 300
+
+
 relay_GPIO = -1
 relay2_GPIO = -1
 
@@ -396,6 +404,8 @@ cfg_parameters = [
 	"relay_GPIO",
 	"relay2_GPIO",
 	"relay_HOST",
+	"mon_log",
+	"mon_max_age",
 	]
 
 
@@ -438,6 +448,8 @@ def main():
 	log_and_message( "INFO: relay_HOST = \"{}\"".format( relay_HOST ) )
 	log_and_message( "INFO: relay_GPIO = \"{}\"".format( relay_GPIO ) )
 	log_and_message( "INFO: relay2_GPIO = \"{}\"".format( relay2_GPIO ) )
+	log_and_message( "INFO: mon_log = \"{}\"".format( mon_log ) )
+	log_and_message( "INFO: mon_max_age = \"{}\"".format( mon_max_age ) )
 	log_and_message( "." )
 
 	nvers = mono_version()
@@ -449,6 +461,7 @@ def main():
 
 	while True:
 		next_image_file()
+		check_log_age( )
 		sleep(sleep_for)
 
 	exit()
@@ -758,6 +771,53 @@ def next_image_file() :
 
 
 
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+#
+# NOTE: This should restart the "other" instance of this script.
+#
+# Checks the age of the monitored log.  If its not been updated recently (relative
+# to mon_max_age) then we have a problem with the process appending to the log.
+#
+#
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+def check_log_age( ) :
+	global mon_log, mon_max_age
+
+
+# @@@
+	mtime = stat( mon_log ).st_mtime
+	now = time.time()
+#	print mtime
+#	print time.time()
+	age = now - mtime
+#	print "DEBUG: age = {:10.2f}".format( age )
+
+	if age > mon_max_age :
+		log_and_message( "ERROR: \"{}\"  has not been updated for {:1.2f} seconds.".format( mon_log, age ) )
+		log_and_message( "ERROR: \"{}\"  has not been updated for {:1.2f} seconds.".format( mon_log, age ) )
+		log_and_message( "ERROR: \"{}\"  has not been updated for {:1.2f} seconds.".format( mon_log, age ) )
+		log_and_message( "ERROR: \"{}\"  has not been updated for {:1.2f} seconds.".format( mon_log, age ) )
+		log_and_message( "ERROR: \"{}\"  has not been updated for {:1.2f} seconds.".format( mon_log, age ) )
+
+	return
+
+
 
 
 
@@ -775,6 +835,7 @@ def read_config( config_file ) :
 	global work_dir, main_image, thumbnail_image, remote_dir
 	global ftp_login, ftp_password, cam_host, relay_HOST
 	global relay_GPIO, relay2_GPIO, webcam_ON, webcam_OFF
+	global mon_log, mon_max_age
 
 # @@@	# https://docs.python.org/2/library/configparser.html
 	config = ConfigParser.RawConfigParser()
@@ -863,6 +924,14 @@ def read_config( config_file ) :
 	relay_GPIO = int( relay_GPIO )
 
 	relay2_GPIO = int( relay2_GPIO )
+
+	if not os.path.exists( mon_log ) :
+		log_and_message( "ERROR: mon_log \"{}\" not found.".format( mon_log ) )
+		exit()
+
+	mon_max_age = int( mon_max_age )
+
+
 
 
 # ----------------------------------------------------------------------------------------
@@ -1505,6 +1574,57 @@ def push_to_server(local_file, remote_path) :
 		except Exception as problem :
 			logger( "ERROR: in push_to_server() FTP (connect): {}".format( problem ) )
 
+		# ----------------------------------------------------------------------------------------
+		#.......................||  (23)
+		#  2019/07/24 09:13:03 INFO: Process /home/pi/S/South/snapshot-2019-07-24-09-12-57.jpg
+		#  2019/07/24 09:13:04 DEBUG: FTP STOR S.jpg from  /home/pi/S/South/S.jpg
+		#  2019/07/24 09:13:05 DEBUG: convert returned data: ""
+		#  2019/07/24 09:13:06 DEBUG: FTP STOR S_thumb.jpg from  /home/pi/S/South/S_thumb.jpg
+		#  ......................||  (22)
+		#  2019/07/24 09:15:20 WARNING: Assumed image age: 0
+		#  2019/07/24 09:15:20 INFO: Process /home/pi/S/South/snapshot-2019-07-24-09-14-57.jpg
+		#  2019/07/24 09:15:40 ERROR: in push_to_server() FTP (connect): [Errno -3] Temporary failure in name resolution
+		#  2019/07/24 09:16:01 ERROR: in push_to_server() FTP (connect): [Errno -3] Temporary failure in name resolution
+		#  2019/07/24 09:16:01 DEBUG: in push_to_server() sleep( 8 )
+		#  2019/07/24 09:16:29 ERROR: in push_to_server() FTP (connect): [Errno -3] Temporary failure in name resolution
+		#  2019/07/24 09:16:29 DEBUG: in push_to_server() sleep( 12 )
+		#  2019/07/24 09:17:01 ERROR: in push_to_server() FTP (connect): [Errno -3] Temporary failure in name resolution
+		#  2019/07/24 09:17:01 DEBUG: in push_to_server() sleep( 16 )
+		#  2019/07/24 09:17:37 ERROR: in push_to_server() FTP (connect): [Errno -3] Temporary failure in name resolution
+		#  2019/07/24 09:17:37 DEBUG: in push_to_server() sleep( 20 )
+		#  2019/07/24 09:18:17 ERROR: in push_to_server() FTP (connect): [Errno -3] Temporary failure in name resolution
+		#  2019/07/24 09:18:17 DEBUG: in push_to_server() sleep( 24 )
+		#  2019/07/24 09:18:41 DEBUG: FTP STOR S.jpg from  /home/pi/S/South/S.jpg
+		#  2019/07/24 09:18:42 DEBUG: convert returned data: ""
+		#  2019/07/24 09:18:43 DEBUG: FTP STOR S_thumb.jpg from  /home/pi/S/South/S_thumb.jpg
+		#  .||  (1)
+		#  2019/07/24 09:18:53 INFO: Process /home/pi/S/South/snapshot-2019-07-24-09-16-57.jpg
+		#  2019/07/24 09:18:53 DEBUG: FTP STOR S.jpg from  /home/pi/S/South/S.jpg
+		#  2019/07/24 09:18:55 DEBUG: convert returned data: ""
+		#  2019/07/24 09:18:55 DEBUG: FTP STOR S_thumb.jpg from  /home/pi/S/South/S_thumb.jpg
+		#  .||  (1)
+		#  2019/07/24 09:19:05 INFO: Process /home/pi/S/South/snapshot-2019-07-24-09-18-57.jpg
+		#  2019/07/24 09:19:05 DEBUG: FTP STOR S.jpg from  /home/pi/S/South/S.jpg
+		#  2019/07/24 09:19:07 DEBUG: convert returned data: ""
+		#
+		#
+		#  2019/07/24 21:33:45 INFO: Starting /home/pi/S/webcamimager.py   PID=11573
+		#  2019/07/24 21:33:45 INFO: reading "/home/pi/S/south.cfg"
+		#  2019/07/24 21:33:45 INFO: ftp_server = "ftp.dilly.family"
+		#  2019/07/24 21:33:45 INFO: ftp_login = "camdilly@dilly.family"
+		#  2019/07/24 21:33:46 INFO: work_dir = "/home/pi/S/South"
+		#  2019/07/24 21:33:46 INFO: main_image = "S.jpg"
+		#  2019/07/24 21:33:46 INFO: thumbnail_image = "S_thumb.jpg"
+		#  2019/07/24 21:33:46 INFO: remote_dir = "South"
+		#  2019/07/24 21:33:46 INFO: image_age_URL = "http://dilly.family/wx/South/S_age.txt"
+		#  2019/07/24 21:33:46 INFO: cam_host = "192.168.1.10"
+		#  2019/07/24 21:33:46 INFO: relay_HOST = "pi@192.168.1.10"
+		#  2019/07/24 21:33:46 INFO: relay_GPIO = "23"
+		#  2019/07/24 21:33:46 INFO: relay2_GPIO = "-1"
+		#  2019/07/24 21:33:46 .
+		#  2019/07/24 21:33:46 WARNING: From mono version check: <type 'exceptions.OSError'>
+		# ----------------------------------------------------------------------------------------
+
 
 	if ftp_OK :
 		try :
@@ -1539,6 +1659,8 @@ def push_to_server(local_file, remote_path) :
 
 
 	return
+
+
 
 
 
