@@ -1,5 +1,7 @@
 # Service for starting Weather Station Watchdog
 # -------------------------------------------------------
+# https://www.raspberrypi.org/documentation/linux/usage/systemd.md
+#
 # http://www.diegoacuna.me/how-to-run-a-script-as-a-service-in-raspberry-pi-raspbian-jessie/
 # https://www.freedesktop.org/software/systemd/man/systemd.unit.html
 # -------------------------------------------------------
@@ -17,7 +19,7 @@ Type=simple
 ###   Relocated 09/04/2017
 WorkingDirectory=/mnt/root/home/pi
 # ExecStart=/mnt/root/home/pi/webcamwatch.py
-ExecStart=/usr/bin/python -u ./webcamwatch.py
+ExecStart=/usr/bin/python -u /mnt/root/home/pi/webcamwatch.py
 
 Restart=always
 ###  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
