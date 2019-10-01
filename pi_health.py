@@ -7,6 +7,9 @@
 #  If copied to apache folder /usr/lib/cgi-bin/pi_health.py it can be accessed as
 #      http://192.168.1.172/cgi-bin/pi_health.py  -  for example...
 #
+#  Check... (without browser)
+#      curl localhost/cgi-bin/pi_health.py
+#
 # ----------------------------------------------------------------------------------------
 #
 # ========================================================================================
@@ -61,9 +64,6 @@
 #      sudo rm /usr/lib/cgi-bin/pi_health.py 
 #      sudo cp /home/pi/webcamwatcher/pi_health.py  /usr/lib/cgi-bin/
 #   Worked!!
-#
-#   Check... (without browser)
-#      curl localhost/cgi-bin/pi_health.py
 #
 #
 #      systemctl -l status apache2
