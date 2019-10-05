@@ -5,6 +5,9 @@
 #    NOTE:
 #    NOTE: At some point, remove push_to_server()
 #    NOTE:
+#    NOTE: This assumes you can
+#    NOTE:     ssh -p 21098 dillwjfq@server162.web-hosting.com
+#    NOTE:
 #    NOTE:
 # 
 # This script is started by 2 services - for for north- and south-facing cameras: 
@@ -165,6 +168,17 @@
 # ========================================================================================
 #
 #
+# 20190924 RAD Switched push_to_server_via_scp() calls (4) back to push_to_server().
+#              It seems this may have been causing our IP hosted server address to
+#              be locked / blocked to to bad credentials.  This was affecting multiple
+#              users if I understood correctly.  Really curious how credential-less
+#              scp can result in bad credentials - but I couldn't justify further
+#              tinkering.  Need to update git...
+# 20190907 RAD Oddly, scp seems to work most of the time, except after building the mp4
+#              file.  It does work twice in midnight_process(), uploading both the
+#              thumbnail and the mp4 (the largest file we upload).  It seems to fail
+#              after a few additional calls to push_to_server_via_scp(). Added some
+#              sleep time for grins, but it seems to have no effect.
 # 20190907 RAD Looks like this script, or perhaps CumulusMX caused a locking up of
 #              our virtual server IP address.  This error was logged at the time of failure:
 #                ERROR: in push_to_server() FTP (connect): 530 Login authentication failed
@@ -180,7 +194,7 @@
 # 20190625 RAD Same issue, processes "running" but apparently hung.  So camera_down()
 #              may not be very useful here ... at least for this failure mode. A separate
 #              watchdog may be required.  As noted below process_new_image() is likely
-#              where the hange occurs because immediate afterward the '.' for the next
+#              where the hang occurs because immediate afterward the '.' for the next
 #              wait cycle is printed - and I'm not seeing it in the log.
 #              We are seeing the "INFO: Process ..." message logged.
 #              .
@@ -500,14 +514,14 @@ def main():
 # ----------------------------------------------------------------------------------------
 def process_new_image( source, target) :
 
-	camera_down()     # TESTING
-
 	logger( "INFO: Process {}".format(source) )
 #DEBUG#	logger( "DEBUG: Called process_new_image(\n\t {},\n\t {} )".format(source, target) )
 
+	camera_down()     # TESTING
+
 	shutil.copy2( source, target )
-#@@@	push_to_server( target, remote_dir )
-	push_to_server_via_scp( target, remote_dir )
+	push_to_server( target, remote_dir )
+#@@@	push_to_server_via_scp( target, remote_dir )
 	# push_to_test( target, "REMOVE_ME/" + remote_dir )
 
 	thumbnail_file = work_dir + '/' + thumbnail_image
@@ -526,11 +540,11 @@ def process_new_image( source, target) :
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	if len(convert) > 0 :
 		logger( "WARNING: convert returned data: \"{}\"".format( convert ) )
-	else :
-		logger( "DEBUG: convert returned data: \"{}\"".format( convert ) )
+#	else :
+#		logger( "DEBUG: convert returned data: \"{}\"".format( convert ) )
 
-#@@@	push_to_server( thumbnail_file, remote_dir )
-	push_to_server_via_scp( thumbnail_file, remote_dir )
+	push_to_server( thumbnail_file, remote_dir )
+#@@@	push_to_server_via_scp( thumbnail_file, remote_dir )
 	# push_to_test( thumbnail_file, "REMOVE_ME/" + remote_dir )
 
 
@@ -855,7 +869,7 @@ def read_config( config_file ) :
 	global relay_GPIO, relay2_GPIO, webcam_ON, webcam_OFF
 	global mon_log, mon_max_age
 
-# @@@	# https://docs.python.org/2/library/configparser.html
+# 	# https://docs.python.org/2/library/configparser.html
 	config = ConfigParser.RawConfigParser()
 	# This was necessary to avoid folding variable names to all lowercase.
 	# https://stackoverflow.com/questions/19359556/configparser-reads-capital-keys-and-make-them-lower-case
@@ -1001,6 +1015,11 @@ def midnight_process(date_string) :
 	tar_failed = True
 
 	logger( "DEBUG: Called midnight_process( {} )".format(date_string ) )
+	logger( "DEBUG: Called midnight_process( {} )".format(date_string ) )
+	logger( "DEBUG: Called midnight_process( {} )".format(date_string ) )
+	logger( "DEBUG: Called midnight_process( {} )".format(date_string ) )
+	logger( "DEBUG: Called midnight_process( {} )".format(date_string ) )
+	logger( "DEBUG: Called midnight_process( {} )".format(date_string ) )
 
 	# Example: 20180523 - - - (looks like a number, but a string here.)
 	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
@@ -1034,8 +1053,8 @@ def midnight_process(date_string) :
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	tnf = daily_thumbnail( date_string, work_dir )
 	if len(tnf) > 0 :
-#@@@		push_to_server( tnf, remote_dir )
-		push_to_server_via_scp( tnf, remote_dir )
+		push_to_server( tnf, remote_dir )
+#@@@		push_to_server_via_scp( tnf, remote_dir )
 		# push_to_test( tnf, "REMOVE_ME/" + remote_dir )
 
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -1049,8 +1068,8 @@ def midnight_process(date_string) :
 	ffmpeg_failed = generate_video( date_string, mp4_file_daylight )
 
 	if not ffmpeg_failed :
-#@@@		push_to_server( mp4_file_daylight, remote_dir )
-		push_to_server_via_scp( mp4_file_daylight, remote_dir )
+		push_to_server( mp4_file_daylight, remote_dir )
+#@@@		push_to_server_via_scp( mp4_file_daylight, remote_dir )
 		# push_to_test( mp4_file_daylight, "REMOVE_ME/" + remote_dir )
 
 
@@ -1073,6 +1092,18 @@ def midnight_process(date_string) :
 
 
 
+	logger( "DEBUG: sleep( 15 )" )
+	sleep( 15 )
+	logger( "DEBUG: sleep( 15 )" )
+	sleep( 15 )
+	logger( "DEBUG: sleep( 15 )" )
+	sleep( 15 )
+	logger( "DEBUG: sleep( 15 )" )
+	sleep( 15 )
+	logger( "DEBUG: sleep( 15 )" )
+	sleep( 15 )
+	logger( "DEBUG: sleep( 15 )" )
+	sleep( 15 )
 
 
 # ----------------------------------------------------------------------------------------
@@ -1205,7 +1236,6 @@ def tar_dailies(date_string) :
 
 
 
-# @@@
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	#  If the system crashes before this is complete, you might see this
 	#     gzip: stdin: unexpected end of file
@@ -1397,7 +1427,7 @@ def remove_night_images( date_string, working_dir ) :
 				kept += 1
 
 	found = kept + deleted
-	logger( "DEBUG: remove_night_images kept {} and deleted {} of ()".format( kept, deleted, found ) )
+	logger( "DEBUG: remove_night_images kept {} and deleted {} of {}".format( kept, deleted, found ) )
 	return found
 
 
@@ -1507,24 +1537,49 @@ def get_stored_filename() :
 # @@@
 # ----------------------------------------------------------------------------------------
 def push_to_server_via_scp(local_file, remote_path) :
-########################################################################	remote_path = "public_html/wx"
-#      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-#		scp -P "21098" do_midnight.log dillwjfq@server162.web-hosting.com:public_html/wx/North
 #	destination = "user@remotehost:remotepath"
 	destination = "dillwjfq@server162.web-hosting.com:public_html/wx/" + remote_path
+	scp_failed = False
 
+#	logger( "DEBUG: subprocess.check_output([\"scp\", \"-q\", \"-P\", \"21098\", {}, {}])".format( local_file, destination ) )
+
+	# Create empty array in case the try block fails. This by the way creates a 0-th member.
+	# Before I got the logic right with an "or" below, I saw...
+	#   DEBUG: #0 ""
 	try :
-		output = subprocess.check_output(["scp", "-q", "-P", "21098", local_file, destination])
-		lines = re.split('\n', output)
+		output = subprocess.check_output(["scp", "-q", "-P", "21098", local_file, destination], stderr=subprocess.STDOUT )
+	except subprocess.CalledProcessError, e :
+		scp_failed = True
+		# lines = []
+		# lines[0] = ""
+	# if len(lines[0]) > 0 or len(lines) > 1 :
+		output = ""
+		logger( "ERROR: scp: \"{}\" (from push_to_server_via_scp(), CalledProcessError)".format( sys.exc_info()[0] ) )
+		logger( "DEBUG: scp cmd = {}".format( e.cmd ) )
+		logger( "DEBUG: scp returncode = {}".format( e.returncode ) )
+		logger( "DEBUG: scp error output:\n{}".format( e.output ) )
+		# https://stackoverflow.com/questions/7575284/check-output-from-calledprocesserror
 	except :
-		messager( "ERROR: scp: {}".format( sys.exc_info()[0] ) )
+		scp_failed = True
+		# lines = []
+		# lines[0] = ""
+		output = ""
+		logger( "ERROR: scp: {} (from push_to_server_via_scp(), general case)".format( sys.exc_info()[0] ) )
 
-	if len(lines) > 1 :
+
+	lines = re.split('\n', output)
+	# if len(lines[0]) > 0 or len(lines) > 1 :
+	if scp_failed and len(lines) > 1 :
+		logger( "DEBUG: scp stdout output:\n".format( e.output ) )
 		for jjj in range( len(lines) ) :
-			print "DEBUG: #{} \"{}\"".format( jjj, lines[jjj] )
+			logger( "DEBUG: #{} \"{}\"".format( jjj, lines[jjj] ) )
 	
 	return
+
+
+
+
 
 
 
@@ -1588,8 +1643,10 @@ def push_to_server(local_file, remote_path) :
 			break
 		except Exception as problem :
 			logger( "ERROR: in push_to_server() FTP (connect): {}".format( problem ) )
-			if "authentication" in problem :
-				logger( "DEBUG: FTP credentials: s=\"{}\" l=\"{}\" p=\"{}\"".format( ftp_server, ftp_login, ftp_password ) )
+
+			logger( "DEBUG: FTP credentials: s=\"{}\" l=\"{}\" p=\"{}\"".format( ftp_server, ftp_login, ftp_password ) )
+#@@@			if "authentication" in problem :
+#@@@				logger( "DEBUG: FTP credentials: s=\"{}\" l=\"{}\" p=\"{}\"".format( ftp_server, ftp_login, ftp_password ) )
 
 		# ----------------------------------------------------------------------------------------
 		# ----------------------------------------------------------------------------------------
@@ -1711,7 +1768,7 @@ def push_to_server(local_file, remote_path) :
 
 			ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
 		except Exception as problem :
-			logger( "ERROR: in push_to_server() ftp.storbinary {}".format( problem ) )
+			logger( "ERROR: in push_to_server() ftp.storbinary \"{}\"".format( problem ) )
 			ftp_OK = False
 
 
@@ -1915,6 +1972,8 @@ def wait_ffmpeg() :
 def camera_down():
 #	global check_counter
 
+	age = "0"
+
 	try:
 
 #DEBUG#		logger("DEBUG: reading: \"{}\"".format( image_age_URL ) )
@@ -1929,14 +1988,15 @@ def camera_down():
 		#     Maybe content = "0 0 00:00:00_UTC" if urlopen fails??
 		# ------------------------------------------------------------------
 	except:
-		age = "0"
-		logger("WARNING: Assumed image age: {}".format( age ) )
+#		age = "0"
+		logger("WARNING: Could not addess {}.  Assume image age: {}".format( image_age_URL, age ) )
 
 	# --------------------------------------------------------------------------------
 	# Avoid ... "ValueError: invalid literal for int() with base 10: ''"
 	# --------------------------------------------------------------------------------
 	if len( age ) < 1 :
-		age = "0"
+#		age = "0"
+		logger("WARNING: Zero-length value from {}.  Assume image age: {}".format( image_age_URL, age ) )
 
 	age = int( age.rstrip() )
 #	##DEBUG## ___print words[0], words[2]
