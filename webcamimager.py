@@ -168,6 +168,8 @@
 # ========================================================================================
 #
 #
+# 20191112 RAD Added other_systemctl to the control file, and use it to restart the
+#              other monitored process if required.
 # 20190924 RAD Switched push_to_server_via_scp() calls (4) back to push_to_server().
 #              It seems this may have been causing our IP hosted server address to
 #              be locked / blocked to to bad credentials.  This was affecting multiple
@@ -394,6 +396,8 @@ thumbnail_image = ""
 remote_dir = ""
 image_age_URL = ""
 
+other_systemctl = ""
+
 this_script = sys.argv[0]
 if re.match('^\./', this_script) :
 	this_script = "{}/{}".format( os.getcwd(), re.sub('^\./', '', this_script) )
@@ -438,6 +442,7 @@ cfg_parameters = [
 	"relay_HOST",
 	"mon_log",
 	"mon_max_age",
+	"other_systemctl",
 	]
 
 
@@ -482,6 +487,7 @@ def main():
 	log_and_message( "INFO: relay2_GPIO = \"{}\"".format( relay2_GPIO ) )
 	log_and_message( "INFO: mon_log = \"{}\"".format( mon_log ) )
 	log_and_message( "INFO: mon_max_age = \"{}\"".format( mon_max_age ) )
+	log_and_message( "INFO: other_systemctl = \"{}\"".format( other_systemctl ) )
 	log_and_message( "." )
 
 	nvers = mono_version()
@@ -832,7 +838,7 @@ def check_log_age( ) :
 	global mon_log, mon_max_age
 
 
-# @@@
+# @@@ here
 	mtime = stat( mon_log ).st_mtime
 	now = time.time()
 #	print mtime
@@ -840,12 +846,24 @@ def check_log_age( ) :
 	age = now - mtime
 #	print "DEBUG: age = {:10.2f}".format( age )
 
-	if age > mon_max_age :
+	if age > mon_max_age and len( other_systemctl ) > 0 :
 		log_and_message( "ERROR: \"{}\"  has not been updated for {:1.2f} seconds.".format( mon_log, age ) )
 		log_and_message( "ERROR: \"{}\"  has not been updated for {:1.2f} seconds.".format( mon_log, age ) )
-		log_and_message( "ERROR: \"{}\"  has not been updated for {:1.2f} seconds.".format( mon_log, age ) )
-		log_and_message( "ERROR: \"{}\"  has not been updated for {:1.2f} seconds.".format( mon_log, age ) )
-		log_and_message( "ERROR: \"{}\"  has not been updated for {:1.2f} seconds.".format( mon_log, age ) )
+#		log_and_message( "ERROR: \"{}\"  has not been updated for {:1.2f} seconds.".format( mon_log, age ) )
+
+
+		restart_cmd = [ "/usr/bin/sudo",
+				"/bin/systemctl",
+				"restart",
+				other_systemctl,
+				]
+
+		try:
+			reply = subprocess.check_output( restart_cmd, stderr=subprocess.STDOUT )
+			logger( "DEBUG: tar -tzf {} checked.  Returned = {} bytes.".format( tar_file, len(reply) ) )
+		except :
+			logger( "ERROR: Unexpected ERROR in {}: {}".format( restart_cmd, sys.exc_info()[0] ) )
+
 
 	return
 
@@ -868,6 +886,7 @@ def read_config( config_file ) :
 	global cam_host, relay_HOST
 	global relay_GPIO, relay2_GPIO, webcam_ON, webcam_OFF
 	global mon_log, mon_max_age
+	global other_systemctl
 
 # 	# https://docs.python.org/2/library/configparser.html
 	config = ConfigParser.RawConfigParser()
