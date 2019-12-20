@@ -7,6 +7,9 @@
 #  If copied to apache folder /usr/lib/cgi-bin/pi_health.py it can be accessed as
 #      http://192.168.1.172/cgi-bin/pi_health.py  -  for example...
 #
+#  Check... (without browser)
+#      curl localhost/cgi-bin/pi_health.py
+#
 # ----------------------------------------------------------------------------------------
 #
 # ========================================================================================
@@ -62,9 +65,6 @@
 #      sudo cp /home/pi/webcamwatcher/pi_health.py  /usr/lib/cgi-bin/
 #   Worked!!
 #
-#   Check... (without browser)
-#      curl localhost/cgi-bin/pi_health.py
-#
 #
 #      systemctl -l status apache2
 #      ls -al /var/log/apache2/
@@ -108,8 +108,8 @@ threshold_matrix = [
 	[    4.0,   8.0  ],    # "proc_load_5m",
 	[     -1,    -1  ],    # "effective_used",
 	[     20,    30  ],    # "mem_pct",
-	[   1024,  5120  ],    # "swap_used",
-	[      1,     5  ],    # "swap_pct",
+	[   5120, 25600  ],    # "swap_used",
+	[      5,    25  ],    # "swap_pct",
 	[     50,    55  ],    # "cpu_temp_c",
 	[    122,   131  ],    # "cpu_temp_f",
 	[     -1,    -1  ],    # "python_version",

@@ -1,5 +1,14 @@
 #!/usr/bin/python -u
 # @@@ ... 
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE: At some point, remove push_to_server()
+#    NOTE:
+#    NOTE: This assumes you can
+#    NOTE:     ssh -p 21098 dillwjfq@server162.web-hosting.com
+#    NOTE:
+#    NOTE:
 # 
 # This script is started by 2 services - for for north- and south-facing cameras: 
 #	webcam_north.service
@@ -159,10 +168,35 @@
 # ========================================================================================
 #
 #
+# 20191112 RAD Added other_systemctl to the control file, and use it to restart the
+#              other monitored process if required.
+# 20190924 RAD Switched push_to_server_via_scp() calls (4) back to push_to_server().
+#              It seems this may have been causing our IP hosted server address to
+#              be locked / blocked to to bad credentials.  This was affecting multiple
+#              users if I understood correctly.  Really curious how credential-less
+#              scp can result in bad credentials - but I couldn't justify further
+#              tinkering.  Need to update git...
+# 20190907 RAD Oddly, scp seems to work most of the time, except after building the mp4
+#              file.  It does work twice in midnight_process(), uploading both the
+#              thumbnail and the mp4 (the largest file we upload).  It seems to fail
+#              after a few additional calls to push_to_server_via_scp(). Added some
+#              sleep time for grins, but it seems to have no effect.
+# 20190907 RAD Looks like this script, or perhaps CumulusMX caused a locking up of
+#              our virtual server IP address.  This error was logged at the time of failure:
+#                ERROR: in push_to_server() FTP (connect): 530 Login authentication failed
+#              Namecheap support was pretty adamant that it wasn't their issue. Logically
+#              I find it difficult to understand how this script could be at fault,
+#              since the credentials are read at startup and should never change while
+#              running ... unless something very surgical wacked some memory. I did
+#              comment out or remove these three from some "global" statements:
+#                      ftp_server, ftp_login, ftp_password
+#              They should only be allowed to be set by read_FTP_config(). I also
+#              log the FTP credentials in push_to_server() if the connect fails and
+#              and "authentication" is found in the error message.
 # 20190625 RAD Same issue, processes "running" but apparently hung.  So camera_down()
 #              may not be very useful here ... at least for this failure mode. A separate
 #              watchdog may be required.  As noted below process_new_image() is likely
-#              where the hange occurs because immediate afterward the '.' for the next
+#              where the hang occurs because immediate afterward the '.' for the next
 #              wait cycle is printed - and I'm not seeing it in the log.
 #              We are seeing the "INFO: Process ..." message logged.
 #              .
@@ -362,6 +396,8 @@ thumbnail_image = ""
 remote_dir = ""
 image_age_URL = ""
 
+other_systemctl = ""
+
 this_script = sys.argv[0]
 if re.match('^\./', this_script) :
 	this_script = "{}/{}".format( os.getcwd(), re.sub('^\./', '', this_script) )
@@ -406,6 +442,7 @@ cfg_parameters = [
 	"relay_HOST",
 	"mon_log",
 	"mon_max_age",
+	"other_systemctl",
 	]
 
 
@@ -450,6 +487,7 @@ def main():
 	log_and_message( "INFO: relay2_GPIO = \"{}\"".format( relay2_GPIO ) )
 	log_and_message( "INFO: mon_log = \"{}\"".format( mon_log ) )
 	log_and_message( "INFO: mon_max_age = \"{}\"".format( mon_max_age ) )
+	log_and_message( "INFO: other_systemctl = \"{}\"".format( other_systemctl ) )
 	log_and_message( "." )
 
 	nvers = mono_version()
@@ -482,14 +520,14 @@ def main():
 # ----------------------------------------------------------------------------------------
 def process_new_image( source, target) :
 
-	camera_down()     # TESTING
-
 	logger( "INFO: Process {}".format(source) )
 #DEBUG#	logger( "DEBUG: Called process_new_image(\n\t {},\n\t {} )".format(source, target) )
 
+	camera_down()     # TESTING
+
 	shutil.copy2( source, target )
-#@@@	push_to_server( target, remote_dir )
-	push_to_server_via_scp( target, remote_dir )
+	push_to_server( target, remote_dir )
+#@@@	push_to_server_via_scp( target, remote_dir )
 	# push_to_test( target, "REMOVE_ME/" + remote_dir )
 
 	thumbnail_file = work_dir + '/' + thumbnail_image
@@ -508,11 +546,11 @@ def process_new_image( source, target) :
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	if len(convert) > 0 :
 		logger( "WARNING: convert returned data: \"{}\"".format( convert ) )
-	else :
-		logger( "DEBUG: convert returned data: \"{}\"".format( convert ) )
+#	else :
+#		logger( "DEBUG: convert returned data: \"{}\"".format( convert ) )
 
-#@@@	push_to_server( thumbnail_file, remote_dir )
-	push_to_server_via_scp( thumbnail_file, remote_dir )
+	push_to_server( thumbnail_file, remote_dir )
+#@@@	push_to_server_via_scp( thumbnail_file, remote_dir )
 	# push_to_test( thumbnail_file, "REMOVE_ME/" + remote_dir )
 
 
@@ -800,7 +838,7 @@ def check_log_age( ) :
 	global mon_log, mon_max_age
 
 
-# @@@
+# @@@ here
 	mtime = stat( mon_log ).st_mtime
 	now = time.time()
 #	print mtime
@@ -808,12 +846,24 @@ def check_log_age( ) :
 	age = now - mtime
 #	print "DEBUG: age = {:10.2f}".format( age )
 
-	if age > mon_max_age :
+	if age > mon_max_age and len( other_systemctl ) > 0 :
 		log_and_message( "ERROR: \"{}\"  has not been updated for {:1.2f} seconds.".format( mon_log, age ) )
 		log_and_message( "ERROR: \"{}\"  has not been updated for {:1.2f} seconds.".format( mon_log, age ) )
-		log_and_message( "ERROR: \"{}\"  has not been updated for {:1.2f} seconds.".format( mon_log, age ) )
-		log_and_message( "ERROR: \"{}\"  has not been updated for {:1.2f} seconds.".format( mon_log, age ) )
-		log_and_message( "ERROR: \"{}\"  has not been updated for {:1.2f} seconds.".format( mon_log, age ) )
+#		log_and_message( "ERROR: \"{}\"  has not been updated for {:1.2f} seconds.".format( mon_log, age ) )
+
+
+		restart_cmd = [ "/usr/bin/sudo",
+				"/bin/systemctl",
+				"restart",
+				other_systemctl,
+				]
+
+		try:
+			reply = subprocess.check_output( restart_cmd, stderr=subprocess.STDOUT )
+			logger( "DEBUG: tar -tzf {} checked.  Returned = {} bytes.".format( tar_file, len(reply) ) )
+		except :
+			logger( "ERROR: Unexpected ERROR in {}: {}".format( restart_cmd, sys.exc_info()[0] ) )
+
 
 	return
 
@@ -833,11 +883,12 @@ def check_log_age( ) :
 # ----------------------------------------------------------------------------------------
 def read_config( config_file ) :
 	global work_dir, main_image, thumbnail_image, remote_dir
-	global ftp_login, ftp_password, cam_host, relay_HOST
+	global cam_host, relay_HOST
 	global relay_GPIO, relay2_GPIO, webcam_ON, webcam_OFF
 	global mon_log, mon_max_age
+	global other_systemctl
 
-# @@@	# https://docs.python.org/2/library/configparser.html
+# 	# https://docs.python.org/2/library/configparser.html
 	config = ConfigParser.RawConfigParser()
 	# This was necessary to avoid folding variable names to all lowercase.
 	# https://stackoverflow.com/questions/19359556/configparser-reads-capital-keys-and-make-them-lower-case
@@ -983,6 +1034,11 @@ def midnight_process(date_string) :
 	tar_failed = True
 
 	logger( "DEBUG: Called midnight_process( {} )".format(date_string ) )
+	logger( "DEBUG: Called midnight_process( {} )".format(date_string ) )
+	logger( "DEBUG: Called midnight_process( {} )".format(date_string ) )
+	logger( "DEBUG: Called midnight_process( {} )".format(date_string ) )
+	logger( "DEBUG: Called midnight_process( {} )".format(date_string ) )
+	logger( "DEBUG: Called midnight_process( {} )".format(date_string ) )
 
 	# Example: 20180523 - - - (looks like a number, but a string here.)
 	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
@@ -1055,6 +1111,18 @@ def midnight_process(date_string) :
 
 
 
+	logger( "DEBUG: sleep( 15 )" )
+	sleep( 15 )
+	logger( "DEBUG: sleep( 15 )" )
+	sleep( 15 )
+	logger( "DEBUG: sleep( 15 )" )
+	sleep( 15 )
+	logger( "DEBUG: sleep( 15 )" )
+	sleep( 15 )
+	logger( "DEBUG: sleep( 15 )" )
+	sleep( 15 )
+	logger( "DEBUG: sleep( 15 )" )
+	sleep( 15 )
 
 
 # ----------------------------------------------------------------------------------------
@@ -1187,7 +1255,6 @@ def tar_dailies(date_string) :
 
 
 
-# @@@
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	#  If the system crashes before this is complete, you might see this
 	#     gzip: stdin: unexpected end of file
@@ -1379,7 +1446,7 @@ def remove_night_images( date_string, working_dir ) :
 				kept += 1
 
 	found = kept + deleted
-	logger( "DEBUG: remove_night_images kept {} and deleted {} of ()".format( kept, deleted, found ) )
+	logger( "DEBUG: remove_night_images kept {} and deleted {} of {}".format( kept, deleted, found ) )
 	return found
 
 
@@ -1489,24 +1556,49 @@ def get_stored_filename() :
 # @@@
 # ----------------------------------------------------------------------------------------
 def push_to_server_via_scp(local_file, remote_path) :
-########################################################################	remote_path = "public_html/wx"
-#      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-#		scp -P "21098" do_midnight.log dillwjfq@server162.web-hosting.com:public_html/wx/North
 #	destination = "user@remotehost:remotepath"
 	destination = "dillwjfq@server162.web-hosting.com:public_html/wx/" + remote_path
+	scp_failed = False
 
+#	logger( "DEBUG: subprocess.check_output([\"scp\", \"-q\", \"-P\", \"21098\", {}, {}])".format( local_file, destination ) )
+
+	# Create empty array in case the try block fails. This by the way creates a 0-th member.
+	# Before I got the logic right with an "or" below, I saw...
+	#   DEBUG: #0 ""
 	try :
-		output = subprocess.check_output(["scp", "-q", "-P", "21098", local_file, destination])
-		lines = re.split('\n', output)
+		output = subprocess.check_output(["scp", "-q", "-P", "21098", local_file, destination], stderr=subprocess.STDOUT )
+	except subprocess.CalledProcessError, e :
+		scp_failed = True
+		# lines = []
+		# lines[0] = ""
+	# if len(lines[0]) > 0 or len(lines) > 1 :
+		output = ""
+		logger( "ERROR: scp: \"{}\" (from push_to_server_via_scp(), CalledProcessError)".format( sys.exc_info()[0] ) )
+		logger( "DEBUG: scp cmd = {}".format( e.cmd ) )
+		logger( "DEBUG: scp returncode = {}".format( e.returncode ) )
+		logger( "DEBUG: scp error output:\n{}".format( e.output ) )
+		# https://stackoverflow.com/questions/7575284/check-output-from-calledprocesserror
 	except :
-		messager( "ERROR: scp: {}".format( sys.exc_info()[0] ) )
+		scp_failed = True
+		# lines = []
+		# lines[0] = ""
+		output = ""
+		logger( "ERROR: scp: {} (from push_to_server_via_scp(), general case)".format( sys.exc_info()[0] ) )
 
-	if len(lines) > 1 :
+
+	lines = re.split('\n', output)
+	# if len(lines[0]) > 0 or len(lines) > 1 :
+	if scp_failed and len(lines) > 1 :
+		logger( "DEBUG: scp stdout output:\n".format( e.output ) )
 		for jjj in range( len(lines) ) :
-			print "DEBUG: #{} \"{}\"".format( jjj, lines[jjj] )
+			logger( "DEBUG: #{} \"{}\"".format( jjj, lines[jjj] ) )
 	
 	return
+
+
+
+
 
 
 
@@ -1527,9 +1619,6 @@ def push_to_server_via_scp(local_file, remote_path) :
 #    NOTE: 
 # ----------------------------------------------------------------------------------------
 def push_to_server(local_file, remote_path) :
-	global ftp_login
-	global ftp_password
-	global ftp_server
 	ftp_OK = False
 
 #DEBUG#	logger( "DEBUG: push_to_server( {}, {}, {} )".format( local_file, remote_path, server ) )
@@ -1574,6 +1663,35 @@ def push_to_server(local_file, remote_path) :
 		except Exception as problem :
 			logger( "ERROR: in push_to_server() FTP (connect): {}".format( problem ) )
 
+			logger( "DEBUG: FTP credentials: s=\"{}\" l=\"{}\" p=\"{}\"".format( ftp_server, ftp_login, ftp_password ) )
+#@@@			if "authentication" in problem :
+#@@@				logger( "DEBUG: FTP credentials: s=\"{}\" l=\"{}\" p=\"{}\"".format( ftp_server, ftp_login, ftp_password ) )
+
+		# ----------------------------------------------------------------------------------------
+		# ----------------------------------------------------------------------------------------
+		#   ......................||  (22)
+		#   2019/09/06 04:48:39 INFO: Process /home/pi/N/North/snapshot-2019-09-06-04-48-38.jpg
+		#   2019/09/06 04:48:53 ERROR: in push_to_server() FTP (connect): 530 Login authentication failed
+		#   2019/09/06 04:49:08 ERROR: in push_to_server() FTP (connect): 530 Login authentication failed
+		#   2019/09/06 04:49:08 DEBUG: in push_to_server() sleep( 8 )
+		#   2019/09/06 04:49:31 ERROR: in push_to_server() FTP (connect): 530 Login authentication failed
+		#   2019/09/06 04:49:31 DEBUG: in push_to_server() sleep( 12 )
+		#   2019/09/06 04:49:58 ERROR: in push_to_server() FTP (connect): 530 Login authentication failed
+		#   2019/09/06 04:49:58 DEBUG: in push_to_server() sleep( 16 )
+		#   2019/09/06 04:50:30 ERROR: in push_to_server() FTP (connect): 530 Login authentication failed
+		#   2019/09/06 04:50:30 DEBUG: in push_to_server() sleep( 20 )
+		#   2019/09/06 04:53:01 ERROR: in push_to_server() FTP (connect): [Errno 110] Connection timed out
+		#   2019/09/06 04:53:01 DEBUG: in push_to_server() sleep( 24 )
+		#   2019/09/06 04:55:34 ERROR: in push_to_server() FTP (connect): [Errno 110] Connection timed out
+		#   2019/09/06 04:55:34 DEBUG: in push_to_server() sleep( 28 )
+		#   2019/09/06 04:58:13 ERROR: in push_to_server() FTP (connect): [Errno 110] Connection timed out
+		#
+		#
+		#
+		#
+		#   2019/09/06 04:59:13 INFO: Starting /home/pi/N/webcamimager.py   PID=26365
+		# ----------------------------------------------------------------------------------------
+		# ----------------------------------------------------------------------------------------
 		# ----------------------------------------------------------------------------------------
 		#.......................||  (23)
 		#  2019/07/24 09:13:03 INFO: Process /home/pi/S/South/snapshot-2019-07-24-09-12-57.jpg
@@ -1640,6 +1758,28 @@ def push_to_server(local_file, remote_path) :
 		exit()
 
 
+	# --------------------------------------------------------------------------------
+	# NOTE: It looks like this might be a temporary condition and a retry might
+	#       might be in order...
+	#       I would expect this is the previous use of the socket was busy.
+	#       I suppose it could be 2 instances of this trying to ftp files concurrently.
+	#
+	#  https://stackoverflow.com/questions/6176445/problem-socket-error-address-already-in-use-in-python-selenium
+	#  https://stackoverflow.com/questions/41423642/python-socket-server-address-already-in-use
+	#
+	# --------------------------------------------------------------------------------
+	#  2019/09/10 17:36:36 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
+	#  2019/09/10 19:28:36 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
+	#  2019/09/11 01:30:38 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
+	#  2019/09/11 04:06:42 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
+	#  2019/09/11 08:40:45 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
+	#  2019/09/11 11:06:42 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
+	#  2019/09/11 11:44:47 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
+	#  2019/09/11 11:58:47 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
+	#  2019/09/11 12:26:47 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
+	#  2019/09/11 13:12:50 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
+	# --------------------------------------------------------------------------------
+
 	if ftp_OK :
 		try :
 #DEBUG#			logger( "DEBUG: FTP STOR {} from  {}".format( local_file_bare, local_file) )
@@ -1647,7 +1787,7 @@ def push_to_server(local_file, remote_path) :
 
 			ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
 		except Exception as problem :
-			logger( "ERROR: in push_to_server() ftp.storbinary {}".format( problem ) )
+			logger( "ERROR: in push_to_server() ftp.storbinary \"{}\"".format( problem ) )
 			ftp_OK = False
 
 
@@ -1851,6 +1991,8 @@ def wait_ffmpeg() :
 def camera_down():
 #	global check_counter
 
+	age = "0"
+
 	try:
 
 #DEBUG#		logger("DEBUG: reading: \"{}\"".format( image_age_URL ) )
@@ -1865,14 +2007,15 @@ def camera_down():
 		#     Maybe content = "0 0 00:00:00_UTC" if urlopen fails??
 		# ------------------------------------------------------------------
 	except:
-		age = "0"
-		logger("WARNING: Assumed image age: {}".format( age ) )
+#		age = "0"
+		logger("WARNING: Could not addess {}.  Assume image age: {}".format( image_age_URL, age ) )
 
 	# --------------------------------------------------------------------------------
 	# Avoid ... "ValueError: invalid literal for int() with base 10: ''"
 	# --------------------------------------------------------------------------------
 	if len( age ) < 1 :
-		age = "0"
+#		age = "0"
+		logger("WARNING: Zero-length value from {}.  Assume image age: {}".format( image_age_URL, age ) )
 
 	age = int( age.rstrip() )
 #	##DEBUG## ___print words[0], words[2]
@@ -2032,7 +2175,7 @@ def do_midnight() :
 		print "Too few arguments"
 		exit()
 
-	print "{} arguments".format(len(sys.argv))
+	print "{} arguments".format(len(sys.argv)-1)
 
 	date_string = sys.argv[2]
 
