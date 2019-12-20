@@ -37,6 +37,58 @@ def log_check():
 
 	FH = open(infile, "r")
 #	FH = open("rasp_cams.grep", "r")
+	log_file_list = FH.readlines()
+	FH.close
+
+
+	for iii in range(0, len(log_file_list)):
+		log_file_list[iii] = log_file_list[iii].rstrip()
+#		print log_file_list[iii]
+#
+#		NOTE: Doesn't work because range is called just once above...
+#		if re.search('^#', log_file_list[iii]) :
+#			log_file_list.pop( iii )
+
+	log_files = len(log_file_list)
+	print "DEBUG: checking {} log files...".format( log_files )
+
+	now = time.time()
+
+	for iii in range(0, len(log_file_list)):
+		if re.search('^#', log_file_list[iii]) :
+			continue
+
+		age_limit = 99999
+		token = re.split('\s*', log_file_list[iii] )
+		if len(token) > 1 :
+			age_limit = token[1]
+			log_file_list[iii] = token[0]
+#		print "DEBUG: pattern {} \"{}\"".format( iii, log_file_list[iii] )
+		log_mtime = stat( log_file_list[iii] ).st_mtime
+		age = now - log_mtime
+#		print "DEBUG: mtime = {}".format( log_mtime )
+		print "DEBUG: age = {:8.2f}  max = {:8.2f}  {}".format( age, float(age_limit), log_file_list[iii] )
+		if age > float(age_limit) :
+			print "ERROR: log file {} is age = {:8.2f} seconds old (beyond {:8.2f} )".format( log_file_list[iii], age, float(age_limit) )
+
+
+	exit()
+	exit()
+	exit()
+	exit()
+	exit()
+
+#	image_dir_mtime = stat( work_dir ).st_mtime
+
+
+
+# ----------------------------------------------------------------------------------------
+# def log_check():
+
+	found = 0
+
+	FH = open(infile, "r")
+#	FH = open("rasp_cams.grep", "r")
 	pattern_list = FH.readlines()
 	FH.close
 
