@@ -86,7 +86,7 @@ from time import sleep
 import sys
 from os import getpid
 
-webcam_channel = 21
+webcam_channel = 23
 sleep_for = 120
 sleep_on_recycle = 300 ; # Leave time for the server side to pick it up...
 log_stride = 2
