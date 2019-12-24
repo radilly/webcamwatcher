@@ -9,6 +9,43 @@
 #    NOTE:     ssh -p 21098 dillwjfq@server162.web-hosting.com
 #    NOTE:
 #    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:  When the network went out, this caused these script to keep restarting it.
+#    NOTE:  Might consider handling it better.
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
 # 
 # This script is started by 2 services - for for north- and south-facing cameras: 
 #	webcam_north.service
@@ -472,7 +509,7 @@ def main():
 
 	log_and_message( "INFO: ftp_server = \"{}\"".format(ftp_server) )
 	log_and_message( "INFO: ftp_login = \"{}\"".format(ftp_login) )
-	## log_and_message( "INFO: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  ftp_password = \"{}\"".format(ftp_password) )
+	log_and_message( "INFO: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  ftp_password = \"{}\"".format(ftp_password) )
 
 	read_config( config_file )
 
@@ -553,6 +590,7 @@ def process_new_image( source, target) :
 #@@@	push_to_server_via_scp( thumbnail_file, remote_dir )
 	# push_to_test( thumbnail_file, "REMOVE_ME/" + remote_dir )
 
+	logger( "DEBUG: done" )
 
 
 
@@ -847,6 +885,7 @@ def check_log_age( ) :
 #	print "DEBUG: age = {:10.2f}".format( age )
 
 	if age > mon_max_age and len( other_systemctl ) > 0 :
+		log_string( "\n" )
 		log_and_message( "ERROR: \"{}\"  has not been updated for {:1.2f} seconds.".format( mon_log, age ) )
 		log_and_message( "ERROR: \"{}\"  has not been updated for {:1.2f} seconds.".format( mon_log, age ) )
 #		log_and_message( "ERROR: \"{}\"  has not been updated for {:1.2f} seconds.".format( mon_log, age ) )
@@ -860,10 +899,10 @@ def check_log_age( ) :
 
 		try:
 			reply = subprocess.check_output( restart_cmd, stderr=subprocess.STDOUT )
-			logger( "DEBUG: tar -tzf {} checked.  Returned = {} bytes.".format( tar_file, len(reply) ) )
-		except :
-			logger( "ERROR: Unexpected ERROR in {}: {}".format( restart_cmd, sys.exc_info()[0] ) )
-
+			logger( "DEBUG: Result from {}: Returned = {} bytes.".format( restart_cmd, len(reply) ) )
+		except Exception as problem :
+			log_and_message( "ERROR: Unexpected ERROR in {}: {}".format( restart_cmd, sys.exc_info()[0] ) )
+			log_and_message( "ERROR: systemctl restart: {}".format( problem ) )
 
 	return
 
@@ -930,12 +969,58 @@ def read_config( config_file ) :
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	ftp_OK = False
 
-	try :
-		ftp = FTP( ftp_server, ftp_login, ftp_password )
-		ftp_OK = True
-	except Exception as problem :
-		log_and_message( "ERROR: Unexpected ERROR in FTP connect: {}".format( sys.exc_info()[0] ) )
-		log_and_message( "ERROR: FTP (connect): {}".format( problem ) )
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	#    2019/12/20 09:38:15 ERROR: Unexpected ERROR in FTP connect: <class 'socket.error'>
+	#    2019/12/20 09:38:15 ERROR: FTP (connect): [Errno 110] Connection timed out
+	#    2019/12/20 09:38:15 ERROR: Quitting due to FTP error(s) above.  Exiting in 30 seconds ...
+	#    2019/12/20 09:38:45   Good bye from /home/pi/N/webcamimager.py
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	# --------------------------------------------------------------------------------
+	for iii in range(8) :
+		# Not on first iteration.  Then increase the sleep time with each iteration.
+		#  With a 4 sec multiplier this comes to 112 seconds max...     (28 * 4)
+		if iii > 0 :
+			logger( "DEBUG: in push_to_server() sleep( {} )".format( iii * 15 ) )
+			sleep( iii * 15 )
+
+		try :
+#DEBUG#			messager( "DEBUG: FTP connect to {}".format( server ) )
+			ftp = FTP( ftp_server, ftp_login, ftp_password )
+			ftp_OK = True
+			break
+		except Exception as problem :
+			log_and_message( "ERROR: Unexpected ERROR in FTP connect: {}".format( sys.exc_info()[0] ) )
+			log_and_message( "ERROR: in read_config() FTP (connect): {}".format( problem ) )
+			log_and_message( "DEBUG: FTP credentials: s=\"{}\" l=\"{}\" p=\"{}\"".format( ftp_server, ftp_login, ftp_password ) )
+#@@@			if "authentication" in problem :
+#@@@				logger( "DEBUG: FTP credentials: s=\"{}\" l=\"{}\" p=\"{}\"".format( ftp_server, ftp_login, ftp_password ) )
+
+		# ----------------------------------------------------------------------------------------
+		# ----------------------------------------------------------------------------------------
+		# ----------------------------------------------------------------------------------------
+		# ----------------------------------------------------------------------------------------
+		# ----------------------------------------------------------------------------------------
+		# ----------------------------------------------------------------------------------------
+		# ----------------------------------------------------------------------------------------
+		# ----------------------------------------------------------------------------------------
+
+#@@@	try :
+#@@@		ftp = FTP( ftp_server, ftp_login, ftp_password )
+#@@@		ftp_OK = True
+#@@@	except Exception as problem :
+#@@@		log_and_message( "ERROR: Unexpected ERROR in FTP connect: {}".format( sys.exc_info()[0] ) )
+#@@@		log_and_message( "ERROR: FTP (connect): {}".format( problem ) )
+
+		# ----------------------------------------------------------------------------------------
+		# ----------------------------------------------------------------------------------------
+		# ----------------------------------------------------------------------------------------
+		# ----------------------------------------------------------------------------------------
+		# ----------------------------------------------------------------------------------------
+		# ----------------------------------------------------------------------------------------
+		# ----------------------------------------------------------------------------------------
+		# ----------------------------------------------------------------------------------------
 
 	if ftp_OK :
 		try :
@@ -952,9 +1037,10 @@ def read_config( config_file ) :
 			log_and_message( "ERROR: Unexpected ERROR in FTP quit: {}".format( sys.exc_info()[0] ) )
 			log_and_message( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
 
+
 	if not ftp_OK :
 		log_and_message( "ERROR: Quitting due to FTP error(s) above.  Exiting in 30 seconds ..." )
-		sleep( 30 )
+		sleep( 240 )
 		log_and_message("  Good bye from " + this_script )
 		log_string( "\n" )
 		exit()
@@ -1642,7 +1728,7 @@ def push_to_server(local_file, remote_path) :
 	for iii in range(8) :
 		# Not on first iteration.  Then increase the sleep time with each iteration.
 		#  With a 4 sec multiplier this comes to 112 seconds max...     (28 * 4)
-		if iii > 1 :
+		if iii > 0 :
 			logger( "DEBUG: in push_to_server() sleep( {} )".format( iii * 4 ) )
 			sleep( iii * 4 )
 
@@ -1781,14 +1867,72 @@ def push_to_server(local_file, remote_path) :
 	# --------------------------------------------------------------------------------
 
 	if ftp_OK :
-		try :
-#DEBUG#			logger( "DEBUG: FTP STOR {} from  {}".format( local_file_bare, local_file) )
-			logger( "DEBUG: FTP STOR {} from  {}".format( local_file_bare, local_file) )
+		for iii in range(8) :
+			if iii > 0 :
+				logger( "DEBUG: in push_to_server() sleep( {} )".format( iii * 4 ) )
+				sleep( iii * 4 )
 
-			ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
-		except Exception as problem :
-			logger( "ERROR: in push_to_server() ftp.storbinary \"{}\"".format( problem ) )
-			ftp_OK = False
+			try :
+				if iii > 0 :
+					logger( "DEBUG: FTP STOR {} ===> {}  attempt #{}".format( local_file, local_file_bare, iii+1) )
+				else :
+#DEBUG#					logger( "DEBUG: FTP STOR {} from  {}".format( local_file_bare, local_file) )
+					logger( "DEBUG: FTP STOR {} ---> {}".format( local_file, local_file_bare ) )
+
+				ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
+				ftp_OK = True
+				break
+
+			except Exception as problem :
+				logger( "ERROR: in push_to_server() ftp.storbinary \"{}\"".format( problem ) )
+				# --------------------------------------------------------
+				# --------------------------------------------------------
+				#                       if not catching_up and ( (file_list_len - line) > 2 ) :
+				# @@@
+				# Should wait and retry when problem =
+				#
+				# 425 Unable to identify the local data socket: Address already in use
+				#						997 in sample
+				#
+				# Wrap in a loop as with the above line:
+				#    ftp = FTP( ftp_server, ftp_login, ftp_password )
+				#
+				#
+				# Other repiles to consider are:
+ 				# [Errno 101] Network is unreachable		3 in sample
+ 				# [Errno 110] Connection timed out		76 in sample
+				#						out of 102841 calls
+				# --------------------------------------------------------
+				# --------------------------------------------------------
+				ftp_OK = False
+
+
+	try :
+		ftp.quit()
+	except Exception as problem :
+		logger( "ERROR: in push_to_server() ftp.quit {}".format( problem ) )
+		ftp.close()
+
+
+	return
+
+
+
+
+
+# ----------------------------------------------------------------------------------------
+#  Read the [ftp] section of the config file passed as the first argument to this script.
+#
+#
+# ----------------------------------------------------------------------------------------
+def read_FTP_config( config_file ) :
+	global ftp_login
+	global ftp_password
+	global ftp_server
+
+#	NOTE: Copied from def read_config( config_file )
+#	------------------------------------------------
+
 
 
 	try :
@@ -2008,7 +2152,7 @@ def camera_down():
 		# ------------------------------------------------------------------
 	except:
 #		age = "0"
-		logger("WARNING: Could not addess {}.  Assume image age: {}".format( image_age_URL, age ) )
+		logger("WARNING: Could not access {}.  Assume image age: {}".format( image_age_URL, age ) )
 
 	# --------------------------------------------------------------------------------
 	# Avoid ... "ValueError: invalid literal for int() with base 10: ''"
