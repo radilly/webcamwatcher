@@ -1,3 +1,6 @@
+maybe run apt-get update or try with --fix-missing?
+
+
  2091  git remote set-url origin git@github.com:radilly/webcamwatcher.git
 ------------------------------------------------------------
 vi webcamwatch.py 
@@ -59,7 +62,7 @@ https://www.brokenlinkcheck.com/
 # ========================================================================================
 #	sudo apt-get update && sudo apt-get upgrade
 #
-#       sudo apt-get vim
+#       sudo apt-get install vim
 #
 #
 #    * NOTE: When I started this up on the North camera on Pi 03 I had to tweak / create
@@ -122,7 +125,159 @@ touch ssh
 https://medium.com/@aallan/setting-up-a-headless-raspberry-pi-zero-3ded0b83f274
 https://raspberrypi.stackexchange.com/questions/56621/temporarily-disable-expand-filesystem-during-first-boot
 
+------------------------------------------------------------
+With console /dsiplay connected, you should see at the end of booting...
+
+My IP address is 192.168.1.xxx
+
+------------------------------------------------------------
+Run ssh-keygen if necessary - - - accept the default (no passphrase)
+	>>> Set the hostname first do the public key will be labeled.
+	>>>>>> "pi@rasp95" in the example below...
 
 
+ $ ssh-keygen
+Generating public/private rsa key pair.
+Enter file in which to save the key (/home/pi/.ssh/id_rsa):
+Created directory '/home/pi/.ssh'.
+Enter passphrase (empty for no passphrase):
+Enter same passphrase again:
+Your identification has been saved in /home/pi/.ssh/id_rsa.
+Your public key has been saved in /home/pi/.ssh/id_rsa.pub.
+The key fingerprint is:
+SHA256:55DgchL5OIDa2P3VDyI8Ctl0QCIQVcPA9AogehC59Aw pi@rasp95
+The key's randomart image is:
++---[RSA 2048]----+
+|XB===            |
+|=E.o.+           |
+|=.* = o          |
+|o* X B . o       |
+|o * B B S +      |
+|   . B + = o     |
+|    . .   . .    |
+|                 |
+|                 |
++----[SHA256]-----+
+
+
+
+:~/.ssh $ vi authorized_keys
+	### Copy in id_rsa.pub from other systems you wish to log in from.
+:~/.ssh $ chmod 600 authorized_keys
+:~/.ssh $ ls -l
+total 16
+-rw------- 1 pi pi 1206 Dec 29 21:42 authorized_keys
+-rw------- 1 pi pi 1811 Dec 29 21:37 id_rsa
+-rw-r--r-- 1 pi pi  391 Dec 29 21:37 id_rsa.pub
+-rw-r--r-- 1 pi pi  222 Dec 29 21:42 known_hosts
+
+$ cat id_rsa.pub | tr "ABCDQTPKYNEFRUI" "_"
+ssh-rsa _____3_za_1yc2_________________hyrG0p6Jy_4_S6_g_v___x5nx1_gy40mnnd_j_zgxx_bgJ___29MZ6y_W+79r_aHzWOJWu_dGxkM_HW_S_6l__ZwxJi3_u0+__8rqXr_h/aZ+c2_bXcjV_1y_3k_q7edJteh_dsl_fS_z_quf_e__a_h88en9tncn_tisc4/5_le/_t_0/_cb_xW_+6_Oc1V___9_hs4Gt__7jm9MchVx_2_zXm39oaV_W+j_ul4rWW+0w_nr4p8dHa7/4npg_84u__H3_Sepv39ZOcO+_o80JJm_wL3_1bsrHh_/_h_lMr__cqby_hppi9u/Lw_hwkO2+Xz__Jq+hHL_p88eeZ2j pi@rasp95
+
+
+------------------------------------------------------------
+SSH is enabled and the default password for the 'pi' user has not been changed.
+This is a security risk - please login as the 'pi' user and type 'passwd' to set
+a new password.
+
+$ passwd
+Changing password for pi.
+Current password:
+New password:
+Retype new password:
+passwd: password updated successfully
+
+------------------------------------------------------------
+
+------------------------------------------------------------
+
+------------------------------------------------------------
+------------------------------------------------------------
+
+$ sha256sum 2019-09-26-raspbian-buster-lite.zip
+a50237c2f718bd8d806b96df5b9d2174ce8b789eda1f03434ed2213bbca6c6ff  2019-09-26-raspbian-buster-lite.zip
+
+$ lsblk -p
+NAME             MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+/dev/mmcblk0     179:0    0   29G  0 disk
+├─/dev/mmcblk0p1 179:1    0 43.9M  0 part /boot
+└─/dev/mmcblk0p2 179:2    0 28.9G  0 part /
+
+>>> Plug in sd card to load...
+
+$ lsblk -p
+NAME             MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+/dev/sda           8:0    1 29.7G  0 disk
+/dev/mmcblk0     179:0    0   29G  0 disk
+├─/dev/mmcblk0p1 179:1    0 43.9M  0 part /boot
+└─/dev/mmcblk0p2 179:2    0 28.9G  0 part /
+
+>>> Target is /dev/sda
+
+$ unzip 2019-09-26-raspbian-buster-lite.zip
+Archive:  2019-09-26-raspbian-buster-lite.zip
+  inflating: 2019-09-26-raspbian-buster-lite.img
+
+>>> Make sure new device is NOT mounted - umount if is is
+
+# df -h
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/root        29G  7.9G   20G  29% /
+devtmpfs        213M     0  213M   0% /dev
+tmpfs           217M     0  217M   0% /dev/shm
+tmpfs           217M  5.9M  211M   3% /run
+tmpfs           5.0M  4.0K  5.0M   1% /run/lock
+tmpfs           217M     0  217M   0% /sys/fs/cgroup
+/dev/mmcblk0p1   44M   22M   22M  51% /boot
+tmpfs            44M     0   44M   0% /run/user/1000
+
+$ ls -al /dev/sda*
+brw-rw---- 1 root disk 8, 0 Dec 29 15:51 /dev/sda
+
+$ sudo dd bs=4M status=progress if=2019-09-26-raspbian-buster-lite.img of=/dev/sda
+2248146944 bytes (2.2 GB, 2.1 GiB) copied, 154.174 s, 14.6 MB/s
+536+0 records in
+536+0 records out
+2248146944 bytes (2.2 GB, 2.1 GiB) copied, 158.824 s, 14.2 MB/s
+
+$ ls -al /dev/sda*
+brw-rw---- 1 root disk 8, 0 Dec 29 16:03 /dev/sda
+brw-rw---- 1 root disk 8, 1 Dec 29 16:03 /dev/sda1
+brw-rw---- 1 root disk 8, 2 Dec 29 16:03 /dev/sda2
+
+$ sudo mkdir /mnt/boot
+$ sudo mkdir /mnt/root
+$ sudo mount /dev/sda1 /mnt/boot
+$ sudo mount /dev/sda2 /mnt/root
+
+$ cd /mnt/boot/
+$ sudo touch ssh
+
+$ cd /mnt/root/etc
+
+$ cd wpa_supplicant/
+$ sudo vi wpa_supplicant.conf
+
+$ cd ..
+$ ls ho*
+host.conf  hostname  hosts  hosts.allow  hosts.deny
+
+------------------------------------------------------------
+
+
+------------------------------------------------------------
+
+------------------------------------------------------------
+$ cat os-release
+PRETTY_NAME="Raspbian GNU/Linux 10 (buster)"
+NAME="Raspbian GNU/Linux"
+VERSION_ID="10"
+VERSION="10 (buster)"
+VERSION_CODENAME=buster
+ID=raspbian
+ID_LIKE=debian
+HOME_URL="http://www.raspbian.org/"
+SUPPORT_URL="http://www.raspbian.org/RaspbianForums"
+BUG_REPORT_URL="http://www.raspbian.org/RaspbianBugs"
 
 ------------------------------------------------------------
