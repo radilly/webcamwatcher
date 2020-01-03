@@ -25,7 +25,31 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+#
+# NOTE: The more general solution might be to read the full log which has readings
+#       from two probes - usually.  For water temp we want ID 28-02099177c8a6.
+#       Could be for some reason we're not reading it and we should handle...
+#
+#    ==> record_temp.log <==
+#    01/02/20,20:55,28-02099177c8a6,1937,1.94,35.49,28-021791772e4a,9062,9.06,48.31,
+#    01/02/20,21:00,28-02099177c8a6,1812,1.81,35.26,28-021791772e4a,9000,9.00,48.20,
+#    01/02/20,21:05,28-02099177c8a6,1875,1.88,35.38,28-021791772e4a,8812,8.81,47.86,
+#    01/02/20,21:10,28-02099177c8a6,2000,2.00,35.60,28-021791772e4a,8750,8.75,47.75,
+#    01/02/20,21:15,28-02099177c8a6,2062,2.06,35.71,28-021791772e4a,8937,8.94,48.09,
+#
+#    ==> record_temp.waterlog <==
+#    01/02/20,20:55,35.49
+#    01/02/20,21:00,35.26
+#    01/02/20,21:05,35.38
+#    01/02/20,21:10,35.60
+#    01/02/20,21:15,35.71
+#
 # ========================================================================================
+# ========================================================================================
+# ========================================================================================
+# 20200102 RAD Was fiddling with the box inside where the temp was in the green
+#              zone.  There was a typo in setting bgcolor in the default case.
+#              Added quite of number of DEBUG prints to figure it out...
 # 20191104 RAD Been working on something to present tracked pond water temp.
 #              Started with watchdog.py ... much of which is still here.
 #
@@ -147,13 +171,27 @@ def table_line( text_in ) :
 	tok = re.split(',', text_in )
 	temp = float( tok[2] )
 ###	print "<!-- DEBUG: temp = {} -->".format( temp )
+###	print "<!-- DEBUG: temp = \"{}\" -->".format( 1.0 * temp )
+###	print "<!-- DEBUG: bool = \"{}\" -->".format( temp < 40.0 )
+###	print "<!-- DEBUG: bool = \"{}\" -->".format( temp < 50.0 )
+###	print "<!-- DEBUG: bool = \"{}\" -->".format( temp < 99.0 )
 
+#	bgcolor = " BGCOLOR=\"#A0A0A0\""
+#	print "<!-- DEBUG: bgcolor = \"{}\" -->".format( bgcolor )
+#	bcgolor = " BGCOLOR=\"#00F900\""
+#	print "<!-- DEBUG: bgcolor = \"{}\" -->".format( bgcolor )
 	if temp < 40.0 :
+###		print "<!-- DEBUG: temp < 40.0 -->"
 		bgcolor = " BGCOLOR=\"#FF5555\""
+###		print "<!-- DEBUG: bgcolor = \"{}\" -->".format( bgcolor )
 	elif temp < 50.0 :
+###		print "<!-- DEBUG: temp < 50.0 -->"
 		bgcolor = " BGCOLOR=\"yellow\""
+###		print "<!-- DEBUG: bgcolor = \"{}\" -->".format( bgcolor )
 	else :
-		bcgolor = " BGCOLOR=\"#00F900\""
+###		print "<!-- DEBUG: else clause -->"
+		bgcolor = " BGCOLOR=\"#00F900\""
+###		print "<!-- DEBUG: bgcolor = \"{}\" -->".format( bgcolor )
 
 ###	print "<!-- DEBUG: bgcolor = {} -->".format( bgcolor )
 
