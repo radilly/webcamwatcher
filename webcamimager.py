@@ -204,7 +204,10 @@
 # ========================================================================================
 # ========================================================================================
 #
-#
+# 20200115 RAD Realised the symbolic link in arc_2020 to /rm_older_files.sh was
+#              missing when I went to run: alias cleanold='df -h . ; pushd ~/S/South/arc_...
+#              Added a line to make the link when the new annual directory is made
+#              in midnight_process().
 # 20191112 RAD Added other_systemctl to the control file, and use it to restart the
 #              other monitored process if required.
 # 20190924 RAD Switched push_to_server_via_scp() calls (4) back to push_to_server().
@@ -1106,6 +1109,7 @@ def power_cycle( interval ):
 # ----------------------------------------------------------------------------------------
 #  Handle a set of midnight tasks.
 #  * Check for the arc_<YYYY> directory, and make if if needed.
+#     * Also link /home/pi/webcamwatcher/rm_older_files.sh
 #  * Tar up the day's snapshot images.
 #  * Create thumbnail image for web pages.
 #  * Delete many of the 'dark hours' images.
@@ -1139,6 +1143,7 @@ def midnight_process(date_string) :
 	if not os.path.exists( arc_dir ) :
 		logger( "INFO: Created {}.  HAPPY NEW YEAR.".format( arc_dir) )
 		os.mkdir( arc_dir, 0755 )
+		os.symlink( "/home/pi/webcamwatcher/rm_older_files.sh", arc_dir + "/rm_older_files.sh" )
 
 	if os.path.isfile( tar_file ) :
 		logger( "ERROR: {} already exists.  Quitting Midnight process.".format( tar_file ) )
