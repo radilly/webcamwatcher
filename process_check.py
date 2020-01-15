@@ -61,7 +61,7 @@ def ps_check():
 	process = re.split('\n', ps_output)
 
 	if use_html :
-		print "<TABLE><TR><TH>"
+		print "<TABLE><TR><TH ALIGN=left>"
 		print "<PRE>UID        PID  PPID  C STIME TTY          TIME CMD</PRE>"
 		print "</TH></TR>"
 	else :
