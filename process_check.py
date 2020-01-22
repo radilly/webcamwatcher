@@ -67,7 +67,6 @@ def ps_check():
 	else :
 		print "UID        PID  PPID  C STIME TTY          TIME CMD"
 
-
 	for iii in range(0, len(process)):
 		if iii > 555 :
 			return

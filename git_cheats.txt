@@ -2,7 +2,7 @@ maybe run apt-get update or try with --fix-missing?
 
 
  2091  git remote set-url origin git@github.com:radilly/webcamwatcher.git
-------------------------------------------------------------
+-----------------------------------------------------------------------------------------
 vi webcamwatch.py 
 cd webcamwatcher/
 ls -altr
@@ -29,7 +29,7 @@ git checkout watchdog.py  (TO ABANDON CHANGES)
 
 
 SET UP NEW LOCAL REPO
-------------------------------------------------------------
+-----------------------------------------------------------------------------------------
 
 
 If not installed...
@@ -50,14 +50,18 @@ Add ssh key to https://github.com/settings/keys
 
 git commit -am "Starting working on webcamimager.py"
 
+If desired, a this to ~/.bashrc
+	export VISUAL='/usr/bin/vi'
+
+
 COMMON PI TWEAKS
 
-------------------------------------------------------------
+-----------------------------------------------------------------------------------------
 
 Broken link checker...
 https://www.brokenlinkcheck.com/
 
-------------------------------------------------------------
+-----------------------------------------------------------------------------------------
 
 # ========================================================================================
 #	sudo apt-get update && sudo apt-get upgrade
@@ -80,7 +84,8 @@ https://www.brokenlinkcheck.com/
 #
 #
 
-------------------------------------------------------------
+https://pimylifeup.com/raspberry-pi-lighttpd/
+-----------------------------------------------------------------------------------------
 APACHE2
 
   762  vi update_upgrade_notes.txt
@@ -97,7 +102,7 @@ APACHE2
   778  sudo vi /etc/apache2/conf-available/serve-cgi-bin.conf 
   780  sudo echo "AddHandler cgi-script .py          #https://www.raspberrypi.org/forums/viewtopic.php?t=155229" >> /etc/apache2/conf-available/serve-cgi-bin.conf 
   781  sudo echo "AddHandler cgi-script .py          #https://www.raspberrypi.org/forums/viewtopic.php?t=155229" >> /etc/apache2/conf-available/serve-cgi-bin.conf.xxx 
-------------------------------------------------------------
+-----------------------------------------------------------------------------------------
 
 https://medium.com/@danidudas/install-raspbian-jessie-lite-and-setup-wi-fi-without-access-to-command-line-or-using-the-network-97f065af722e
 
@@ -121,16 +126,17 @@ in /boot ...
 touch ssh
 
 
+-----------------------------------------------------------------------------------------
 
 https://medium.com/@aallan/setting-up-a-headless-raspberry-pi-zero-3ded0b83f274
 https://raspberrypi.stackexchange.com/questions/56621/temporarily-disable-expand-filesystem-during-first-boot
 
-------------------------------------------------------------
+-----------------------------------------------------------------------------------------
 With console /dsiplay connected, you should see at the end of booting...
 
 My IP address is 192.168.1.xxx
 
-------------------------------------------------------------
+-----------------------------------------------------------------------------------------
 Run ssh-keygen if necessary - - - accept the default (no passphrase)
 	>>> Set the hostname first do the public key will be labeled.
 	>>>>>> "pi@rasp95" in the example below...
@@ -175,7 +181,7 @@ $ cat id_rsa.pub | tr "ABCDQTPKYNEFRUI" "_"
 ssh-rsa _____3_za_1yc2_________________hyrG0p6Jy_4_S6_g_v___x5nx1_gy40mnnd_j_zgxx_bgJ___29MZ6y_W+79r_aHzWOJWu_dGxkM_HW_S_6l__ZwxJi3_u0+__8rqXr_h/aZ+c2_bXcjV_1y_3k_q7edJteh_dsl_fS_z_quf_e__a_h88en9tncn_tisc4/5_le/_t_0/_cb_xW_+6_Oc1V___9_hs4Gt__7jm9MchVx_2_zXm39oaV_W+j_ul4rWW+0w_nr4p8dHa7/4npg_84u__H3_Sepv39ZOcO+_o80JJm_wL3_1bsrHh_/_h_lMr__cqby_hppi9u/Lw_hwkO2+Xz__Jq+hHL_p88eeZ2j pi@rasp95
 
 
-------------------------------------------------------------
+-----------------------------------------------------------------------------------------
 SSH is enabled and the default password for the 'pi' user has not been changed.
 This is a security risk - please login as the 'pi' user and type 'passwd' to set
 a new password.
@@ -187,12 +193,12 @@ New password:
 Retype new password:
 passwd: password updated successfully
 
-------------------------------------------------------------
+-----------------------------------------------------------------------------------------
 
-------------------------------------------------------------
+-----------------------------------------------------------------------------------------
 
-------------------------------------------------------------
-------------------------------------------------------------
+-----------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------
 
 $ sha256sum 2019-09-26-raspbian-buster-lite.zip
 a50237c2f718bd8d806b96df5b9d2174ce8b789eda1f03434ed2213bbca6c6ff  2019-09-26-raspbian-buster-lite.zip
@@ -262,12 +268,12 @@ $ cd ..
 $ ls ho*
 host.conf  hostname  hosts  hosts.allow  hosts.deny
 
-------------------------------------------------------------
+-----------------------------------------------------------------------------------------
 
 
-------------------------------------------------------------
+-----------------------------------------------------------------------------------------
 
-------------------------------------------------------------
+-----------------------------------------------------------------------------------------
 $ cat os-release
 PRETTY_NAME="Raspbian GNU/Linux 10 (buster)"
 NAME="Raspbian GNU/Linux"
@@ -280,4 +286,4 @@ HOME_URL="http://www.raspbian.org/"
 SUPPORT_URL="http://www.raspbian.org/RaspbianForums"
 BUG_REPORT_URL="http://www.raspbian.org/RaspbianBugs"
 
-------------------------------------------------------------
+-----------------------------------------------------------------------------------------

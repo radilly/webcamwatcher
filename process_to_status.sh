@@ -15,7 +15,7 @@ echo "Raspberry Pi Expected Processes" >> ${WORK_FILE}
 echo "</H1>" >> ${WORK_FILE}
 echo "" >> ${WORK_FILE}
 echo "<CENTER>" >> ${WORK_FILE}
-echo "<TABLE>" >> ${WORK_FILE}
+echo "<TABLE PADDING=0>" >> ${WORK_FILE}
 echo "<TR><TD>" >> ${WORK_FILE}
 
 # echo "<P> &nbsp;" >> ${WORK_FILE}
@@ -25,19 +25,23 @@ echo "<TR><TD>" >> ${WORK_FILE}
 
 echo "<H4> Process Check</H4>" >> ${WORK_FILE}
 
-echo "<PRE>" >> ${WORK_FILE}
-~/bin/process_check.py ~/expected_procs.grep  >> ${WORK_FILE}
+### echo "<PRE>" >> ${WORK_FILE}
+~/bin/process_check.py --html ~/expected_procs.grep  >> ${WORK_FILE}
+### ~/bin/process_check.py ~/expected_procs.grep  >> ${WORK_FILE}
 echo "" >> ${WORK_FILE}
-echo "</PRE>" >> ${WORK_FILE}
+### echo "</PRE>" >> ${WORK_FILE}
 echo "</TD></TR>" >> ${WORK_FILE}
+
+echo "<TR><TD> &nbsp; </TD></TR>" >> ${WORK_FILE}
 
 echo "<TR><TD>" >> ${WORK_FILE}
 ################# echo "<P> &nbsp;" >> ${WORK_FILE}
 
 echo "<H4> Logs Check </H4>" >> ${WORK_FILE}
-echo "<PRE>" >> ${WORK_FILE}
-~/bin/log_check.py ~/expected_logs.grep  >> ${WORK_FILE}
-echo "</PRE>" >> ${WORK_FILE}
+### echo "<PRE>" >> ${WORK_FILE}
+~/bin/log_check.py --html ~/expected_logs.grep  >> ${WORK_FILE}
+### ~/bin/log_check.py ~/expected_logs.grep  >> ${WORK_FILE}
+### echo "</PRE>" >> ${WORK_FILE}
 echo "</TD></TR>" >> ${WORK_FILE}
 echo "<TR><TD>" >> ${WORK_FILE}
 echo "<P> &nbsp;" >> ${WORK_FILE}
@@ -48,19 +52,23 @@ echo "</TD></TR>" >> ${WORK_FILE}
 echo "<TR><TD>" >> ${WORK_FILE}
 
 echo "<H4> Process Check</H4>" >> ${WORK_FILE}
-echo "<PRE>" >> ${WORK_FILE}
-ssh pi@raspb_01_cams ~/bin/process_check.py ~/expected_procs.grep  >> ${WORK_FILE}
+### echo "<PRE>" >> ${WORK_FILE}
+ssh pi@raspb_01_cams ~/bin/process_check.py --html ~/expected_procs.grep  >> ${WORK_FILE}
+### ssh pi@raspb_01_cams ~/bin/process_check.py ~/expected_procs.grep  >> ${WORK_FILE}
 echo "" >> ${WORK_FILE}
-echo "</PRE>" >> ${WORK_FILE}
+### echo "</PRE>" >> ${WORK_FILE}
 echo "</TD></TR>" >> ${WORK_FILE}
+
+echo "<TR><TD> &nbsp; </TD></TR>" >> ${WORK_FILE}
 
 echo "<TR><TD>" >> ${WORK_FILE}
 ################# echo "<P> &nbsp;" >> ${WORK_FILE}
 
 echo "<H4> Logs Check </H4>" >> ${WORK_FILE}
-echo "<PRE>" >> ${WORK_FILE}
-ssh pi@raspb_01_cams ~/bin/log_check.py ~/expected_logs.grep  >> ${WORK_FILE}
-echo "</PRE>" >> ${WORK_FILE}
+### echo "<PRE>" >> ${WORK_FILE}
+ssh pi@raspb_01_cams ~/bin/log_check.py --html ~/expected_logs.grep  >> ${WORK_FILE}
+### ssh pi@raspb_01_cams ~/bin/log_check.py ~/expected_logs.grep  >> ${WORK_FILE}
+### echo "</PRE>" >> ${WORK_FILE}
 echo "</TD></TR>" >> ${WORK_FILE}
 echo "</TABLE>" >> ${WORK_FILE}
 
