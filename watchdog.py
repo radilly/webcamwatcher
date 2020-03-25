@@ -737,6 +737,20 @@ def read_cpu_temp():
 
 
 # ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+#
+# Had the idea to list the calling routine, and maybe the line number.
+#
+#    https://stackoverflow.com/questions/3056048/filename-and-line-number-of-python-script
+#        This seems to grant you access to the stack, etc.
+#
+#   https://stackoverflow.com/questions/45621045/python-print-debugging-show-file-and-line-number
+#
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
 # Write message to the log file with a leading timestamp.
 #
 # NOTE: This just calls messager() at the moment.  (Not exactly sure why I did this...
