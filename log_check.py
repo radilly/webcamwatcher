@@ -222,7 +222,7 @@ if __name__ == '__main__':
 	#   https://docs.python.org/2/howto/argparse.html
 	# --------------------------------------------------------------------------------
 	parser = argparse.ArgumentParser()
-	parser.add_argument("infile", help="This will echo the (required) argument given")
+	parser.add_argument("infile", help="Contains a list of log file to check, and optionally a time threshhold")
 	parser.add_argument("--html", help="Output in HTML", action="store_true")
 	args = parser.parse_args()
 #	print args.infile
