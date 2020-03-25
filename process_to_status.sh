@@ -77,11 +77,35 @@ echo "<P> &nbsp;" >> ${WORK_FILE}
 echo "<P><FONT SIZE=-1> `date +'%x %X %Z'` </FONT>" >> ${WORK_FILE}
 
 
-echo "<P ALIGN=center><a href=\"procs.html\">Check Procs</a>" >> ${WORK_FILE}
-echo "&nbsp; &nbsp; &nbsp; - &nbsp; &nbsp; &nbsp;" >> ${WORK_FILE}
-echo "<a href=\"event_status.html\">Pi Events</a>" >> ${WORK_FILE}
-echo "&nbsp; &nbsp; &nbsp; - &nbsp; &nbsp; &nbsp;" >> ${WORK_FILE}
-echo "<a href=\"status.html\">Pi Status</a>" >> ${WORK_FILE}
+echo "" >> ${WORK_FILE}
+echo "<!-- FOOTER -->" >> ${WORK_FILE}
+echo "" >> ${WORK_FILE}
+
+
+echo "<p>" >> ${WORK_FILE}
+echo "<a TARGET=\"_blank\" HREF=\"procs.html\">Procs</a>" >> ${WORK_FILE}
+echo "&nbsp; &nbsp; - &nbsp; &nbsp;" >> ${WORK_FILE}
+echo "<a TARGET=\"_blank\" HREF=\"event_status.html\">Events</a>" >> ${WORK_FILE}
+echo "&nbsp; &nbsp; - &nbsp; &nbsp;" >> ${WORK_FILE}
+echo "<a TARGET=\"_blank\" HREF=\"status.html\">Status</a>" >> ${WORK_FILE}
+echo "&nbsp; &nbsp; - &nbsp; &nbsp;" >> ${WORK_FILE}
+echo "<a TARGET=\"_blank\" HREF=\"http://192.168.1.167/cgi-bin/pi_health.py\">Pi Health: raspb_01_Cams</a>" >> ${WORK_FILE}
+echo "&nbsp; &nbsp; - &nbsp; &nbsp;" >> ${WORK_FILE}
+echo "<a TARGET=\"_blank\" HREF=\"http://192.168.1.172/cgi-bin/pi_health.py\">Pi Health: raspberrypi_03</a>" >> ${WORK_FILE}
+echo "&nbsp; &nbsp; - &nbsp; &nbsp;" >> ${WORK_FILE}
+echo "<a TARGET=\"_blank\" HREF=\"NOTES.html\">I> My Notes </I></a>" >> ${WORK_FILE}
+echo "&nbsp; &nbsp; - &nbsp; &nbsp;" >> ${WORK_FILE}
+echo "<a TARGET=\"_blank\" HREF=\"http://dilly.family/wx/\">WX Web Page</a>" >> ${WORK_FILE}
+echo "&nbsp; &nbsp; - &nbsp; &nbsp;" >> ${WORK_FILE}
+echo "<a TARGET=\"_blank\" HREF=\"http://dilly.family/wx/webcam.html\">Webcams</a>" >> ${WORK_FILE}
+
+
+
+## echo "<P ALIGN=center><a href=\"procs.html\">Check Procs</a>" >> ${WORK_FILE}
+## echo "&nbsp; &nbsp; &nbsp; - &nbsp; &nbsp; &nbsp;" >> ${WORK_FILE}
+## echo "<a href=\"event_status.html\">Pi Events</a>" >> ${WORK_FILE}
+## echo "&nbsp; &nbsp; &nbsp; - &nbsp; &nbsp; &nbsp;" >> ${WORK_FILE}
+## echo "<a href=\"status.html\">Pi Status</a>" >> ${WORK_FILE}
 
 
 
