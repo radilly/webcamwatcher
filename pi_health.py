@@ -163,7 +163,7 @@ data_keys = [
 	]
 
 
-data_aligh = [
+data_align = [
 	"left",
 	"right",
 	"right",
@@ -397,7 +397,7 @@ def status_table():
 
 #		format_str = "<TR><TD{}> {} </TD><TD ALIGN=right{}> " + data_format[iii]  + " </TD><TD ALIGN=right{}> {}, {} </TD></TR>\n"
 		format_str = "<TR><TD{}> {} </TD><TD ALIGN=right{}> " + data_format[iii]  + " </TD><TD ALIGN=center{}> {} </TD></TR>\n"
-		format_str = "<TR><TD{}> {} </TD><TD ALIGN=" + data_aligh[iii] + "{}>  " + data_format[iii]  + " </TD><TD ALIGN=center{}> {} </TD></TR>\n"
+		format_str = "<TR><TD{}> {} </TD><TD ALIGN=" + data_align[iii] + "{}>  " + data_format[iii]  + " </TD><TD ALIGN=center{}> {} </TD></TR>\n"
 #
 #		print " - - - - - - "
 #		print iii
