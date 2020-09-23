@@ -113,6 +113,7 @@ threshold_matrix = [
 	[     50,    55  ],    # "cpu_temp_c",
 	[    122,   131  ],    # "cpu_temp_f",
 	[     -1,    -1  ],    # "python_version",
+	[     -1,    -1  ],    # "raspi_version",
 	]
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -131,6 +132,7 @@ data_format = [
 	"{}&percnt;",
 	"{:6.1f} &deg;C",
 	"{:6.1f} &deg;F",
+	"{}",
 	"{}",
 	]
 
@@ -157,6 +159,24 @@ data_keys = [
 	"cpu_temp_c",
 	"cpu_temp_f",
 	"python_version",
+	"raspi_version",
+	]
+
+
+data_aligh = [
+	"left",
+	"right",
+	"right",
+	"right",
+	"right",
+	"right",
+	"right",
+	"right",
+	"right",
+	"right",
+	"right",
+	"left",
+	"left",
 	]
 
 strftime_FMT = "%Y/%m/%d %H:%M:%S"
@@ -180,8 +200,39 @@ def main() :
 	proc_load()
 	proc_pct()
 	mem_usage()
+	raspi_version()
 
 	status_table()
+
+
+# ----------------------------------------------------------------------------------------
+#
+#
+#
+#
+#
+#
+#
+#  Read and parse the first line of "/proc/stat", the cpu line, and calulate the
+#  average cpu utilization as a percentage.
+#
+#  First call is the initialization - usage since boot-up.
+#  Subsequent calls find the avergae utilization since the previous call.
+#
+# ----------------------------------------------------------------------------------------
+def raspi_version() :
+	global data
+
+	# --------------------------------------------------------------------------------
+	# 
+	# --------------------------------------------------------------------------------
+	raspi_version = subprocess.check_output( ["/usr/bin/lsb_release", "-a"] )
+	raspi_version = re.sub(' *\n *', '<BR>', raspi_version )
+	data['raspi_version'] = raspi_version
+
+
+
+
 
 
 # ----------------------------------------------------------------------------------------
@@ -346,6 +397,7 @@ def status_table():
 
 #		format_str = "<TR><TD{}> {} </TD><TD ALIGN=right{}> " + data_format[iii]  + " </TD><TD ALIGN=right{}> {}, {} </TD></TR>\n"
 		format_str = "<TR><TD{}> {} </TD><TD ALIGN=right{}> " + data_format[iii]  + " </TD><TD ALIGN=center{}> {} </TD></TR>\n"
+		format_str = "<TR><TD{}> {} </TD><TD ALIGN=" + data_aligh[iii] + "{}>  " + data_format[iii]  + " </TD><TD ALIGN=center{}> {} </TD></TR>\n"
 #
 #		print " - - - - - - "
 #		print iii
