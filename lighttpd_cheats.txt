@@ -1,12 +1,35 @@
+LIGHTTPD
+"lighty"
 
-
+https://www.lighttpd.net/
 
 https://redmine.lighttpd.net/boards/2/topics/8730?r=8731#message-8731
 
 https://redmine.lighttpd.net/boards/2/topics/8309
 
+# =============================================================================
+
+per https://redmine.lighttpd.net/boards/2/topics/9391
 
 
+RE: New Raspberry Pi Install Yields 403 Forbidden at localhost - Added by gstrauss about 12 hours ago
+lighttpd works fine on Raspberry Pi when built from source.
+
+This site is the official site for lighttpd. However, each Linux distro is responsible (or irresponsible) for packaging programs in their distro. The packages are intended to make it easier for people to install the software and hook it into startup scripts and the like. Please direct your question to Raspberry Pi forums (not lighttpd forums) and include the specific details of what you did for "I did 2 installs of lighttpd the other day on Raspberry Pis."
+
+The official lighttpd source (on this site) does not contain "index.lighttpd.html" so please report that to the packagers for RPi.
+
+Generic troubleshooting information:
+Look in the error log for errors. For lighttpd, look in /etc/lighttpd/lighttpd.conf to see if server.errorlog is defined.
+Look at the help for the program: lighttpd -h
+To test lighttpd config: lighttpd -f /etc/lighttpd/lighttpd.conf -tt
+To print lighttpd config: lighttpd -f /etc/lighttpd/lighttpd.conf -p
+(1-1/1)
+
+
+
+
+# =============================================================================
 rasp_02_Cumulus
 rasp_02_Cumulus
 rasp_02_Cumulus
@@ -37,6 +60,7 @@ rasp_02_Cumulus
  2018  sudo /etc/init.d/lighttpd force-reload
 
 
+# =============================================================================
 raspi-005
 raspi-005
 raspi-005
@@ -140,3 +164,7 @@ raspi-005
   340  history | tail -n 44 >> lighttpd_cheats.txt 
   341  history | grep apt >> lighttpd_cheats.txt 
   342  history | grep lighttpd >> lighttpd_cheats.txt 
+
+
+# =============================================================================
+
