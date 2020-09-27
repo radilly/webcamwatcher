@@ -1,0 +1,44 @@
+
+
+Sun 27 Sep 15:47:25 EDT 2020
+Looking at WeeWx.  Although it supports Python2, Python3 is recommended.
+-----------------------------------------------------------------------------------------
+
+
+https://docs.python.org/2/library/2to3.html
+	Doesn't seem to installed on Buster Lite
+
+
+ 2004  cd webcamwatcher/
+ 2005  pull
+ 2006  git pull
+ 2007  ls -al
+ 2008  ls -al *txt
+ 2009  vi python_notes.txt
+ 2010  2to3
+ 2011  mk ~/webcamwatcher_002
+ 2012  mkdir ~/webcamwatcher_002
+ 2013  cp -p *.py ~/webcamwatcher_002
+ 2014  cd ~/webcamwatcher_002
+ 2015  ls
+ 2016  ls -al
+ 2017  diff ww.py webcamimager.py | less
+ 2018  2to3 watchdog.py
+ 2019  2to3 --version
+ 2020  cd -
+
+-----------------------------------------------------------------------------------------
+No apparent difference in the defaul, and using -f all
+
+pi@raspb_01_Cams:~/webcamwatcher_002 $ 2to3 watchdog.py > watchdog.py.2to3.default
+
+pi@raspb_01_Cams:~/webcamwatcher_002 $ 2to3 -f all watchdog.py > watchdog.py.2to3.all
+-rw-r--r-- 1 pi pi  13388 Sep 27 17:13 watchdog.py.2to3.default
+-rw-r--r-- 1 pi pi  13388 Sep 27 17:15 watchdog.py.2to3.all
+
+pi@raspb_01_Cams:~/webcamwatcher_002 $ diff watchdog.py.2to3.*
+pi@raspb_01_Cams:~/webcamwatcher_002 $
+
+
+
+

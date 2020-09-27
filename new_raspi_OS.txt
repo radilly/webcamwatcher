@@ -38,8 +38,19 @@ Add ssh key to https://github.com/settings/keys
 	Run ssh-keygen if necessary
 	https://www.digitalocean.com/community/tutorials/how-to-set-up-ssh-keys-on-ubuntu-1604
 
+-----------------------------------------------------------------------------------------
 If desired, a this to ~/.bashrc
 	export VISUAL='/usr/bin/vi'
+
+cd ~/webcamwatcher/pi_basic
+git pull
+ls ~/.ba*
+cp -p .bash_aliases ~
+. ~/.bash_aliases
+alias
+
+
+
 
 
 
