@@ -1,0 +1,46 @@
+
+
+Setting up pi-005-zero-b
+Sun 27 Sep 16:31:27 EDT 2020
+-----------------------------------------------------------------------------------------
+
+sudo raspi-config
+- Set password
+- Set ssh
+- Set timezone
+- Set hostname
+- Set wifi
+
+
+ssh-keygen
+cd .ssh
+cat id_rsa.pub            # If you want to copy elsewhere like git
+vi authorized_keys
+
+
+sudo apt-get install vim
+#       echo "syntax enable
+#             set hlsearch" > ~/.vimrc
+#        OR      printf "syntax enable\nset hlsearch\n" > ~/.vimrc
+
+sudo apt-get install git
+
+-----------------------------------------------------------------------------------------
+git clone https://github.com/radilly/webcamwatcher
+
+cd webcamwatcher
+
+git remote set-url origin git@github.com:radilly/webcamwatcher.git
+git config --global user.name "Bob Dilly"
+git config --global user.email "GitHub@radilly.org"
+
+Add ssh key to https://github.com/settings/keys
+	Run ssh-keygen if necessary
+	https://www.digitalocean.com/community/tutorials/how-to-set-up-ssh-keys-on-ubuntu-1604
+
+If desired, a this to ~/.bashrc
+	export VISUAL='/usr/bin/vi'
+
+
+
+
