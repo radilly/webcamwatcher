@@ -583,6 +583,8 @@ def mono_threads():
 	lineList[0] = re.sub('\n', '', lineList[0])        # Remove any newline which might be left
 	tok = re.split(' *', lineList[0])
 
+	# NOTE:
+	#   See https://man7.org/linux/man-pages/man5/proc.5.html for /proc pseudo-filesystem
 	data['mono_threads'] = int(tok[19])
 	return int(tok[19])
 
