@@ -1,9 +1,8 @@
-LIGHTTPD
+LIGHTTPD  @@@
 "lighty"
+See below for some Apache notes, some of which may relate to lighttp
 
 https://www.lighttpd.net/
-
-https://redmine.lighttpd.net/boards/2/topics/8730?r=8731#message-8731
 
 https://redmine.lighttpd.net/boards/2/topics/8309
 
@@ -27,6 +26,22 @@ To print lighttpd config: lighttpd -f /etc/lighttpd/lighttpd.conf -p
 (1-1/1)
 
 
+
+# =============================================================================
+Other bookmarks
+
+For bugs in the Debian / Raspberry Pi OS -
+https://bugs.debian.org/cgi-bin/pkgreport.cgi?pkg=lighttpd
+
+403 when trying to access the default page after install
+https://redmine.lighttpd.net/boards/2/topics/8730?r=8731#message-8731
+
+
+
+
+
+For Ubuntu ... not Debian
+https://www.atlantic.net/vps-hosting/how-to-set-up-lighttpd-web-server-on-ubuntu-18-04/
 
 
 # =============================================================================
@@ -164,6 +179,19 @@ raspi-005
   340  history | tail -n 44 >> lighttpd_cheats.txt 
   341  history | grep apt >> lighttpd_cheats.txt 
   342  history | grep lighttpd >> lighttpd_cheats.txt 
+
+
+# =============================================================================
+APACHE
+
+
+
+
+https://httpd.apache.org/docs/1.3/logs.html
+
+
+
+# =============================================================================
 
 
 # =============================================================================
