@@ -103,8 +103,9 @@ def main():
 	# --------------------------------------------------------------------------------
 	#  Find the min and max readings.  Compute a scale facor for the bar chart.
 	# --------------------------------------------------------------------------------
+	limit = (check_lines+1) * -12 * check_lines
 	maxT = -999.0
-	for iii in range(-1, -140, -1 ):
+	for iii in range(-1, limit, -1 ):
 		tok = re.split(',', lineList[iii])
 		temp = float( tok[2] )
 		maxT = max( maxT, temp )
@@ -126,8 +127,10 @@ def main():
 	print "<link rel = \"icon\" type = \"image/png\" href = \"/WX_Blue_Green_32x32.png\">"
 	print "</HEAD>"
 	print "<H1 Align=left> Pond Water Temp </H1>"
+	print "<BR> &nbsp; &nbsp; &nbsp; <I>- page automatically reloads -</I>"
 	print "<BR> Min Temp = {:5.2f}&deg;".format( minT )
 	print "<BR> Max Temp = {:5.2f}&deg;".format( maxT )
+	print "<BR> records checked = {}".format( -1 * limit )
 	print "<H2 Align=left> 5-Minute Reads </H2>"
 	print "<TABLE BORDER=1 CELLPADDING=3>"
 
@@ -154,7 +157,7 @@ def main():
 	print "<H2 Align=left> Hourly Reads </H2>"
 	print "<TABLE BORDER=1 CELLPADDING=3>"
 
-	for iii in range(-1-check_lines, ((check_lines+1) * -12 * check_lines), -12 ):
+	for iii in range(-1-check_lines, limit, -12 ):
 		lineList[iii] = re.sub('\n', ' ', lineList[iii])        # Remove any newline which might be left
 		table_line( lineList[iii] )
 		### print lineList[iii] 
