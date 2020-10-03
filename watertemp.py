@@ -70,6 +70,11 @@ logger_file = re.sub('\.py', '.log', logger_file)
 # strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
 strftime_FMT = "%Y/%m/%d %H:%M:%S"
 
+maxT = -999.0
+minT = +999.0
+rangeT = -1.0
+scaleT = -1.0
+
 
 # ----------------------------------------------------------------------------------------
 #
@@ -82,10 +87,13 @@ strftime_FMT = "%Y/%m/%d %H:%M:%S"
 #		last_realtime() return value should be leveraged <<<  OBSOLETE???????????????
 # ----------------------------------------------------------------------------------------
 def main():
+###	global maxT, minT, rangeT, scaleT
+	global minT, scaleT
 
 # @@@
 
         print "Content-type: text/html\n\n\n\n"
+        print "<META HTTP-EQUIV=\"refresh\" CONTENT=\"300\">"
 	print "<HEAD>\n"
 #	print "table, th, td {"
 #	print "  border: 1px solid black;"
@@ -95,7 +103,7 @@ def main():
 #	print "}\n"
 	print "<TITLE> Pond Water Temp </TITLE>"
 	# See https://www.quora.com/How-can-I-get-the-logo-on-title-bar
-	print "<link rel = \"icon\" type = \"image/png\" href = \"WX_Blue_Green_32x32.png\">"
+	print "<link rel = \"icon\" type = \"image/png\" href = \"/WX_Blue_Green_32x32.png\">"
 	print "</HEAD>"
 	print "<H1 Align=left> Pond Water Temp </H1>"
 	print "<H2 Align=left> 5-Minute Reads </H2>"
@@ -109,6 +117,19 @@ def main():
 	fileHandle = open ( watertemplog,"r" )
 	lineList = fileHandle.readlines()
 	fileHandle.close()
+
+	maxT = -999.0
+	minT = +999.0
+	for iii in range(-1, -140, -1 ):
+		tok = re.split(',', lineList[iii])
+		temp = float( tok[2] )
+###		print "<P> CHECKING = {}".format( temp )
+		maxT = max( maxT, temp )
+		minT = min( minT, temp )
+###	print "<P> MIN = {}".format( minT )
+###	print "<P> MAX = {}".format( maxT )
+	rangeT = maxT - minT
+	scaleT = 500 / rangeT
 
 	for iii in range(-1, (-1 * (check_lines+1)), -1):
 		lineList[iii] = re.sub('\n', ' ', lineList[iii])        # Remove any newline which might be left
@@ -162,6 +183,7 @@ def main():
 # ----------------------------------------------------------------------------------------
 # @@@
 def table_line( text_in ) :
+#	global maxT, minT
 
 ###	text = re.sub( ",", " &nbsp; ", text_in, count=1 )
 ###	text = re.sub( ",", " </TD><TD> ", text, count=1 )
@@ -180,22 +202,31 @@ def table_line( text_in ) :
 #	print "<!-- DEBUG: bgcolor = \"{}\" -->".format( bgcolor )
 #	bcgolor = " BGCOLOR=\"#00F900\""
 #	print "<!-- DEBUG: bgcolor = \"{}\" -->".format( bgcolor )
+# @@@
+###################################################################################################	rangeT = maxT - minT
+###################################################################################################	scaleT = 600 / rangeT
+
 	if temp < 40.0 :
 ###		print "<!-- DEBUG: temp < 40.0 -->"
 		bgcolor = " BGCOLOR=\"#FF5555\""
+		img = "<TD BGCOLOR=#000000><IMG SRC=\"/1_pixel_%23FF5555.jpg\" HEIGHT=8 WIDTH={}>".format( temp * 5 )
+		img = "<TD WIDTH=525 BGCOLOR=#000000><IMG SRC=\"/1_pixel_%23FF5555.jpg\" HEIGHT=8 WIDTH={}>".format( 1 + (temp - minT) * scaleT )
 ###		print "<!-- DEBUG: bgcolor = \"{}\" -->".format( bgcolor )
 	elif temp < 50.0 :
 ###		print "<!-- DEBUG: temp < 50.0 -->"
 		bgcolor = " BGCOLOR=\"yellow\""
+		img = "<TD WIDTH=525 BGCOLOR=#000000><IMG SRC=\"/1_pixel_Yellow.jpg\" HEIGHT=8 WIDTH={}>".format( 1 + (temp - minT) * scaleT )
 ###		print "<!-- DEBUG: bgcolor = \"{}\" -->".format( bgcolor )
 	else :
 ###		print "<!-- DEBUG: else clause -->"
 		bgcolor = " BGCOLOR=\"#00F900\""
+		img = "<TD WIDTH=525 BGCOLOR=#000000><IMG SRC=\"/1_pixel_%2300F900.jpg\" HEIGHT=8 WIDTH={}>".format( 1 + (temp - minT) * scaleT )
 ###		print "<!-- DEBUG: bgcolor = \"{}\" -->".format( bgcolor )
 
 ###	print "<!-- DEBUG: bgcolor = {} -->".format( bgcolor )
 
-	print "<TR{}><TD> &nbsp; {} &nbsp; {} &nbsp; </TD><TH> &nbsp; {}&deg; &nbsp; </TH><TR>".format( bgcolor, tok[0], tok[1], tok[2] )
+###	print "<TR{}><TD> &nbsp; {} &nbsp; {} &nbsp; </TD><TH> &nbsp; {}&deg; &nbsp; </TH><TR>".format( bgcolor, tok[0], tok[1], tok[2] )
+	print "<TR{}><TD> &nbsp; {} &nbsp; {} &nbsp; </TD><TH> &nbsp; {}&deg; &nbsp; </TH>{}</TD><TR>".format( bgcolor, tok[0], tok[1], tok[2], img )
 
 
 # ----------------------------------------------------------------------------------------
