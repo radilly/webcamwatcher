@@ -30,22 +30,6 @@
 #    NOTE:
 #    NOTE:
 #    NOTE:
-#    NOTE:
-#    NOTE:
-#    NOTE:
-#    NOTE:
-#    NOTE:
-#    NOTE:
-#    NOTE:
-#    NOTE:
-#    NOTE:
-#    NOTE:
-#    NOTE:
-#    NOTE:
-#    NOTE:
-#    NOTE:
-#    NOTE:
-#    NOTE:
 # 
 # This script is started by 2 services - for for north- and south-facing cameras: 
 #	webcam_north.service
@@ -204,7 +188,17 @@
 # ========================================================================================
 # ========================================================================================
 #
-#
+# 20200207 RAD Looks like the video generation process takes on the order of 1 minute.
+#              We could drive it from a date change on the snapshot being processed.
+#						if last_day_code != day_code :
+#              ... in next_image_file().
+# 20200118 RAD Updated do_midnight() to handle the ftp config info. Wasn't needed
+#              for scp, but that seemed to cause other issues. Also, there were
+#              def read_FTP_config()s. Code was using the correct second definition!
+# 20200115 RAD Realised the symbolic link in arc_2020 to /rm_older_files.sh was
+#              missing when I went to run: alias cleanold='df -h . ; pushd ~/S/South/arc_...
+#              Added a line to make the link when the new annual directory is made
+#              in midnight_process().
 # 20191112 RAD Added other_systemctl to the control file, and use it to restart the
 #              other monitored process if required.
 # 20190924 RAD Switched push_to_server_via_scp() calls (4) back to push_to_server().
@@ -590,7 +584,7 @@ def process_new_image( source, target) :
 #@@@	push_to_server_via_scp( thumbnail_file, remote_dir )
 	# push_to_test( thumbnail_file, "REMOVE_ME/" + remote_dir )
 
-	logger( "DEBUG: done" )
+#DEBUG#	logger( "DEBUG: done" )
 
 
 
@@ -635,6 +629,8 @@ def next_image_file() :
 	global work_dir, last_mtime, last_filename, last_image_dir_mtime
 	global catching_up, current_filename, dot_counter, small_counter
 	global last_day_code
+
+	date_rollover = False
 
 #DEBUG#	logger( "DEBUG: in next_image_file()   last_mtime = {}".format( last_mtime ) )
 #TEST#	sleep( 0.5 )
@@ -737,6 +733,7 @@ def next_image_file() :
 			line += 1
 			continue
 
+
 ###### NOTE: Could check
 ###### date +%Z
 		if not catching_up and ( (file_list_len - line) > 2 ) :
@@ -751,6 +748,11 @@ def next_image_file() :
 
 		# snapshot-2018-05-23-16-57-04.jpg
 		tok = re.split('-', re.sub('\.jpg', '', file_list[line]) )
+		day_code = int(tok[3])
+		if last_day_code != day_code :
+			date_rollover = True
+		else :
+			date_rollover = False
 
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# May happen when webcam power-cycles, but NTP hasn't synched yet...
@@ -765,20 +767,9 @@ def next_image_file() :
 			unlink( "{}/{}".format(work_dir, old_file ) )
 
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		# We only know that we have to run the midnight proecess when we get the
-		# first image of a new day - i.e. that date number has changed.  The
-		# last (previous) image filename contains yesterday's date string.
+		# If not in catching up mode wait for size to stablize, if not it was
+		# written a while ago - an no waiting is needed.
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		day_code = int(tok[3])
-#DEBUG#		logger( "DEBUG: last_day_code = {}   day_code = {}".format( day_code, last_day_code ) )
-		if last_day_code != day_code :
-			log_string( "\n" )
-			logger( "INFO: MIDNIGHT ROLLOVER!" )
-			logger( "INFO: MIDNIGHT ROLLOVER!" )
-			logger( "INFO: MIDNIGHT ROLLOVER!" )
-			logger( "INFO: MIDNIGHT ROLLOVER!" )
-			midnight_process(re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename))
-
 		if not catching_up :
 			# this takes 4 seconds.
 			jpg_size = check_stable_size( source_file )
@@ -822,8 +813,27 @@ def next_image_file() :
 			log_string( "||  ({})\n".format( dot_counter ) )
 			process_new_image( source_file, target_file )
 			# First '.' right after processing is done...
+			if not date_rollover :
+				log_string( '.' )
+				dot_counter = 1
+
+
+
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# We only know that we have to run the midnight proecess when we get the
+		# first image of a new day - i.e. that date number has changed.  The
+		# last (previous) image filename contains yesterday's date string.
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#DEBUG#		logger( "DEBUG: last_day_code = {}   day_code = {}".format( day_code, last_day_code ) )
+		if date_rollover :
+			log_string( "\n" )
+			logger( "INFO: MIDNIGHT ROLLOVER!\n" )
+			midnight_process(re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename))
+
 			log_string( '.' )
 			dot_counter = 1
+
+
 
 		store_file_data ( current_mtime, file_list[line] )
 		last_day_code = day_code
@@ -1106,6 +1116,7 @@ def power_cycle( interval ):
 # ----------------------------------------------------------------------------------------
 #  Handle a set of midnight tasks.
 #  * Check for the arc_<YYYY> directory, and make if if needed.
+#     * Also link /home/pi/webcamwatcher/rm_older_files.sh
 #  * Tar up the day's snapshot images.
 #  * Create thumbnail image for web pages.
 #  * Delete many of the 'dark hours' images.
@@ -1119,11 +1130,7 @@ def midnight_process(date_string) :
 	ffmpeg_failed = True
 	tar_failed = True
 
-	logger( "DEBUG: Called midnight_process( {} )".format(date_string ) )
-	logger( "DEBUG: Called midnight_process( {} )".format(date_string ) )
-	logger( "DEBUG: Called midnight_process( {} )".format(date_string ) )
-	logger( "DEBUG: Called midnight_process( {} )".format(date_string ) )
-	logger( "DEBUG: Called midnight_process( {} )".format(date_string ) )
+#DEBUG#	logger( "DEBUG: Called midnight_process( {} )".format(date_string ) )
 	logger( "DEBUG: Called midnight_process( {} )".format(date_string ) )
 
 	# Example: 20180523 - - - (looks like a number, but a string here.)
@@ -1139,6 +1146,7 @@ def midnight_process(date_string) :
 	if not os.path.exists( arc_dir ) :
 		logger( "INFO: Created {}.  HAPPY NEW YEAR.".format( arc_dir) )
 		os.mkdir( arc_dir, 0755 )
+		os.symlink( "/home/pi/webcamwatcher/rm_older_files.sh", arc_dir + "/rm_older_files.sh" )
 
 	if os.path.isfile( tar_file ) :
 		logger( "ERROR: {} already exists.  Quitting Midnight process.".format( tar_file ) )
@@ -1169,7 +1177,7 @@ def midnight_process(date_string) :
 		logger( "WARNING: Could not find images for date \"{}\"".format( date_string ) )
 
 	mp4_file_daylight = "{}/{}_daylight.mp4".format( arc_dir, date_stamp )
-	logger( "DEBUG: Building {}".format( mp4_file_daylight ) )
+	### logger( "DEBUG: Building {}".format( mp4_file_daylight ) )
 	ffmpeg_failed = generate_video( date_string, mp4_file_daylight )
 
 	if not ffmpeg_failed :
@@ -1197,17 +1205,9 @@ def midnight_process(date_string) :
 
 
 
-	logger( "DEBUG: sleep( 15 )" )
-	sleep( 15 )
-	logger( "DEBUG: sleep( 15 )" )
-	sleep( 15 )
-	logger( "DEBUG: sleep( 15 )" )
-	sleep( 15 )
-	logger( "DEBUG: sleep( 15 )" )
-	sleep( 15 )
-	logger( "DEBUG: sleep( 15 )" )
-	sleep( 15 )
-	logger( "DEBUG: sleep( 15 )" )
+#DEBUG#	logger( "DEBUG: sleep( 15 )" )
+#DEBUG#	sleep( 15 )
+	logger( "DEBUG: sleep( 15 )\n" )
 	sleep( 15 )
 
 
@@ -1221,6 +1221,8 @@ def midnight_process(date_string) :
 def generate_video(date_string, mp4_out) :
 	global work_dir
 
+	logger( "DEBUG: generate_video( \"{}\", \"{}\" ) called".format( date_string, mp4_out ) )
+
 	ffmpeg_failed = True
 
 	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
@@ -1230,8 +1232,6 @@ def generate_video(date_string, mp4_out) :
 	if os.path.isfile( mp4_out ) :
 		logger( "WARNING: {} already exists and will be deleted.".format ( mp4_out ) )
 		unlink( mp4_out )
-
-	logger( "DEBUG: Creating mp4 file" + mp4_out )
 
 	cat_cmd = r"cat {}/snapshot-{}*.jpg".format( work_dir, date_string )
 	logger( "DEBUG: cat_cmd = \"{}\"".format( cat_cmd ) )
@@ -1876,8 +1876,8 @@ def push_to_server(local_file, remote_path) :
 				if iii > 0 :
 					logger( "DEBUG: FTP STOR {} ===> {}  attempt #{}".format( local_file, local_file_bare, iii+1) )
 				else :
-#DEBUG#					logger( "DEBUG: FTP STOR {} from  {}".format( local_file_bare, local_file) )
-					logger( "DEBUG: FTP STOR {} ---> {}".format( local_file, local_file_bare ) )
+					dummy_for_else_clause = 1
+#DEBUG#					logger( "DEBUG: FTP STOR {} ---> {}".format( local_file, local_file_bare ) )
 
 				ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
 				ftp_OK = True
@@ -1915,37 +1915,6 @@ def push_to_server(local_file, remote_path) :
 
 
 	return
-
-
-
-
-
-# ----------------------------------------------------------------------------------------
-#  Read the [ftp] section of the config file passed as the first argument to this script.
-#
-#
-# ----------------------------------------------------------------------------------------
-def read_FTP_config( config_file ) :
-	global ftp_login
-	global ftp_password
-	global ftp_server
-
-#	NOTE: Copied from def read_config( config_file )
-#	------------------------------------------------
-
-
-
-	try :
-		ftp.quit()
-	except Exception as problem :
-		logger( "ERROR: in push_to_server() ftp.quit {}".format( problem ) )
-		ftp.close()
-
-
-	return
-
-
-
 
 
 # ----------------------------------------------------------------------------------------
@@ -2303,12 +2272,27 @@ if __name__ == '__main__':
 #  going back in history to create a _daylight version of the video.  For the moment
 #  this remains here are the end of the file just in case.
 #
+#  Before running...
+#     - Create a .save directory under arc_20xx
+#     - Move (mv) the 3 files for the date in question
+#     - Run the hacked webcamimager.py
+#     - Copy or move (mv) the .save/*.tgz back to arc_20xx
+#         --> This tar will have *ALL* the day's frames
+#     - Remove the files in .save/ - if you wish
+#
 #  You may want to hack up logger()...
 #  def logger(message):
-#	messager(message)
-#	return
+#	messager(message)      <<<<<<<<--------------------  INSERT
+#	return                 <<<<<<<<--------------------  INSERT
 #	timestamp = datetime.datetime.now().strftime(strftime_FMT)
 #
+# Modify 
+# def midnight_process(date_string) :
+#	return                 <<<<<<<<--------------------  INSERT
+#	logger( "DEBUG: sleep( 15 )" )
+#	sleep( 15 )
+#
+#  Arguments:
 #  Arguments:
 #   1 - "N" or "S"
 #   2 - date string, e.g. 2018-05-23
@@ -2317,10 +2301,14 @@ def do_midnight() :
 	global work_dir, remote_dir
 	if len(sys.argv) < 3 :
 		print "Too few arguments"
+		print "Example:"
+		print "S 2020-01-13"
+		### print "S 2020-01-13 ~/S/south.cfg"
 		exit()
 
 	print "{} arguments".format(len(sys.argv)-1)
 
+	### config_file = sys.argv[3]
 	date_string = sys.argv[2]
 
 	NS = sys.argv[1]
@@ -2328,10 +2316,12 @@ def do_midnight() :
 		mp4_file = "/home/pi/N/North/arc_2018/{}_daylight.mp4".format( re.sub(r'-', r'', date_string) )
 		remote_dir = "North"
 		work_dir = "/home/pi/N/North"
+		config_file = "/home/pi/N/north.cfg"
 	elif "S" in NS :
 		mp4_file = "/home/pi/S/South/arc_2018/{}_daylight.mp4".format( re.sub(r'-', r'', date_string) )
 		remote_dir = "South"
 		work_dir = "/home/pi/S/South"
+		config_file = "/home/pi/S/south.cfg"
 	else :
 		print "Arg #1 is bad.  Use N or S"
 		exit()

@@ -1,7 +1,7 @@
 #!/usr/bin/python
-# ps_check
+# process_check.py
 #
-# Check for a set of expect running processes.
+# Check for a set of expected running processes.
 #
 # Initial input files...
 #    cmx_procs.grep
@@ -16,6 +16,9 @@
 #       https://www.programiz.com/python-programming/methods/list/pop
 #
 # ========================================================================================
+# 20191223 RAD Intend to add an option to generate HTML.  Ultimately this would be
+#              driven from a web server, but I've not put one on the Pi running
+#              Cumulus MX yet.   I'm a litle concerned about loading and conflicts.
 # 20190622 RAD In assessing a missing process, one needs to know which pattern(s) wasn't
 #              found.
 # 20190609 RAD Started with a bash script but global variables in a loop caused an issue.
@@ -26,9 +29,11 @@
 import re
 import sys
 import subprocess
+import argparse
 
 infile = ""
 found_PIDS = {}
+use_html = False
 
 # ----------------------------------------------------------------------------------------
 #
@@ -37,6 +42,7 @@ found_PIDS = {}
 def ps_check():
 
 	found = 0
+	return_value = 0
 
 	FH = open(infile, "r")
 #	FH = open("rasp_cams.grep", "r")
@@ -54,7 +60,13 @@ def ps_check():
 
 	process = re.split('\n', ps_output)
 
-	print "UID        PID  PPID  C STIME TTY          TIME CMD"
+	if use_html :
+		print "<TABLE><TR><TH ALIGN=left>"
+		print "<PRE>UID        PID  PPID  C STIME TTY          TIME CMD</PRE>"
+		print "</TH></TR>"
+	else :
+		print "UID        PID  PPID  C STIME TTY          TIME CMD"
+
 	for iii in range(0, len(process)):
 		if iii > 555 :
 			return
@@ -66,7 +78,15 @@ def ps_check():
 
 		for jjj in range(0, len(pattern_list)):
 			if re.search( pattern_list[jjj], process[iii]) :
-				print "{}".format( process[iii] )
+
+				if use_html :
+					print "<TR><TD BGCOLOR=green>"
+					print "<PRE>{}</PRE>".format( process[iii] )
+					print "</TD></TR>"
+				else :
+					print "{}".format( process[iii] )
+
+
 				token = re.split(' *', process[iii] )
 				PID = token[1]
 				if PID in found_PIDS :
@@ -79,34 +99,250 @@ def ps_check():
 				found += 1
 				break   # Having changed the pattern_list length...
 
+	if use_html :
+		print "<TR><TD>"
+
 	print "\nfound {} of the expected {} processes".format( found, patterns )
 
+	if use_html :
+		print "</TD></TR>"
+
 	if found != patterns :
+		return_value = 1
+
+		if use_html :
+			print "<TR><TD> &nbsp; </TD></TR>"
+			print "<TR><TD>"
+
 		print "ERROR: Missing processes..."
+
+		if use_html :
+			print "</TD></TR>"
+
 
 	if len(pattern_list) > 0 :
 		for jjj in range(0, len(pattern_list)):
+
+			if use_html :
+				print "<TR><TD BGCOLOR=red`>"
+
 			print "{} {}".format( jjj + 1, pattern_list[jjj] )
 
+			if use_html :
+				print "</TD></TR>"
 
-		exit( 1 )
+	if use_html :
+		print "</TABLE>"
 
-	exit( 0 )
+	return_value = 0
+	exit( return_value )
 
 	return
 
 
-
 # ----------------------------------------------------------------------------------------
+#
+#
+# Option to output HTML???
+#   https://docs.python.org/2/howto/argparse.html
+#   http://zetcode.com/python/argparse/
+#
 #
 #
 # ----------------------------------------------------------------------------------------
 if __name__ == '__main__':
 
-	infile = sys.argv[1]
+	# global use_html
+
+	# --------------------------------------------------------------------------------
+	#   https://docs.python.org/2/howto/argparse.html
+	# --------------------------------------------------------------------------------
+	parser = argparse.ArgumentParser()
+	parser.add_argument("infile", help="This will echo the (required) argument given")
+	parser.add_argument("--html", help="Output in HTML", action="store_true")
+	args = parser.parse_args()
+#	print args.infile
+#	if args.html:
+#		print "html turned on"
+
+	use_html = args.html
+
+	infile = args.infile
+	### infile = sys.argv[1]
 	ps_check()
 	exit()
 
 
 	print "\n\n\n\n\n"
 
+
+
+
+
+# ----------------------------------------------------------------------------------------
+#
+#
+# ----------------------------------------------------------------------------------------
+def argparse_examples():
+
+
+	# --------------------------------------------------------------------------------
+	#   https://docs.python.org/2/howto/argparse.html
+	# --------------------------------------------------------------------------------
+	parser = argparse.ArgumentParser()
+	parser.add_argument("echo", help="This will echo the (required) argument given")
+	parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
+	args = parser.parse_args()
+	print args.echo
+	if args.verbose:
+		print "verbose turned on"
+
+	exit()
+
+
+	# --------------------------------------------------------------------------------
+	#   https://docs.python.org/2/howto/argparse.html
+	# --------------------------------------------------------------------------------
+	parser = argparse.ArgumentParser()
+	parser.add_argument("echo", help="This will echo the (required) argument given")
+	parser.add_argument("--verbose", help="increase output verbosity", action="store_true")
+	args = parser.parse_args()
+	print args.echo
+	if args.verbose:
+		print "verbose turned on"
+
+	exit()
+
+	# --------------------------------------------------------------------------------
+	#   https://docs.python.org/2/howto/argparse.html
+	# --------------------------------------------------------------------------------
+	parser = argparse.ArgumentParser()
+	parser.add_argument("echo", help="This will echo the (required) argument given")
+	parser.add_argument("--verbosity", help="increase output verbosity to the level specified")
+	args = parser.parse_args()
+	print args.echo
+	if args.verbosity:
+		print "verbosity turned on"
+
+	exit()
+
+	# --------------------------------------------------------------------------------
+	#   https://docs.python.org/2/howto/argparse.html
+	# --------------------------------------------------------------------------------
+	parser = argparse.ArgumentParser()
+	parser.add_argument("echo", help="This will echo the (required) argument given")
+	args = parser.parse_args()
+	print args.echo
+
+	exit()
+
+
+# ----------------------------------------------------------------------------------------
+#
+#
+# ----------------------------------------------------------------------------------------
+def ps_check______():
+
+	found = 0
+	return_value = 0
+
+	FH = open(infile, "r")
+#	FH = open("rasp_cams.grep", "r")
+	pattern_list = FH.readlines()
+	FH.close
+
+
+	for iii in range(0, len(pattern_list)):
+		pattern_list[iii] = pattern_list[iii].rstrip()
+#		print pattern_list[iii]
+
+	patterns = len(pattern_list)
+
+	ps_output = subprocess.check_output( ["/bin/ps", "-ef"] )
+
+	process = re.split('\n', ps_output)
+
+	if use_html :
+		print "<TABLE><TR><TH>"
+
+	print "UID        PID  PPID  C STIME TTY          TIME CMD"
+
+	if use_html :
+		print "</TH></TR>"
+
+	for iii in range(0, len(process)):
+		if iii > 555 :
+			return
+
+#		print "{}  {}".format( iii, process[iii] )
+
+#		if "init" in process[iii] :
+#			print "     init found!"
+
+		for jjj in range(0, len(pattern_list)):
+			if re.search( pattern_list[jjj], process[iii]) :
+
+				if use_html :
+					print "<TR><TD BGCOLOR=green>"
+
+				print "{}".format( process[iii] )
+
+				if use_html :
+					print "</TD></TR>"
+
+				token = re.split(' *', process[iii] )
+				PID = token[1]
+				if PID in found_PIDS :
+					print "WARNING: duplicate PID {}".format( PID )
+				found_PIDS[ PID ] = 1
+
+				xxx = pattern_list.pop( jjj )
+				# print "DEBUG: Popped \"{}\"".format( xxx )
+
+				found += 1
+				break   # Having changed the pattern_list length...
+
+	if use_html :
+		print "<TR><TD>"
+
+	print "\nfound {} of the expected {} processes".format( found, patterns )
+
+
+	if use_html :
+		print "</TD></TR>"
+
+	if found != patterns :
+		return_value = 1
+
+		if use_html :
+			print "<TR><TD> &nbsp; </TD></TR>"
+			print "<TR><TD>"
+
+		print "ERROR: Missing processes..."
+
+		if use_html :
+			print "</TD></TR>"
+
+
+	if len(pattern_list) > 0 :
+		for jjj in range(0, len(pattern_list)):
+
+			if use_html :
+				print "<TR><TD BGCOLOR=red`>"
+
+
+			print "{} {}".format( jjj + 1, pattern_list[jjj] )
+
+			if use_html :
+				print "</TD></TR>"
+
+	if use_html :
+		print "</TABLE>"
+
+	return_value = 0
+	exit( return_value )
+
+	return
+
+
+# ----------------------------------------------------------------------------------------
