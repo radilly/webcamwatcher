@@ -1,0 +1,999 @@
+    1  passwd
+    2  ls -al
+    3  ls /etc/ssh
+    4  ls -altr /etc/ssh
+    5  df
+    6  sudo shutdown now
+    7  ifconfig
+    8  raspi-config
+    9  sudo raspi-config
+   10  ifconfig
+   11  sudo iwlist wlan0 scan
+   12  sudo iwlist wlan0 scan ~ less
+   13  sudo raspi-config
+   14  sudo iwlist wlan0 scan ~ less
+   15  sudo raspi-config
+   16  sudo iwlist wlan0 scan | less
+   17  sudu vi /etc/wpa_supplicant/wpa_supplicant.conf 
+   18  sudo vi /etc/wpa_supplicant/wpa_supplicant.conf 
+   19  sudo iwlist wlan0 scan | less
+   20  sudo vi /etc/wpa_supplicant/wpa_supplicant.conf 
+   21  ifconfig
+   22  sudo wpi_cli -i wlan0 reconfigure
+   23  sudo wpa_cli -i wlan0 reconfigure
+   24  ifconfig wlan0
+   25  alias
+   26  sudo apt-get update
+   27  ls -al
+   28  sudo apt-get upgrade
+   29  sudo apt-get dist-upgrade
+   30  sudo rpi-update
+   31  sudo reboot
+   32  ls -al
+   33  df
+   34  ls -l /sbin/ifconfig
+   35  iwconfig
+   36  less /etc/network/interfaces
+   37  less /etc/network/interfaces.d
+   38  ls -al /etc/network/interfaces.d
+   39  sudu shutdown
+   40  sudo shutdown now
+   41  ls -altr
+   42  ./light_timer.py 
+   43  ./light_timer.py n
+   44  ./light_timer.py off
+   45  ./light_timer.py on
+   46  ./light_timer.py off
+   47  sudo shutdown now
+   48  ifconfig
+   49  sudo shutdown now
+   50  on
+   51  off
+   52  on
+   53  off
+   54  on
+   55  off
+   56  on
+   57  bash
+   58  off
+   59  alias
+   60  ifconfig
+   61  on
+   62  . .bash_aliases 
+   63  on
+   64  off
+   65  on
+   66  off
+   67  date
+   68  which vi
+   69  crontab -e
+   70  date
+   71  eatch date
+   72  watch date
+   73  crontab -e
+   74  off
+   75  ls
+   76  vi light_timer.log
+   77  off 
+   78  ls -latr
+   79  df
+   80  free
+   81  on
+   82  off
+   83  on
+   84  off
+   85  off
+   86  ls -al
+   87  vi .bashrc
+   88  vi .profile 
+   89  env
+   90  ls -al
+   91  vi .bashrc 
+   92  . .bashrc 
+   93  crontab -e
+   94  vi light_timer.py 
+   95  on
+   96  ls -altr
+   97  tail -f light_timer.log 
+   98  off
+   99  vi light_timer.py
+  100  off
+  101  tail -f light_timer.log 
+  102  on
+  103  off
+  104  uptime
+  105  tail -f light_timer.log 
+  106  ls -al
+  107  vi light_timer.py 
+  108  off
+  109  sleep 10 ; off
+  110  on
+  111  off
+  112  crontab -e
+  113  tail -f light_timer.log 
+  114  on
+  115  off
+  116  cd .ssh/
+  117  ls -al
+  118  vi authorized_keys 
+  119  cd S
+  120  ls
+  121  cd ..
+  122  cd S
+  123  ls
+  124  cd S]\
+  125  ls
+  126  off
+  127  on
+  128  off
+  129  last
+  130  ls -altr
+  131  on
+  132  tail -f light_timer.log 
+  133  df
+  134  on
+  135  off
+  136  ls -altr4
+  137  ls -altr
+  138  vi light_timer.py 
+  139  on
+  140  vi light_timer.py 
+  141  cp -p light_timer.py light_timer.001.py
+  142  vi light_timer.py 
+  143  ls -altr
+  144  ./foo.sh 
+  145  vi light_timer.py 
+  146  ls -altr
+  147  mv .light_timer.py.swp x.light_timer.py.swp
+  148  vi light_timer.py 
+  149  ./foo.sh 
+  150  of
+  151  on
+  152  vi light_timer.py 
+  153  vi fun.txt
+  154  ./light_timer.py fun.txt
+  155  off
+  156  ls -altr
+  157  less light_timer.log 
+  158  vi light_timer.py 
+  159  grep 'if ' light_timer.py 
+  160  vi light_timer.py 
+  161  vi fun.txt 
+  162  ./light_timer.py fun.txt
+  163  vi fun.txt 
+  164  vi ./light_timer.py fun.txt
+  165  ./light_timer.py fun.txt
+  166  vi ./light_timer.py fun.txt
+  167  ./light_timer.py fun.txt
+  168  vi ./light_timer.py fun.txt
+  169  ./light_timer.py fun.txt
+  170  vi ./light_timer.py fun.txt
+  171  ./light_timer.py fun.txt
+  172  ls -altr
+  173  tail light_timer.log 
+  174  ls -altr
+  175  ./light_timer.py fun.txt
+  176  vi ./light_timer.py fun.txt
+  177  ./light_timer.py fun.txt
+  178  vi ./light_timer.py fun.txt &
+  179  fg
+  180  ./light_timer.py fun.txt &
+  181  tail -f light_timer.log 
+  182  less light_timer.log 
+  183  ls -altr
+  184  vi fun.txt 
+  185  ./light_timer.py fun.txt
+  186  vi fun.txt 
+  187  offp
+  188  off
+  189  ./light_timer.py fun.txt 
+  190  on
+  191  tail -f light_timer.log 
+  192  ./light_timer.py fun.txt 
+  193  tttts
+  194  ls -akltr
+  195  tail -f light_timer.log 
+  196  ttttn
+  197  ls
+  198  tail -f light_timer.log 
+  199  ./light_timer.py fun.txt 
+  200  ls -al
+  201  cd webcamwatcher/
+  202  ls -altr
+  203  git pull
+  204  grep git *
+  205  vi git cheats
+  206  vi git_cheats.txt 
+  207  alias
+  208  grep apt-get *
+  209  less webcamimager.py 
+  210  less git_cheats.txt 
+  211  vi git_cheats.txt webcamimager.py
+  212  ls -al
+  213  ls -al ..
+  214  history | grep apt
+  215  grep -r 'apt-get'
+  216  ls -altr ~/.ssh
+  217  cd ..
+  218  ls -al
+  219  vi .vimrc
+  220  ls a-l
+  221  ./light_timer.py fun.txt 
+  222  sudo raspi-config
+  223  ./light_timer.py fun.txt 
+  224  ls -altr
+  225  sudo shutdown now
+  226  ls -altr
+  227  on
+  228  ./light_timer.py fun.txt 
+  229  on
+  230  ./light_timer.py fun.txt 
+  231  ls -altr
+  232  ./light_timer.py fun.txt 
+  233  on
+  234  ./light_timer.py fun.txt 
+  235  vi fun.txt 
+  236  ls -altr
+  237  crontab -e
+  238  ls -altr
+  239  ps -ef | grep pi
+  240  kill -9 8576
+  241  ps -ef | grep pi
+  242  kill -9 8577
+  243  ps -ef | grep pi
+  244  off
+  245  sudo shutdown now
+  246  last
+  247  sudo shutdown now
+  248  on
+  249  sudo shutdown now
+  250  on
+  251  crontab -l
+  252  sudo shutdown now
+  253  ./light_timer.py fun.txt 
+  254  ls -altr
+  255  on
+  256  top
+  257  free
+  258  df
+  259  df -h
+  260  ls -al
+  261  on
+  262  ./light_timer.py fun.txt 
+  263  sleep 10 ; on
+  264  off
+  265  sleep 10 ; on
+  266  ./light_timer.py grad.txt
+  267  sleep 5 ; on
+  268  off
+  269  sleep 5 ; on
+  270  off
+  271  ls -altr
+  272  ./light_timer.py fun.txt &
+  273  head fun.txt 
+  274  vi grad.txt
+  275  ./light_timer.py grad.txt 
+  276  vi light_timer.log
+  277  sudo shutdown now
+  278  on
+  279  off
+  280  sudo reboot
+  281  on
+  282  sudo shutdown now
+  283  ./light_timer.py grad.txt 
+  284  ls -altr
+  285  vi light_timer.
+  286  vi light_timer.py 
+  287  sudo shutdown now
+  288  off
+  289  on
+  290  ./light_timer.py grad.txt 
+  291  ./light_timer.py fun.txt 
+  292  crontab -e
+  293  uptime
+  294  ifconfig
+  295  iwconfig
+  296  ls /etc
+  297  find /etc -name '*ssh*' -ls
+  298  less /etc/ssh/ssh_config
+  299  from astral import Astral
+  300  python
+  301  which pip
+  302  sudo apt-get update && sudo apt-get upgrade
+  303  iwconfig
+  304  ifconfig
+  305  df
+  306  ./light_timer.py fun.txt 
+  307  dmesg -e | less
+  308  pi@raspberrypi:~ $ cat /proc/cpuinfo | tail -3
+  309  Hardware        : BCM2835
+  310  Revision        : a02082
+  311  Serial          : 00000000a7b1402f
+  312  cat /proc/cpuinfo | tail -3
+  313  ./light_timer.py fun.txt 
+  314  ifconfig
+  315  iwconfig
+  316  sudo shutdown now
+  317  ifconfig
+  318  find . -ls
+  319  ifconfig
+  320  find /etc -ls
+  321  ifconfig
+  322  iwconfig
+  323  df
+  324  cd webcamwatcher/
+  325  ./light_timer.py fun.txt 
+  326  on
+  327  crontab -e
+  328  cd webcamwatcher/
+  329  git status
+  330  diff git_cheats.txt 
+  331  git diff git_cheats.txt 
+  332  git add git_cheats.txt 
+  333  git commit -m "Common packages I use."
+  334  git push
+  335  git pull
+  336  ls -altr
+  337  mv git_cheats.txt .git_cheats.txt 
+  338  git pull
+  339  git checkout git_cheats.txt
+  340  git reset
+  341  git pull
+  342  git status
+  343  mkdir ../wwwww
+  344  mv git_cheats.txt north.cfg rm_older_files.sh south.cfg statuscollector.py watchdog.py webcam_north.service webcam_south.service webcamimager.py webcamwatch.py ../wwwww/
+  345  git pull
+  346  mv cumulusmx.service gpio_test.py power_cycle.py wxwatchdog.service ../wwwww/
+  347  git pull
+  348  ls -al
+  349  ls
+  350  ls | xargs rm
+  351  ls -al
+  352  git pull
+  353  git status
+  354  git reset
+  355  git reset --mixed
+  356  ls -al
+  357  git pull
+  358  cd 
+  359  vi light_timer.py 
+  360  alias
+  361  vi light_timer.py 
+  362  cd webcamwatcher/
+  363  ls -al
+  364  ./power_cycle.py 18
+  365  ifconfig
+  366  ls -altr
+  367  rm cycle_driver.py 
+  368  git pull
+  369  ls -al
+  370  cd webcamwatcher/
+  371  git status
+  372  mv .git_cheats.txt ../wwwww/
+  373  cd ..
+  374  rm -rf webcamwatcher/
+  375  cat wwwww/.git_cheats.txt 
+  376  git clone https://github.com/radilly/webcamwatcher
+  377  cd webcamwatcher/
+  378  ls -al
+  379  diff ../wwwww/.git_cheats.txt git_cheats.txt 
+  380  vi ../wwwww/.git_cheats.txt git_cheats.txt 
+  381  git status
+  382  cd ../.ssh/
+  383  ls -altr
+  384  cat authorized_keys 
+  385  cat id_rsa.pub 
+  386  vi authorized_keys 
+  387  cd -
+  388  ls -altr
+  389  git status
+  390  scp pi@raspb_01_Cams:/home/pi/webcamwatcher/cycle_driver.py .
+  391  vi ../.ssh/authorized_keys 
+  392  cat ../.ssh/id_rsa.pub 
+  393  ssh raspb_01_Cams date
+  394  cd
+  395  ls -al
+  396  alias
+  397  crontab -l
+  398  man cron
+  399  man crontab
+  400  crontab
+  401  which logrotate
+  402  man logrotate
+  403  dmesg | tail -f
+  404  dmesg -T | tail -f
+  405  man dmesg
+  406  dmesg -H | tail -f
+  407  dmesg --follow
+  408  dmesg -H | tail -f
+  409  dmesg --follow
+  410  ls /usr
+  411  ls /usr/local/
+  412  ls /usr/local/etc/
+  413  find /usr/local 
+  414  du
+  415  alias
+  416  ./light_timer.py fun.txt 
+  417  ls
+  418  ./light_timer.py grad.txt 
+  419  ls
+  420  cat /proc/cpuinfo | tail -3
+  421  ifconfig eth0
+  422  if
+  423  ifconfig
+  424  ./light_timer.py grad.txt 
+  425  ls al
+  426  ls -al
+  427  crontab -e
+  428  ls -al
+  429  rm x.light_timer.py.swp 
+  430  ./light_timer.py grad.txt 
+  431  ifconfig
+  432  ./light_timer.py grad.txt 
+  433  on
+  434  ls -altr
+  435  tail light_timer.log 
+  436  ls -altr
+  437  sudo shutdown now
+  438  df
+  439  on
+  440  off
+  441  on
+  442  off
+  443  on
+  444  off
+  445  ./light_timer.py grad.txt 
+  446  off
+  447  on
+  448  off
+  449  sudo shutdown now
+  450  on
+  451  off
+  452  alias
+  453  vi light_timer.py 
+  454  ./light_timer.py grad.txt 
+  455  exit
+  456  sudo shutdown now
+  457  on
+  458  off
+  459  sudo shutdown now
+  460  on
+  461  off
+  462  on
+  463  sudo vi /boot/config.txt 
+  464  sudo pwd
+  465  ls -al
+  466  sudo cp -p .vimrc /
+  467  sudo vi /boot/config.txt 
+  468  cp /boot/config.txt .
+  469  vi config.txt 
+  470  sudo vi /boot/config.txt 
+  471  diff config.txt /boot/config.txt 
+  472  sudo cp config.txt /boot/config.txt 
+  473  sudo vi /boot/config.txt 
+  474  ipconfig
+  475  ifconfig
+  476  sudo reboot
+  477  scp pi@192.168.1.163:DS18B20.py .
+  478  ls -altr
+  479  while true ; do ./DS18B20.py ; sleep 10 ; done | tee -a DS18B20.txt
+  480  sudo shutdown now
+  481  off
+  482  on
+  483  ls -altr
+  484  yail -f DS18B20.txt
+  485  tail -f DS18B20.txt
+  486  ./light_timer.py grad.txt 
+  487  ssh rasp_02_Cumulus
+  488  cd .ssh
+  489  ls -al
+  490  cat id_rsa.pub 
+  491  ssh rasp_02_Cumulus date
+  492  ssh rasp_02_Cumulus grep '"temp":' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  493  ssh rasp_02_Cumulus ls -l /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  494  ssh rasp_02_Cumulus grep '"temp":' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  495  ssh rasp_02_Cumulus grep '"temp"' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  496  ssh rasp_02_Cumulus sed -n 's/"temp":"[^"]*"/\1/p' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  497  ssh rasp_02_Cumulus sed -n '\'s/"temp":"[^"]*"/\1/p\'' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  498  ssh rasp_02_Cumulus echo '\'s/"temp":"[^"]*"/\1/p\'' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  499  ssh rasp_02_Cumulus sed -n 's/"temp":"[^"]*"/\1/p' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  500  ssh rasp_02_Cumulus echo 's/"temp":"[^"]*"/\1/p' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  501  ssh rasp_02_Cumulus echo 's/\"temp\":\"[^\"]*\"/\1/p' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  502  ssh rasp_02_Cumulus grep -n 's/\"temp\":\"[^\"]*\"/\1/p' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  503  ssh rasp_02_Cumulus grep -n 's/\"temp\"://p' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  504  ssh rasp_02_Cumulus grep -n '\'s/\"temp\":\"[^\"]*\"/\1/p'\' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  505  ssh rasp_02_Cumulus grep -n '\"s/\"temp\":\"[^\"]*\"/\1/p\"' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  506  ssh rasp_02_Cumulus grep -n '\"s/\"temp\":\"([^\"]*)\"/\1/p\"' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  507  ssh rasp_02_Cumulus grep -n '\"s/\"temp\":\"\([^\"]*\)\"/\1/p\"' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  508  ssh rasp_02_Cumulus echo '\"s/\"temp\":\"\([^\"]*\)\"/\1/p\"' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  509  ssh rasp_02_Cumulus sed -n '\"s/\"temp\":\"\([^\"]*\)\",/\1/p\"' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  510  ssh rasp_02_Cumulus sed -n '\"s/\\"temp\\":\\"\([^\\"]*\)\\",/\1/p\"' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  511  ssh rasp_02_Cumulus sed -n '\"s/.temp.:/\1/p' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  512  ssh rasp_02_Cumulus sed -n 's/.temp.:/\1/p' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  513  ssh rasp_02_Cumulus sed -n 's/.temp.:.//p' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  514  ssh rasp_02_Cumulus sed -n 's/.temp.:\"//p' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  515  ssh rasp_02_Cumulus sed -n 's/.temp.:\"([^\"]*)/\1/p' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  516  ssh rasp_02_Cumulus sed -n 's/.temp.:\"\([^\"]*\)/\1/p' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  517  ssh rasp_02_Cumulus echo sed -n 's/.temp.:\"\([^\"]*\)/\1/p' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  518  ssh rasp_02_Cumulus echo sed -n '\"s/.temp.:\\\"\([^\\\"]*\)/\1/p\"' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  519  ssh rasp_02_Cumulus  sed -n '\"s/.temp.:\\\"\([^\\\"]*\)/\1/p\"' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  520  ssh rasp_02_Cumulus  sed -n '\'s/.temp.:\\\"\([^\\\"]*\)/\1/p\'' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  521  ssh rasp_02_Cumulus  sed -n ''s/.temp.:\\\"\([^\\\"]*\)/\1/p'' /mnt/root/home/pi/Cumulus_MX/web/realtimegauges.txt
+  522  ssh rasp_02_Cumulus /mnt/root/home/pi/Cumulus_MX/get_temp.sh
+  523  on
+  524  while true ; do ./DS18B20.py ; sleep 10 ; done | tee -a DS18B20.txt
+  525  while true ; do printf "%s  %s\n" `./DS18B20.py` `ssh rasp_02_Cumulus /mnt/root/home/pi/Cumulus_MX/get_temp.sh` ; sleep 10 ; done | tee -a DS18B20.txt
+  526  while true ;  echo "`./DS18B20.py` `ssh rasp_02_Cumulus /mnt/root/home/pi/Cumulus_MX/get_temp.sh`" ; sleep 10 ; done | tee -a DS18B20.txt
+  527  while true ; do echo "`./DS18B20.py` `ssh rasp_02_Cumulus /mnt/root/home/pi/Cumulus_MX/get_temp.sh`" ; sleep 10 ; done | tee -a DS18B20.txt
+  528  while true ; do echo "`./DS18B20.py` `ssh rasp_02_Cumulus /mnt/root/home/pi/Cumulus_MX/get_temp.sh`" ; sleep 30 ; done | tee -a DS18B20.txt
+  529  while true ; do echo "`./DS18B20.py` `ssh rasp_02_Cumulus /mnt/root/home/pi/get_temp.sh`" ; sleep 30 ; done | tee -a DS18B20.txt
+  530  ./light_timer.py grad.txt
+  531  ls -al
+  532  while true ; do echo "`./DS18B20.py` `ssh rasp_02_Cumulus /mnt/root/home/pi/get_temp.sh`" ; sleep 30 ; done | tee -a DS18B20.txt
+  533  ls -altr
+  534  fi foo.sh 
+  535  vi foo.sh 
+  536  history | tail > bar.sh
+  537  vi bar.sh 
+  538  chmod +x bar.sh 
+  539  nohup ./bar.sh &
+  540  tail -f nohup.out 
+  541  tail -f DS18B20.txt 
+  542  ./light_timer.py grad.txt
+  543  ls -altr
+  544  tail -f DS18B20.txt 
+  545  tail -n 33 -f DS18B20.txt 
+  546  tail -n 100 -f DS18B20.txt 
+  547  ps -ef | grep tee
+  548  ls -altr
+  549  ps -ef | grep bar
+  550  vi bar.sh
+  551  history | grep bar
+  552  kill -9 23684
+  553  nohup ./bar.sh &
+  554  ls -altr
+  555  tail -n 100 -f DS18B20.txt 
+  556  ./light_timer.py grad.txt
+  557  tail -n 100 -f DS18B20.txt 
+  558  last
+  559  uptime
+  560  ls -altr
+  561  vi bar.sh 
+  562  nohup ./bar.sh &
+  563  tail -n 100 -f DS18B20.txt 
+  564  ls -altr
+  565  tail -n 100 -f DS18B20.txt 
+  566  vi DS18B20.txt 
+  567  tail -n 100 -f DS18B20.txt 
+  568  ./light_timer.py grad.txt
+  569  tail -n 100 -f DS18B20.txt 
+  570  ./light_timer.py grad.txt
+  571  ./light_timer.py grad.txt 
+  572  tail -n 100 -f DS18B20.txt 
+  573  ifconfig
+  574  ./light_timer.py grad.txt 
+  575  tail -n 100 -f DS18B20.txt 
+  576  ixlist
+  577  iwlist
+  578  iwlist wlan0 scan
+  579  iwlist scan
+  580  sudo iw dev wlan0 scan | grep SSID
+  581  man iw
+  582  iw
+  583  iw list
+  584  iw info
+  585  sudo iwlist wlan0 scanning
+  586  sudo iwlist wlan0 scanning | egrep 'Cell |Encryption|Quality|Last beacon|ESSID'
+  587  sudo iwlist wlan0 scanning | egrep 'Cell |Frequency:|Quality|Last beacon|ESSID'
+  588  tail -n 100 -f DS18B20.txt 
+  589  ifconfig
+  590  tail -n 100 -f DS18B20.txt 
+  591  ./light_timer.py grad.txt 
+  592  tail -n 100 -f DS18B20.txt 
+  593  ./light_timer.py grad.txt 
+  594  dmesg
+  595  sleep 10 ; ./light_timer.py grad.txt 
+  596  sudo raspi-config
+  597  sleep 10 ; ./light_timer.py grad.txt 
+  598  ls -al
+  599  cd webcamwatcher/
+  600  git status
+  601  git pull
+  602  git status
+  603  ls -la
+  604  sleep 10 ; ./light_timer.py grad.txt 
+  605  df
+  606  ifconfig
+  607  sleep 10 ; ./light_timer.py grad.txt 
+  608  sleep 10 ; ./light_timer.py grad.txt &
+  609  ls -altr
+  610  DS18B20.py
+  611  ./DS18B20.py
+  612  on
+  613  sleep 10 ; ./light_timer.py grad.txt &
+  614  -
+  615  sleep 10 ; ./light_timer.py grad.txt &
+  616  ls -altr
+  617  sudo poweroff
+  618  off
+  619  on
+  620  off
+  621  sudo poweroff
+  622  on
+  623  off
+  624  date
+  625  on
+  626  sleep 10 ; ./light_timer.py grad.txt &
+  627  dmesg
+  628  ping raspi_04
+  629  ssh raspi_04
+  630  exit
+  631  sleep 10 ; ./light_timer.py grad.txt &
+  632  cd webcamwatcher/
+  633  git status
+  634  git pull
+  635  ifconfig
+  636  man ifconfig
+  637  sudo reboot
+  638  tty
+  639  who
+  640  ifconfig
+  641  man dhclient 
+  642  dhclient -v eth0
+  643  sudo dhclient -v eth0
+  644  sudo dhclient -v 
+  645  ifconfig
+  646  sudo dhclient -r eth0
+  647  ifconfig
+  648  sudo dhclient -r eth0
+  649  ifconfig
+  650  sudo dhclient -v -r eth0
+  651  sudo dhclient -v  eth0
+  652  ifconfig
+  653  sudo ifdown eth0
+  654  ifconfig
+  655  sudo ifconfig eth0 down
+  656  sudo ifconfig eth0 up
+  657  ifconfig
+  658  sudo ifconfig eth0 down
+  659  ifconfig
+  660  sudo ifconfig eth0 up
+  661  ifconfig
+  662  sleep 10 ; ./light_timer.py grad.txt &
+  663  on
+  664  ls -altr
+  665  tail -f light_timer.log 
+  666  crontab -e
+  667  tail -f light_timer.log
+  668  sleep 10 ; ./light_timer.py grad.txt &
+  669  on
+  670  d
+  671  sleep 10 ; ./light_timer.py grad.txt &
+  672  off
+  673  sleep 10 ; ./light_timer.py grad.txt &
+  674  ls -altr
+  675  tail light_timer.l
+  676  tail light_timer.log 
+  677  on
+  678  off
+  679  ls -al
+  680  ls -altr
+  681  vi light_timer.log 
+  682  on
+  683  crontab -l
+  684  sleep 10 ; ./light_timer.py grad.txt &
+  685  sleep 10 ; nohup ./light_timer.py grad.txt &
+  686  on
+  687  off
+  688  sleep 10 ; nohup ./light_timer.py grad.txt &
+  689  grep 'Bobs-Laptop-rsa-key-20180511' ~/.ssh/authorized_keys
+  690  vi .ssh/authorized_keys 
+  691  sleep 10 ; nohup ./light_timer.py grad.txt &
+  692  on
+  693  sleep 10 ; nohup ./light_timer.py grad.txt &
+  694  ls
+  695  cd webcamwatcher/
+  696  ls
+  697  git status
+  698  git pull
+  699  cd
+  700  ls
+  701  alias
+  702  ls webcamwatcher/
+  703  cp -p light_timer.py webcamwatcher/
+  704  git status
+  705  cd -
+  706  git status
+  707  git commit -am "Initial checkin."
+  708  git status
+  709  git add light_timer.py 
+  710  git commit -am "Initial checkin."
+  711  git push
+  712  cd webcamwatcher/
+  713  git status
+  714  git push
+  715  cd ../.ssh
+  716  ls
+  717  cay id_rsa.pub 
+  718  cat id_rsa.pub 
+  719  cd -
+  720  ls -altr
+  721  less git_cheats.txt 
+  722  head -n 50 git_cheats.txt 
+  723  git config --global user.name "Bob Dilly"
+  724  git config --global user.email "GitHub@radilly.org"
+  725  git push
+  726  head -n 65 git_cheats.txt 
+  727  git remote set-url origin git@github.com:radilly/webcamwatcher.git
+  728  git push
+  729  ls -altr
+  730  vi light_timer.py 
+  731  grep def light_timer.py 
+  732  egrep '^def ' light_timer.py 
+  733  egrep '^def ' light_timer.py | xargs -i printf '#  %s\n' {}
+  734  egrep '^def ' light_timer.py | xargs -i printf '#  %s\n' {} >> light_timer.py 
+  735  vi light_timer.py 
+  736  ls -altr
+  737  diff light_timer.py webcamimager.py
+  738  diff light_timer.py webcamimager.py | less
+  739  ls -altr
+  740  diff light_timer.py watchdog.py | less
+  741  head light_timer.py watchdog.py 
+  742  vi light_timer.py 
+  743  cd ..
+  744  ls -al
+  745  mv light_timer.py .light_timer.py
+  746  rm light_timer.001.py
+  747  lm webcamwatcher/light_timer.py .
+  748  ln -s webcamwatcher/light_timer.py .
+  749  on
+  750  off
+  751  ls -aaltr
+  752  tail light_timer.log 
+  753  cd -
+  754  git status
+  755  git add light_timer.py 
+  756  git commit -m "Ripped out most of the unused stuff."
+  757  git push
+  758  on
+  759  off
+  760  ls -al
+  761  ls -al *txt
+  762  vi update_upgrade_notes.txt
+  763  ls -altr
+  764  tail light_timer.log 
+=============================================================================
+=============================================================================
+=============================================================================
+=============================================================================
+
+  765  sudo apt-get update
+  766  alias
+  767  sudo apt-get upgrade
+  768  sudo apt-get update
+  769  sudo apt-get install apache2
+  770  ipconfig
+  771  ifconfig
+  772  sudo vi /var/www/html/index.html
+  773  ls -al /usr/lib/cgi-bin/
+  774  ls -al /etc/apache2/
+  775  ls -al /etc/apache2/conf-enabled/
+  776  ls -al /etc/apache2/conf-available/
+  777  less /etc/apache2/conf-available/serve-cgi-bin.conf 
+  778  sudo vi /etc/apache2/conf-available/serve-cgi-bin.conf 
+  779  cat .vimrc 
+  780  sudo echo "AddHandler cgi-script .py          #https://www.raspberrypi.org/forums/viewtopic.php?t=155229" >> /etc/apache2/conf-available/serve-cgi-bin.conf 
+  781  sudo echo "AddHandler cgi-script .py          #https://www.raspberrypi.org/forums/viewtopic.php?t=155229" >> /etc/apache2/conf-available/serve-cgi-bin.conf.xxx 
+  782  sudo echo "AddHandler cgi-script .py          #https://www.raspberrypi.org/forums/viewtopic.php?t=155229" >> $PWD/xxx 
+  783  sudo vi /etc/apache2/conf-available/serve-cgi-bin.conf $PWD/xxx 
+  784  rm xxx 
+  785  history | less
+  786  cd webcamwatcher/
+  787  git pull
+  788  ls -alls -al
+  789  ls -al
+  790  ls -Al
+  791  vi git_cheats.txt 
+  792  history | tail -n 44 >> git_cheats.txt 
+  793  vi git_cheats.txt 
+  794  git statis
+  795  git sta
+  796  git stat
+  797  git status
+  798  git diff git_cheats.txt 
+  799  git add git_cheats.txt 
+  800  git commit -m "Added some notes on installing apache2.  Works out of the box."
+  801  git push
+  802  ls
+  803  vi pi_health.py 
+  804  ./pi_health.py 
+  805  vi +1815 pi_health.py 
+  806  man free
+  807  less /proc/info
+  808  man free
+  809  less /proc/meminfo 
+  810  cat /proc/meminfo ; free
+  811  expr 63840 + 686292
+  812  expr 949444 - 40800 - 48112 - 810300
+  813  expr 949444 - 40800 - 48112 
+  814  expr 949444 - 40800 - 48112 - 98344
+  815  expr 40800 + 48112 + 795000
+  816  expr 40800 + 98344 + 48112 + 795000
+  817  expr 40800 + 98344 +  795000
+  818  vi +1815 pi_health.py 
+  819  ./pi_health.py 
+  820  git diff pi_health.py 
+  821  cat /etc/os-release
+  822  ./pi_health.py 
+  823  vi +1815 pi_health.py 
+  824  ./pi_health.py 
+  825  vi +1815 pi_health.py 
+  826  ./pi_health.py 
+  827  lsb_release -a
+  828  vi +1815 pi_health.py 
+  829  ./pi_health.py 
+  830  vi +1815 pi_health.py 
+  831  ./pi_health.py 
+  832  which lsb_release
+  833  vi +1815 pi_health.py 
+  834  ./pi_health.py 
+  835  vi +1815 pi_health.py 
+  836  ./pi_health.py 
+  837  vi +1815 pi_health.py 
+  838  ./pi_health.py 
+  839  vi +1815 pi_health.py 
+  840  ./pi_health.py 
+  841  vi +1815 pi_health.py 
+  842  ./pi_health.py 
+  843  vi +1815 pi_health.py 
+  844  ./pi_health.py 
+  845  vi +1815 pi_health.py 
+  846  free -o -h
+  847  vi +1815 pi_health.py 
+  848  free -V
+  849  vi +1815 pi_health.py 
+  850  ./pi_health.py 
+  851  vi +1815 pi_health.py 
+  852  ./pi_health.py 
+  853  cat /proc/meminfo
+  854  vi +1815 pi_health.py 
+  855  whih cat
+  856  which cat
+  857  vi +1815 pi_health.py 
+  858  ./pi_health.py 
+  859  vi +1815 pi_health.py 
+  860  ./pi_health.py 
+  861  vi +1915 pi_health.py 
+  862  ./pi_health.py 
+  863  vi +1915 pi_health.py 
+  864  ./pi_health.py 
+  865  vi +1915 pi_health.py 
+  866  ./pi_health.py 
+  867  vi +1915 pi_health.py 
+  868  ./pi_health.py 
+  869  vi +1915 pi_health.py 
+  870  ./pi_health.py 
+  871  vi +1915 pi_health.py 
+  872  ./pi_health.py 
+  873  vi +1915 pi_health.py 
+  874  ./pi_health.py 
+  875  vi +1915 pi_health.py 
+  876  ./pi_health.py 
+  877  vi +1915 pi_health.py 
+  878  ./pi_health.py 
+  879  vi +1915 pi_health.py 
+  880  ./pi_health.py 
+  881  vi +1915 pi_health.py 
+  882  echo "        mem_total = int(words[0])
+  883          mem_used = int(words[1])        # Not referenced
+  884          mem_free = int(words[2])        # Not referenced
+  885          shared = words[3]               # Not referenced
+  886          buffers = words[4]              # Not referenced
+  887          cached = words[5]               # Not referenced
+  888          bu_ca_used = int(words[6])      # Not referenced
+  889          bu_ca_free = int(words[7])
+  890          swap_total = int(words[8])
+  891          swap_used = int(words[9])
+  892          data['swap_used'] = swap_used
+  893          swap_free = int(words[10])      # Not referenced
+  894  "
+  895  vi +1915 pi_health.py 
+  896  ./pi_health.py 
+  897  ls -altr
+  898  git add pi_health.py 
+  899  git commit -m "Broken for 'free from procps-ng 3.3.12' but has lot's of debugging.  Unsure about v 3.3.9."
+  900  git push
+  901  vi +1915 pi_health.py 
+  902  ./pi_health.py 
+  903  vi +1915 pi_health.py 
+  904  git status
+  905  git diff pi_health.py
+  906  git add pi_health.py
+  907  git commit -m "Tweaking some commentary."
+  908  git push
+  909  ls /var
+  910  ls /usr/lib/
+  911  ls /usr/lib/cgi-bin/
+  912  cd webcamwatcher/
+  913  git pull
+  914  ./pi_health.py 
+  915  vi +1886 pi_health.py 
+  916  ./pi_health.py 
+  917  vi +1886 pi_health.py 
+  918  ./pi_health.py 
+  919  pwd
+  920  vi +1886 pi_health.py 
+  921  ./pi_health.py 
+  922  ls /usr/lib/cgi-bin/
+  923  sudo cp -p pi_health.py /usr/lib/cgi-bin/
+  924  ls /usr/lib/cgi-bin/
+  925  ls -al /usr/lib/cgi-bin/
+  926  sudo chown root /usr/lib/cgi-bin/pi_health.py 
+  927  sudo chgrp root /usr/lib/cgi-bin/pi_health.py 
+  928  ls -al /usr/lib/cgi-bin/
+  929  i[config
+  930  ipconfig
+  931  ifconfig
+  932  systemctl -l status apache2
+  933  sudo vi /usr/lib/cgi-bin/pi_health.py 
+  934  sudo systemctl -l reload apache2
+  935  ls /etc/apache2/
+  936  ls /etc/apache2/sites-enabled/
+  937  less /etc/apache2/sites-enabled/000-default.conf 
+  938  find /etc/apache2/ -type f -ls
+  939  less /etc/apache2/conf-available/serve-cgi-bin.conf
+  940  sudo vi /usr/lib/cgi-bin/pi_health.py 
+  941  sudo service reload apache2
+  942  sudo systemctl -l reload apache2
+  943  sudo systemctl -l status apache2
+  944  sudo journalctl -u apache2
+  945  diff pi_health.py /usr/lib/cgi-bin/pi_health.py 
+  946  ls -l pi_health.py /usr/lib/cgi-bin/pi_health.py 
+  947  less /etc/apache2/sites-enabled/000-default
+  948  less /etc/apache2/sites-enabled/
+  949  ls -al /etc/apache2/sites-enabled/
+  950  less /etc/apache2/sites-enabled/000-default.conf 
+  951  less /var/log/apache2/error.log
+  952  grep -r ServerName /etc/apache2/ 
+  953  less /etc/apache2/conf-available/serve-cgi-bin.conf
+  954  sudo vi /etc/apache2/conf-available/serve-cgi-bin.conf
+  955  sudo systemctl -l reload apache2
+  956  sudo systemctl -l status apache2
+  957  less /etc/apache2/sites-enabled/000-default.conf 
+  958  sudo vi /etc/apache2/sites-enabled/000-default.conf 
+  959  sudo systemctl -l reload apache2
+  960  sudo systemctl -l status apache2
+  961  sudo vi /etc/apache2/sites-enabled/000-default.conf 
+  962  sudo ls -la /usr/lib/cgi-bin/pi_health.py 
+  963  /usr/lib/cgi-bin/pi_health.py 
+  964  man a2enmod
+  965  sudo a2enmod cgi
+  966  sudo systemctl -l reload apache2
+  967  sudo systemctl -l status apache2
+  968  history | less
+  969  sudo a2enmod cgi
+  970  curl localhost/cgi-bin/pi_health.py
+  971  ls -altr ..
+  972  tail ../light_timer.log
+  973  off
+  974  tail ../light_timer.log
+  975  sudo reboot
+  976  curl localhost/cgi-bin/pi_health.py
+  977  less /var/log/apache2/error.log
+  978  tail /var/log/apache2/error.log
+  979  sudo vi +1767 /usr/lib/cgi-bin/pi_health.py 
+  980  tail /var/log/apache2/error.log
+  981  curl localhost/cgi-bin/pi_health.py
+  982  cd webcamwatcher/
+  983  git status
+  984  git diff pi_health.py
+  985  sudo systemctl -l status apache2
+  986  diff pi_health.py /usr/lib/cgi-bin/pi_health.py 
+  987  mv pi_health.py .pi_health.py 
+  988  cp /usr/lib/cgi-bin/pi_health.py .
+  989  ls -al
+  990  git diff pi_health.py
+  991  git add pi_health.py
+  992  git commit -m "Got this running on raspberrypi_03 - the Pi running deck lights.  Couple tweaks.  With the newer OS and free, the older parser didn't work.  Might be interesting to fix it to compare the data from meminfo and free - but there is a little apples and oranges there."
+  993  git push
+  994  history >> apache2_intall.txt

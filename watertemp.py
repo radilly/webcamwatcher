@@ -47,6 +47,7 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20201003 RAD Added a bar chart column with scaling to exaggerate the changes.
 # 20200102 RAD Was fiddling with the box inside where the temp was in the green
 #              zone.  There was a typo in setting bgcolor in the default case.
 #              Added quite of number of DEBUG prints to figure it out...
@@ -70,6 +71,11 @@ logger_file = re.sub('\.py', '.log', logger_file)
 # strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
 strftime_FMT = "%Y/%m/%d %H:%M:%S"
 
+maxT = -999.0
+minT = +999.0
+rangeT = -1.0
+scaleT = -1.0
+
 
 # ----------------------------------------------------------------------------------------
 #
@@ -82,10 +88,33 @@ strftime_FMT = "%Y/%m/%d %H:%M:%S"
 #		last_realtime() return value should be leveraged <<<  OBSOLETE???????????????
 # ----------------------------------------------------------------------------------------
 def main():
+	global minT, scaleT
 
-# @@@
+
+	# --------------------------------------------------------------------------------
+	# check_lines controls length of the first table, and the second
+	# --------------------------------------------------------------------------------
+	check_lines = 5
+
+	fileHandle = open ( watertemplog,"r" )
+	lineList = fileHandle.readlines()
+	fileHandle.close()
+
+	# --------------------------------------------------------------------------------
+	#  Find the min and max readings.  Compute a scale facor for the bar chart.
+	# --------------------------------------------------------------------------------
+	limit = (check_lines+1) * -12 * check_lines
+	maxT = -999.0
+	for iii in range(-1, limit, -1 ):
+		tok = re.split(',', lineList[iii])
+		temp = float( tok[2] )
+		maxT = max( maxT, temp )
+		minT = min( minT, temp )
+	rangeT = maxT - minT
+	scaleT = 500 / rangeT
 
         print "Content-type: text/html\n\n\n\n"
+        print "<META HTTP-EQUIV=\"refresh\" CONTENT=\"300\">"
 	print "<HEAD>\n"
 #	print "table, th, td {"
 #	print "  border: 1px solid black;"
@@ -95,20 +124,15 @@ def main():
 #	print "}\n"
 	print "<TITLE> Pond Water Temp </TITLE>"
 	# See https://www.quora.com/How-can-I-get-the-logo-on-title-bar
-	print "<link rel = \"icon\" type = \"image/png\" href = \"WX_Blue_Green_32x32.png\">"
+	print "<link rel = \"icon\" type = \"image/png\" href = \"/WX_Blue_Green_32x32.png\">"
 	print "</HEAD>"
 	print "<H1 Align=left> Pond Water Temp </H1>"
+	print "<BR> &nbsp; &nbsp; &nbsp; <I>- page automatically reloads -</I>"
+	print "<BR> Min Temp = {:5.2f}&deg;".format( minT )
+	print "<BR> Max Temp = {:5.2f}&deg;".format( maxT )
+	print "<BR> records checked = {}".format( -1 * limit )
 	print "<H2 Align=left> 5-Minute Reads </H2>"
 	print "<TABLE BORDER=1 CELLPADDING=3>"
-
-	# --------------------------------------------------------------------------------
-	# --------------------------------------------------------------------------------
-	# --------------------------------------------------------------------------------
-	check_lines = 5
-
-	fileHandle = open ( watertemplog,"r" )
-	lineList = fileHandle.readlines()
-	fileHandle.close()
 
 	for iii in range(-1, (-1 * (check_lines+1)), -1):
 		lineList[iii] = re.sub('\n', ' ', lineList[iii])        # Remove any newline which might be left
@@ -133,7 +157,7 @@ def main():
 	print "<H2 Align=left> Hourly Reads </H2>"
 	print "<TABLE BORDER=1 CELLPADDING=3>"
 
-	for iii in range(-1-check_lines, (-1 * (check_lines+1)*11*check_lines), -12 ):
+	for iii in range(-1-check_lines, limit, -12 ):
 		lineList[iii] = re.sub('\n', ' ', lineList[iii])        # Remove any newline which might be left
 		table_line( lineList[iii] )
 		### print lineList[iii] 
@@ -143,59 +167,44 @@ def main():
 
 
 	return
-	# --------------------------------------------------------------------------------
-	# --------------------------------------------------------------------------------
-	# --------------------------------------------------------------------------------
-
-
-
-
-
-
 
 
 # ----------------------------------------------------------------------------------------
-#
+# Called for each line in the tables generated.
 #
 #
 #
 # ----------------------------------------------------------------------------------------
 # @@@
 def table_line( text_in ) :
+#	global minT, scaleT
 
-###	text = re.sub( ",", " &nbsp; ", text_in, count=1 )
-###	text = re.sub( ",", " </TD><TD> ", text, count=1 )
-###	print "<TR><TD> " + text + "</TD><TR>"
-
-###	print "<!-- DEBUG: text_in = \"{}\" -->".format( text_in )
 	tok = re.split(',', text_in )
 	temp = float( tok[2] )
-###	print "<!-- DEBUG: temp = {} -->".format( temp )
-###	print "<!-- DEBUG: temp = \"{}\" -->".format( 1.0 * temp )
-###	print "<!-- DEBUG: bool = \"{}\" -->".format( temp < 40.0 )
-###	print "<!-- DEBUG: bool = \"{}\" -->".format( temp < 50.0 )
-###	print "<!-- DEBUG: bool = \"{}\" -->".format( temp < 99.0 )
 
-#	bgcolor = " BGCOLOR=\"#A0A0A0\""
-#	print "<!-- DEBUG: bgcolor = \"{}\" -->".format( bgcolor )
-#	bcgolor = " BGCOLOR=\"#00F900\""
-#	print "<!-- DEBUG: bgcolor = \"{}\" -->".format( bgcolor )
+	# --------------------------------------------------------------------------------
+	# NOTE: code %23 maps to '#' sign
+	# --------------------------------------------------------------------------------
+	barWidth = int( 1 + (temp - minT) * scaleT )
 	if temp < 40.0 :
 ###		print "<!-- DEBUG: temp < 40.0 -->"
 		bgcolor = " BGCOLOR=\"#FF5555\""
+		img = "<TD WIDTH=525 BGCOLOR=#000000><IMG SRC=\"/1_pixel_%23FF5555.jpg\" HEIGHT=8 WIDTH={}>".format( barWidth )
 ###		print "<!-- DEBUG: bgcolor = \"{}\" -->".format( bgcolor )
 	elif temp < 50.0 :
 ###		print "<!-- DEBUG: temp < 50.0 -->"
 		bgcolor = " BGCOLOR=\"yellow\""
+		img = "<TD WIDTH=525 BGCOLOR=#000000><IMG SRC=\"/1_pixel_Yellow.jpg\" HEIGHT=8 WIDTH={}>".format( barWidth )
 ###		print "<!-- DEBUG: bgcolor = \"{}\" -->".format( bgcolor )
 	else :
 ###		print "<!-- DEBUG: else clause -->"
 		bgcolor = " BGCOLOR=\"#00F900\""
+		img = "<TD WIDTH=525 BGCOLOR=#000000><IMG SRC=\"/1_pixel_%2300F900.jpg\" HEIGHT=8 WIDTH={}>".format( barWidth )
 ###		print "<!-- DEBUG: bgcolor = \"{}\" -->".format( bgcolor )
 
 ###	print "<!-- DEBUG: bgcolor = {} -->".format( bgcolor )
 
-	print "<TR{}><TD> &nbsp; {} &nbsp; {} &nbsp; </TD><TH> &nbsp; {}&deg; &nbsp; </TH><TR>".format( bgcolor, tok[0], tok[1], tok[2] )
+	print "<TR{}><TD> &nbsp; {} &nbsp; {} &nbsp; </TD><TH> &nbsp; {}&deg; &nbsp; </TH>{}</TD><TR>".format( bgcolor, tok[0], tok[1], tok[2], img )
 
 
 # ----------------------------------------------------------------------------------------
