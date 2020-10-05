@@ -165,7 +165,6 @@
 # import urllib
 # https://docs.python.org/2/howto/urllib2.html
 # https://docs.python.org/2/library/urllib2.html
-# from urllib2 import urlopen, URLError, HTTPError
 from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
 
@@ -430,7 +429,7 @@ def main():
 	python_version = re.sub(' *\n *', '<BR>', python_version )
 	python_version = re.sub(' *\(', '<BR>(', python_version )
 
-	messager("INFO: Python version: " + str(sys.version))
+	logger("INFO: Python version: " + str(sys.version))
 	data['python_version'] = python_version
 
 	iii = 0
@@ -442,7 +441,7 @@ def main():
 			for jjj in range(0, len(CSV_keys)):
 				hdr = hdr + " {},".format( CSV_keys[jjj] )
 
-			print(hdr)
+			logger(hdr)
 
 		# Capture the data by calling functions.  Ignore return values.
 		server_stalled()
@@ -467,7 +466,7 @@ def main():
 				if data[CSV_keys[jjj]] > 0 :
 					Prob_Flag = " <<<<<,"
 
-		print(CSV_rec + Prob_Flag)
+		logger(CSV_rec + Prob_Flag)
 
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# NOTE: Would be great to output data and use highcharts
@@ -481,22 +480,6 @@ def main():
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		if 0 == iii % summary_stride :
 			summarize()
-
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		#		swap_pct 0
-		#		swap_used 500
-		#		cpu_temp 38.089
-		#		mem_pct 34
-		#		rf_dropped 0
-		#		effective_used 323012
-		#		watcher_pid 16978
-		#		cpu_temp_f 100.5602
-		#		last_realtime -2
-		#		proc_load 0.24
-		#		server_stalled 0
-		#		ws_data_stopped 0
-		#		camera_down 0
-		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
 		iii += 1
 		sleep(sleep_for)
@@ -800,6 +783,17 @@ def log_and_message(message):
 	messager(message)
 	logger(message)
 
+# ----------------------------------------------------------------------------------------
+# This prints just a symbol or two - for a progress indicator.
+#
+#		sys.stdout.write('.')
+#		sys.stdout.flush()
+# ----------------------------------------------------------------------------------------
+def log_string(text):
+	FH = open(logger_file, "a")
+	FH.write( text )
+	FH.close
+
 
 # ----------------------------------------------------------------------------------------
 # Write the PID of this Python script to a .PID file by the name name.
@@ -810,7 +804,7 @@ def write_pid_file():
 	pid_file = sys.argv[0]
 	pid_file = re.sub('\.py', '.PID', pid_file)
 
-	messager( "DEBUG: Writing {}".format( pid_file ) )
+	logger( "DEBUG: Writing {}".format( pid_file ) )
 
 	FH = open(pid_file, "w")
 	FH.write(PID)
@@ -855,12 +849,12 @@ def ws_data_stopped():
 		if ws_data_last_secs < 1 :
 			ws_data_last_secs = int( datetime.datetime.utcnow().strftime("%s") )
 			# Long message the first time we see this...
-			messager( "WARNING:  CumulusMX reports data_stopped (<#DataStopped> == 1).   (code 101)" )
+			logger( "WARNING:  CumulusMX reports data_stopped (<#DataStopped> == 1).   (code 101)" )
 			log_event("", "CumulusMX reports data_stopped (<#DataStopped> == 1).", 101 )
 		else:
 			elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  ws_data_last_secs 
 			if elapsed > 400 :
-				messager( "WARNING:   systemctl restart cumulusmx.   (code 999)" )
+				logger( "WARNING:   systemctl restart cumulusmx.   (code 999)" )
 				log_event("", "systemctl restart cumulusmx.", 999 )
 				restart_cmd = ['/usr/bin/sudo',
 					'systemctl',
@@ -879,14 +873,14 @@ def ws_data_stopped():
 					logger( "DEBUG: restart returned data: \"" + restart + "\"" )
 ###########################################################################################################################################################################################################################################################################################################				exit()
 				sleep( 10 )
-				print("\n\n\n\n\n")
-				messager( "INFO: systemctl restarted cumulusmx.   (code 998)" )
+				log_string("\n\n\n\n\n")
+				logger( "INFO: systemctl restarted cumulusmx.   (code 998)" )
 				log_event("", "systemctl restarted cumulusmx.", 998 )
 
 
 			# Short message while this status continues
 			elif 0 == ws_data_last_count % 3 :
-				messager( "WARNING:  CumulusMX reports data_stopped ... " + str(elapsed) + " sec" )
+				logger( "WARNING:  CumulusMX reports data_stopped ... " + str(elapsed) + " sec" )
 	else:
 		ws_data_last_secs = 0
 		ws_data_last_count = 0
@@ -916,15 +910,15 @@ def server_stalled():
 	except ( URLError, Exception ) as err :
 	### >>>> except URLError as err :
 	# At one point got "httplib.BadStatusLine: ''" (unhandled) - See below
-		messager( "ERROR: in server_stalled: {}".format( sys.exc_info()[0] ) )
+		log_and_message( "ERROR: in server_stalled: {}".format( sys.exc_info()[0] ) )
 		if hasattr(err, 'reason'):
-			messager( 'ERROR: We failed to reach a server.' )
-			messager( 'ERROR: Reason: ()'.format( err.reason ) )
+			log_and_message( 'ERROR: We failed to reach a server.' )
+			log_and_message( 'ERROR: Reason: ()'.format( err.reason ) )
 			# Avoid downstream issue working with this variable.
 			content = "1"
 		elif hasattr(err, 'code'):
-			messager( 'ERROR: The server couldn\'t fulfill the request.' )
-			messager( 'ERROR: code: ()'.format( err.code ) )
+			log_and_message( 'ERROR: The server couldn\'t fulfill the request.' )
+			log_and_message( 'ERROR: code: ()'.format( err.code ) )
 			# Avoid downstream issue working with this variable.
 			content = "1"
 ####	else:
@@ -938,18 +932,10 @@ def server_stalled():
 	# .................................................................
 	content = content.rstrip()
 	if len(content) < 1:
-		messager( "DEBUG: WS_Updates.txt looks short = \"" + content.rstrip() + "\"" )
+		logger( "DEBUG: WS_Updates.txt looks short = \"" + content.rstrip() + "\"" )
 
-	# ...... REMOVE ...................................................
-	####### result = re.search('(\d*)', content)
-	####### The file contains at least a trailing newline ... I've not looked
-	####### words = re.split(' +', content)
-	# .................................................................
 	try:
 		unique_count = int(content)
-		# ...... REMOVE ...........................................
-		####### unique_count = int(result.group(1))
-		# .........................................................
 	except :
 		# .........................................................
 		# Big value - obvious if debugging...
@@ -958,7 +944,7 @@ def server_stalled():
 	##_DEBUG_## ___print "wx/WS_Updates.txt = " + str( unique_count )
 	if unique_count < 3 :
 		data['server_stalled'] = 1
-		messager( "WARNING:  unique_count =" + str(unique_count) + "; expected 12." + \
+		logger( "WARNING:  unique_count =" + str(unique_count) + "; expected 12." + \
 			"  realtime.txt data was not updated recently (last 45 mins)." )
 		return 1
 	else:
@@ -992,18 +978,18 @@ def last_realtime():
 		content = response.read().decode('utf-8')
 		content = content.rstrip()
 	except ( URLError, Exception ) as err :
-		messager( "ERROR: in last_realtime: {}".format( sys.exc_info()[0] ) )
+		log_and_message( "ERROR: in last_realtime: {}".format( sys.exc_info()[0] ) )
 		# ------------------------------------------------------------------------
 		#  See https://docs.python.org/2/tutorial/errors.html (~ middle)
 		# ------------------------------------------------------------------------
-		messager( "ERROR: type: {}".format( type(err) ) )
-		messager( "ERROR: args: {}".format( err.args ) )
+		log_and_message( "ERROR: type: {}".format( type(err) ) )
+		log_and_message( "ERROR: args: {}".format( err.args ) )
 		if hasattr(err, 'reason'):
-			messager( 'ERROR: We failed to reach a server.' )
-			messager( 'ERROR: Reason: ()'.format( err.reason ) )
+			log_and_message( 'ERROR: We failed to reach a server.' )
+			log_and_message( 'ERROR: Reason: ()'.format( err.reason ) )
 		elif hasattr(err, 'code'):
-			messager( 'ERROR: The server couldn\'t fulfill the request.' )
-			messager( 'ERROR: code: ()'.format( err.code ) )
+			log_and_message( 'ERROR: The server couldn\'t fulfill the request.' )
+			log_and_message( 'ERROR: code: ()'.format( err.code ) )
 		# ------------------------------------------------------------------------
 		#  https://docs.python.org/2/tutorial/errors.html
 		#  https://docs.python.org/2/library/sys.html
@@ -1013,7 +999,7 @@ def last_realtime():
 		#  https://stackoverflow.com/questions/8238360/how-to-save-traceback-sys-exc-info-values-in-a-variable
 		# ------------------------------------------------------------------------
 		content = "00/00/00 00:00:00 45.5 80 39.7 0.0 0.7 360 0.00 0.05 30.14 N 0 mph ..."
-		messager( "DEBUG: content = \"" + content + "\" in last_realtime()" )
+		logger( "DEBUG: content = \"" + content + "\" in last_realtime()" )
 
 	words = re.split(' +', content)
 
@@ -1066,22 +1052,22 @@ def last_realtime():
 	elif diff_secs > 200 :
 		stat_text = "NOT UPDATED"
 		status = 1
-		messager( "WARNING: " + str(diff_secs) + " elapsed since realtime.txt was updated." )
+		logger( "WARNING: " + str(diff_secs) + " elapsed since realtime.txt was updated." )
 	elif diff_secs < -2000 :
 		stat_text = "NOT UPDATED"
 		status = -1
-		messager( "DEBUG: Got large negative value from record:\n\t" + content )
+		logger( "DEBUG: Got large negative value from record:\n\t" + content )
 #		for item in content :
 #			___print "    " + item
 		if last_date != date_str :
 			#  -----------------------------------------------------
 			#  Timestamp in realtime.txt is in "local" time.
 			#  -----------------------------------------------------
-			messager( "DEBUG: Likely the day rolled over as save date does not match..." )
+			logger( "DEBUG: Likely the day rolled over as save date does not match..." )
 			if seconds < 300 :
-				messager( "DEBUG:    ... and seconds = " + str(seconds) )
+				logger( "DEBUG:    ... and seconds = " + str(seconds) )
 			if diff_secs == -86376 :
-				messager( "DEBUG:    ... yep, the date on the Pi rolled over" )
+				logger( "DEBUG:    ... yep, the date on the Pi rolled over" )
 			last_date = date_str
 	else:
 		stat_text = "ok"
@@ -1117,7 +1103,7 @@ def proc_load():
 
 	load = re.sub('.*average: *', '', load)
 	load = load.rstrip()
-	# messager( "DEBUG: uptime data: \"" + load + "\"" )
+	# logger( "DEBUG: uptime data: \"" + load + "\"" )
 	# load = re.sub(',', '', load)
 	words = re.split(', ', load)
 ###	for iii in range(0, len(words)):
@@ -1127,7 +1113,7 @@ def proc_load():
 	proc_load_5m = float(words[1])
 
 	if cur_proc_load > proc_load_lim :
-		messager( "WARNING: \t" + \
+		logger( "WARNING: \t" + \
 			"proc_load_lim = " + str(proc_load_lim) + \
 			"\t\t 1 minute load average = " + str(cur_proc_load) )
 	data['proc_load'] = cur_proc_load
@@ -1137,7 +1123,7 @@ def proc_load():
 
 
 	if cur_proc_load > proc_load_lim :
-		messager( "WARNING: 1 minute load average = " + str(cur_proc_load) + \
+		logger( "WARNING: 1 minute load average = " + str(cur_proc_load) + \
 			";  proc_load_lim = " + str(proc_load_lim) )
 		return 1
 	else:
@@ -1193,74 +1179,10 @@ def mem_usage():
 	free = subprocess.check_output('/usr/bin/free').decode('utf-8')
 #%%	print( "/usr/bin/free" )
 #%%	print( free )
-	#                       Remove all the text portions - we want just the numbers
-#%%	print( "/usr/bin/free" )
-	XXXXXX = re.split( '\n', free )
-#%%	for token in XXXXXX :
-#%%		if "total" in token :
-#%%			print( "HEADER -----------------" )
-#%%		if "Mem: " in token :
-#%%			print( "Mem ----------------------------------------------" )
-#%%		if "Swap: " in token :
-#%%			print( "Swap ----------------------------------------------" )
-#%%		print( token )
-	#                       Remove all the text portions - we want just the numbers
-#%%	free = re.sub('.*total *used *free *shared *buffers *cached\n.*Mem: *', '', free)
-#%%	print( "@@@" )
-#%%	print( free )
-#%%	if "buffers/cache" in free :
-#%%		free = re.sub('\n.*buffers/cache: *', ' ', free)
-#%%		print( free )
-#%%	free = re.sub('Swap: +', ' ', free)
-#%%	print( "- Swap" )
-#%%	print( free )
-#%%	free = re.sub('\n', ' ', free)                    # Remove any newline which might be left
-#%%	print( free )
-#%%	free = re.sub(' +', ' ', free)                    # Reduce multiple spaces to 1
-#%%	print( free )
-#%%	free = re.sub(' $', '', free)                     # Trim any trailing blank
-#%%	print( free )
-#%%	words = re.split(' +', free)
-#%%	print( words )
+	lines = re.split( '\n', free )
 
-	# free|945512|908692|36820|3732|244416|226828|437448|508064|102396|3064|99332
-
-#%%	if (len(words)) < 11 :
-#%%		messager( "WARNING:  Expecting 11 tokens from \"free\", but got " + str(mem_pct)  )
-
-	### for iii in range(0, len(words)):
-	### 	___print str(iii) + "  " + words[iii]
-
-#%%	mem_total = int(words[0])
-#%%	mem_used = int(words[1])
-#%%	mem_free = int(words[2])
-
-#%%	shared = words[3]
-#%%	buffers = words[4]
-#%%	cached = words[5]
-
-#%%	bu_ca_used = int(words[6])
-#%%	bu_ca_free = int(words[7])
-
-#%%	swap_total = int(words[8])
-#%%	swap_used = int(words[9])
-
-
-# Fri  2 Oct 14:36:54 EDT 2020
-#                 total        used        free      shared  buff/cache   available
-#   Mem:         948076      117092      563896       12292      267088      763808
-#               mem_total
-#                         effective_used
-#
-#
-#
-#
-#   Swap:        102396           0      102396
-#                swap_total  swap_used   swap_free
-#
-#
 # @@@
-	for token in XXXXXX :
+	for token in lines :
 #%%		if "total" in token :
 #%%			print( "HEADER -----------------" )
 		if "Mem: " in token :
@@ -1281,20 +1203,16 @@ def mem_usage():
 	swap_pct = 100 * swap_used / swap_total
 	swap_pct = int( 100 * swap_used / swap_total )
 	data['swap_pct'] = swap_pct
-#####################################################################################################	effective_used = mem_total - bu_ca_free
 
 
 	data['effective_used'] = effective_used 
+
 	mem_pct = 100 * effective_used / mem_total
 	mem_pct = int( 100 * effective_used / mem_total )
 	data['mem_pct'] = mem_pct
-#%%	print( "DEBUG: {:6d}, {:2d}%, {:6d}, {:2d}%,".format(effective_used, mem_pct, swap_used, swap_pct) )
-	# This was misleading...
-	# mem_pct = 100 * mem_used / mem_total
-	if mem_pct > mem_usage_lim :
-		messager( "WARNING:  " + str(mem_pct) + "% mem in use" )
 
-	# free = re.sub(' ', '|', free)                     # Replace each blank with a |
+	if mem_pct > mem_usage_lim :
+		logger( "WARNING:  " + str(mem_pct) + "% mem in use" )
 
 	cpu_temp = read_cpu_temp()
 	data['cpu_temp_c'] = cpu_temp
@@ -1325,11 +1243,11 @@ def WX_RF_Restored(cur_line, lineList):
 			countOKs += 1
 			if countOKs > 1 :
 				restored = 1
-				messager( "DEBUG:  Sensor RF contact appears to have been restored after " + str(elapsed) + " sec  (code 116)")
+				logger( "DEBUG:  Sensor RF contact appears to have been restored after " + str(elapsed) + " sec  (code 116)")
 				log_event("", "DEBUG:  Sensor RF contact <B>appears</B> to have been restored. Out for " + str(elapsed) + " sec", 116 )
 				break
 		else :
-			messager( "DEBUG:  Sensor RF status indeterminate.")
+			logger( "DEBUG:  Sensor RF status indeterminate.")
 
 	return restored
 
@@ -1371,14 +1289,14 @@ def rf_dropped() :
 	#  At time I collect files here, so look at the whole list if need be...
 	count = len( file_list )
 	for iii in range(-1, -1 * count, -1):
-		### messager( "DEBUG:  Checking in diags file, " + file_list[iii])
+		### logger( "DEBUG:  Checking in diags file, " + file_list[iii])
 		if re.search('^20', file_list[iii]) :
 			log_file = file_list[iii]
 			break
 
 
 
-	### messager( "DEBUG:  log_file = " + log_file )
+	### logger( "DEBUG:  log_file = " + log_file )
 	# ___print log_file
 
 	# --------------------------------------------------------------------------------
@@ -1392,7 +1310,7 @@ def rf_dropped() :
 
 	for iii in range(-1, (-1 * check_lines), -1):
 		lineList[iii] = re.sub('\n', ' ', lineList[iii])        # Remove any newline which might be left
-		### messager( "DEBUG:  lineList[" + str(iii) + "] = \"" + lineList[iii] + "\"" )
+		### logger( "DEBUG:  lineList[" + str(iii) + "] = \"" + lineList[iii] + "\"" )
 		# ___print str(iii) + " \t" + lineList[iii]
 		# ------------------------------------------------------------------------
 		# We may print the same exception multiple times.  It could be identified
@@ -1401,22 +1319,8 @@ def rf_dropped() :
 		#     2017-09-22 22:24:00.485
 		#     -----------------------
 		# ------------------------------------------------------------------------
-		# 2017/09/23 02:23:38 GMT,  0,  0,  0,  24,   0.15,  0,  150444,  15%,  0,  0%,  48.3,  48.312,
-		# free|945512|764200|181312|6828|445312|168444|150444|795068|102396|0|102396
-		# WARNING:  Cumulus MX Exception thrown
-		# 
-		# 1       2017-09-22 22:24:00.485 WU update:    at System.Net.WebConnection.HandleError(WebExceptionStatus st, System.Exception e, System.String where)
-		# 2017/09/23 02:24:02 GMT,  0,  0,  0,  24,   0.10,  0,  150672,  15%,  0,  0%,  49.4,  49.388,
-		# free|945512|764432|181080|6828|445316|168444|150672|794840|102396|0|102396
-		# WARNING:  Cumulus MX Exception thrown
-		# 
-		# 1       2017-09-22 22:24:00.485 WU update:    at System.Net.WebConnection.HandleError(WebExceptionStatus st, System.Exception e, System.String where)
-		# 2017/09/23 02:24:27 GMT,  0,  0,  0,  24,   0.06,  0,  150808,  15%,  0,  0%,  49.4,  49.388,
-		# free|945512|764580|180932|6828|445328|168444|150808|794704|102396|0|102396
-		# ------------------------------------------------------------------------
 		#      WARNING:  exception_tstamp = 2017-10-0210:57:00.626:.....
-
-
+		#
 		#   2017/11/09 18:28:07 GMT WARNING:  Cumulus MX Exception thrown:    exception_tstamp =
 		#   2017-11-0913:28:00.388:.....
 		#   2017-11-09 13:28:00.388 WU update:    at System.Net.WebConnection.HandleError(WebExceptionStatus st, System.Exception e, System.String where)
@@ -1452,8 +1356,8 @@ def rf_dropped() :
 				else :
 					logger_code =111
 
-				print("")
-				messager( "WARNING:  Cumulus MX Exception thrown:    exception_tstamp = " + \
+				logger("")
+				logger( "WARNING:  Cumulus MX Exception thrown:    exception_tstamp = " + \
 					exception_tstamp + "  (" + str(logger_code) + ")" )
 
 				# --------------------------------------------------------
@@ -1464,17 +1368,17 @@ def rf_dropped() :
 				log_fragment = "<BR><FONT SIZE=-1><PRE>\n"
 				for jjj in range(iii-3, 0, 1) :
 					# Number the lines in the file we read
-					print(str(len(lineList)+jjj+1) + "\t" + lineList[jjj].rstrip())
+					logger(str(len(lineList)+jjj+1) + "\t" + lineList[jjj].rstrip())
 					log_fragment = log_fragment + \
 						"{:06d}  {}\n".format( (len(lineList)+jjj+1), lineList[jjj].rstrip())
 
 				log_fragment = log_fragment + "</PRE></FONT>\n"
-				messager( "WARNING:    from  " + mxdiags_dir + "/" + log_file )
-				print("")
+				logger( "WARNING:    from  " + mxdiags_dir + "/" + log_file )
+				logger("")
 
 				log_event(exception_tstamp, "Cumulus MX Exception thrown:" + log_fragment, logger_code )
 ###			else:
-###				messager( "WARNING:  Cumulus MX Exception thrown (see above) @ " + \
+###				logger( "WARNING:  Cumulus MX Exception thrown (see above) @ " + \
 ###				check_lines = 12
 ###					exception_tstamp )
 			break
@@ -1495,19 +1399,19 @@ def rf_dropped() :
 		########### if "Sensor contact lost; ignoring outdoor data" in lineList[iii] :
 		### 2017-11-05 07:36:59.373 Sensor contact lost; ignoring outdoor data
 		elif "Sensor contact lost" in lineList[iii] :
-			### messager( "DEBUG:  Sensor contact lost; " + lineList[iii])
+			### logger( "DEBUG:  Sensor contact lost; " + lineList[iii])
 			if saved_contact_lost < 1 :
 				# 20180226 - Just testing at this point....
 				WX_RF_Restored(iii, lineList)
 				saved_contact_lost = int( datetime.datetime.utcnow().strftime("%s") )
 				# Long message the first time we see this...
-				messager( "WARNING:  Sensor RF contact lost; ignoring outdoor data.  " + \
+				logger( "WARNING:  Sensor RF contact lost; ignoring outdoor data.  " + \
 					"Press \"V\" button on WS console   (code 115)" )
 				log_event("", "Sensor RF contact lost; ignoring outdoor data.", 115 )
 			else:
 				elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  saved_contact_lost 
 				# Shorter message while this status continues
-				messager( "WARNING:  Sensor RF contact lost; ... " + str(elapsed) + " sec" )
+				logger( "WARNING:  Sensor RF contact lost; ... " + str(elapsed) + " sec" )
 
 			return_value = 1
 			break
@@ -1542,11 +1446,6 @@ def rf_dropped() :
 		# ------------------------------------------------------------------------
 		# ------------------------------------------------------------------------
 		#
-		# NOTE:  This caused a 24 hour outage with Weather Underground
-		# NOTE:  This caused a 24 hour outage with Weather Underground
-		# NOTE:  This caused a 24 hour outage with Weather Underground
-		# NOTE:  This caused a 24 hour outage with Weather Underground
-		# NOTE:  This caused a 24 hour outage with Weather Underground
 		# NOTE:  This caused a 24 hour outage with Weather Underground
 		#
 		# 2018/11/15 13:32:56, 0, 0, 0,  24,    0.00, 0,    16, 138936, 14%,   2356,  2%, 38.1c, 100.6f,  63.7f,   0.4%,   17.6674, 0, ,
@@ -1583,13 +1482,9 @@ def rf_dropped() :
 		#   seen it several times.
 		#
 		# ------------------------------------------------------------------------
-		# ------------------------------------------------------------------------
-		# ------------------------------------------------------------------------
-		# ------------------------------------------------------------------------
-		# ------------------------------------------------------------------------
 		elif "WU update: The Task was canceled" in lineList[iii] :
 			WU_Cancels += 1
-			messager( "WARNING:   The WEATHER UNDERGROUND Task was canceled Instance # {}".format( WU_Cancels ) )
+			logger( "WARNING:   The WEATHER UNDERGROUND Task was canceled Instance # {}".format( WU_Cancels ) )
 
 		elif "The Task was canceled" in lineList[iii] :
 			# ----------------------------------------------------------------
@@ -1601,13 +1496,13 @@ def rf_dropped() :
 			for jjj in range(iii-3, 0, 1) :
 				# Number the lines in the file we read
 				# Here we do NOT use the messager() function.
-				print(str(len(lineList)+jjj+1) + "\t" + lineList[jjj].rstrip())
+				logger(str(len(lineList)+jjj+1) + "\t" + lineList[jjj].rstrip())
 				log_fragment = log_fragment + \
 					"{:06d}  {}\n".format( (len(lineList)+jjj+1), lineList[jjj].rstrip())
 
 			log_fragment = log_fragment + "</PRE></FONT>\n"
-			messager( "WARNING:   \"The Task was canceled\"  from  " + mxdiags_dir + "/" + log_file )
-			print("")
+			logger( "WARNING:   \"The Task was canceled\"  from  " + mxdiags_dir + "/" + log_file )
+			logger("")
 
 			log_event("", "Cumulus MX: \"The Task was canceled\"" + log_fragment, 118 )
 
@@ -1632,12 +1527,11 @@ def rf_dropped() :
 		# the USB link is lost.  It doesn seem like CumulusMX ever recovers,
 		# but hase to be restarted.
 		#
-		#
 		# ------------------------------------------------------------------------
 		elif "Data input appears to have stopped" in lineList[iii] :
 			# ----------------------------------------------------------------
 			log_event("", "Data input appears to have stopped, USB likely disconnected.", 120 )
-			messager( "INFO: \"Data input appears to have stopped\", USB likely disconnected.   (code 120)" )
+			logger( "INFO: \"Data input appears to have stopped\", USB likely disconnected.   (code 120)" )
 			return_value = 1
 			break
 
@@ -1668,20 +1562,20 @@ def rf_dropped() :
 				if saved_contact_lost > 2 :
 					elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  saved_contact_lost 
 					log_event("", "Sensor RF contact RESTORED; receiving telemetry again. " + str(elapsed) + " sec", 116 )
-					messager( "INFO:  Sensor RF contact RESTORED; ... lost for " + str(elapsed) + " sec   (code 116)" )
+					logger( "INFO:  Sensor RF contact RESTORED; ... lost for " + str(elapsed) + " sec   (code 116)" )
 				saved_contact_lost = -1
 				if len( saved_exception_tstamp ) > 3 :
-					messager( "INFO: \"WU Response: OK: success\"; clearing pending exception flag.   (code 112)" )
+					logger( "INFO: \"WU Response: OK: success\"; clearing pending exception flag.   (code 112)" )
 					log_event("","\"WU Response: OK: success\"; clearing pending exception flag.", 112 )
 				saved_exception_tstamp = "X"    # Set this flag back to the sentinal value
 				break
 
 		else :
 			if iii < (-1 * check_lines) + 1 :
-				messager( "WARNING:  Unknown status from  " + mxdiags_dir + "/" + log_file + "   (code 199)" )
+				logger( "WARNING:  Unknown status from  " + mxdiags_dir + "/" + log_file + "   (code 199)" )
 				for jjj in range(iii-3, 0, 1) :
 					# Number the lines in the file we read
-					print(str(len(lineList)+jjj+1) + "\t" + lineList[jjj].rstrip())
+					logger(str(len(lineList)+jjj+1) + "\t" + lineList[jjj].rstrip())
 				log_event("", "Unknown status from  " + mxdiags_dir + "/" + log_file, 199 )
 
 
@@ -1699,12 +1593,17 @@ def rf_dropped() :
 	data['rf_dropped'] = return_value
 	return return_value
 
-
+	# --------------------------------------------------------------------------------
+	#
+	#
+	#                  NOTE:   Tons of comments removed here
+	#
+	#
 	# --------------------------------------------------------------------------------
 	# Pulling these Latest reading records out, I notice a pattern when the RF seems
 	# to be down of "FF FF FF" as shown, but it isn't quite right because we didn't
 	# have around 20 minutes of changing data from looking at the graphs.
-	# 
+	#
 	#  2018-02-26 05:25:00.424 Latest reading: 75A0: 18 35 B1 00 FF FF FF 6A 26 FF FF FF 80 45 0E C0
 	#  2018-02-26 05:30:00.439 Latest reading: 75A0: 1D 35 B2 00 FF FF FF 6C 26 FF FF FF 80 45 0E C0
 	#  2018-02-26 05:35:00.453 Latest reading: 75B0: 04 35 B2 00 47 28 00 6C 26 00 00 00 00 45 0E 80
@@ -1715,49 +1614,6 @@ def rf_dropped() :
 	#  2018-02-26 06:00:00.539 Latest reading: 75B0: 1D 36 B7 00 FF FF FF 6D 26 FF FF FF 80 45 0E C0
 	#                                                            ^^^^^^^^
 	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-	# Looking at the charts, there appears to be a single jump in values between
-	# 5:32 and 5:33.   In the data log the shift shows up this way, with a string
-	# before and after 5:33 of the same values.
-	#
-	#  26/02/18,05:30,40.6,72,32.3,3.1,5.4,360,0.00,0.00,30.42,43.15,64.0,53,5.4,38.9,40.6,0.0,0,0.000,0.000,35.4,0,0.0,360,0.00,0.00
-	#  26/02/18,05:35,39.2,71,30.6,0.0,0.0,0,0.00,0.00,30.42,43.15,64.0,53,0.0,39.2,39.2,0.0,0,0.000,0.000,35.4,0,0.0,360,0.00,0.00
-	#
-	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-	# Looking at the details of the Diags log around this time, the "Sensor contact lost"
-	# one might think the data is updating for something like 18 minutes, but that's not
-	# what the temperature chart shows, which is just a single jag in the plot at 5:33.
-	# CMX is still sending data, even though it is stuck.
-	#
-	#  2018-02-26 05:31:49.202 Sensor contact lost; ignoring outdoor data
-	#  2018-02-26 05:31:59.150 Sensor contact lost; ignoring outdoor data
-	#  2018-02-26 05:32:00.666 WU Response: OK: success
-	#
-	#  2018-02-26 05:32:09.150 Sensor contact lost; ignoring outdoor data
-	#  2018-02-26 05:33:00.681 WU Response: OK: success
-	#
-	#  2018-02-26 05:34:00.667 WU Response: OK: success
-	#
-	#  2018-02-26 05:35:00.448 Writing log entry for 2/26/2018 5:35:00 AM
-	#  2018-02-26 05:35:00.449 Written log entry for 2/26/2018 5:35:00 AM
-	#  2018-02-26 05:35:00.453 Writing today.ini, LastUpdateTime = 2/26/2018 5:35:00 AM raindaystart = 43.14566924733 rain counter = 43.14566924733
-	#  2018-02-26 05:35:00.453 Latest reading: 75B0: 04 35 B2 00 47 28 00 6C 26 00 00 00 00 45 0E 80
-	#  2018-02-26 05:35:00.682 WU Response: OK: success
-	#
-	#      ..... Gap here .....
-	#
-	#  2018-02-26 05:48:00.694 WU Response: OK: success
-	#
-	#  2018-02-26 05:49:00.674 WU Response: OK: success
-	#
-	#  2018-02-26 05:50:00.492 Writing log entry for 2/26/2018 5:50:00 AM
-	#  2018-02-26 05:50:00.494 Written log entry for 2/26/2018 5:50:00 AM
-	#  2018-02-26 05:50:00.497 Writing today.ini, LastUpdateTime = 2/26/2018 5:50:00 AM raindaystart = 43.14566924733 rain counter = 43.14566924733
-	#  2018-02-26 05:50:00.498 Latest reading: 75B0: 11 36 B5 00 47 28 00 6F 26 00 00 00 00 45 0E 80
-	#  2018-02-26 05:50:00.707 WU Response: OK: success
-	#
-	#  2018-02-26 05:50:01.010 WeatherCloud Response: OK: 200
-	#  2018-02-26 05:50:49.156 Sensor contact lost; ignoring outdoor data
-	#  2018-02-26 05:50:59.578 Sensor contact lost; ignoring outdoor data
 	#  2018-02-26 05:51:00.979 WU Response: OK: success
 	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 	# 
@@ -1769,27 +1625,6 @@ def rf_dropped() :
 	# "WeatherCloud Response" record could be in there depending on the
 	# response time from the server.
 	# 
-	# --------------------------------------------------------------------------------
-	# Appears that CumulusMX retries to read the sensor approximately every 10 seconds
-	#     2017-11-05 07:33:49.373 Sensor contact lost; ignoring outdoor data
-	#     2017-11-05 07:33:59.373 Sensor contact lost; ignoring outdoor data
-	#     2017-11-05 07:34:00.946 WU Response: OK: success
-	#     
-	#     2017-11-05 07:34:09.372 Sensor contact lost; ignoring outdoor data
-	#     2017-11-05 07:34:19.472 Sensor contact lost; ignoring outdoor data
-	#     2017-11-05 07:34:29.472 Sensor contact lost; ignoring outdoor data
-	#     2017-11-05 07:34:39.373 Sensor contact lost; ignoring outdoor data
-	#     2017-11-05 07:34:49.373 Sensor contact lost; ignoring outdoor data
-	#     2017-11-05 07:34:59.373 Sensor contact lost; ignoring outdoor data
-	#     2017-11-05 07:35:00.348 Writing log entry for 11/5/2017 7:35:00 AM
-	#     2017-11-05 07:35:00.350 Written log entry for 11/5/2017 7:35:00 AM
-	#     2017-11-05 07:35:00.353 Writing today.ini, LastUpdateTime = 11/5/2017 7:35:00 AM raindaystart = 32.811...
-	#     2017-11-05 07:35:00.353 Latest reading: 21F0: 09 3D CA 00 FF FF FF 33 26 FF FF FF 84 EF 0A C0
-	#     2017-11-05 07:35:00.946 WU Response: OK: success
-	#     
-	#     2017-11-05 07:35:09.373 Sensor contact lost; ignoring outdoor data
-	#     2017-11-05 07:35:19.373 Sensor contact lost; ignoring outdoor data
-	#     2017-11-05 07:35:29.373 Sensor contact lost; ignoring outdoor data
 	# --------------------------------------------------------------------------------
 
 
@@ -1824,13 +1659,13 @@ def camera_down():
 		age = age.rstrip()
 	except ( URLError, Exception ) as err :
 	### >>>> except URLError as err :
-		messager( "ERROR: in camera_down: {}".format( sys.exc_info()[0] ) )
+		log_and_message( "ERROR: in camera_down: {}".format( sys.exc_info()[0] ) )
 		if hasattr(err, 'reason'):
-			messager( 'ERROR: We failed to reach a server.' )
-			messager( 'ERROR: Reason: ()'.format( err.reason ) )
+			log_and_message( 'ERROR: We failed to reach a server.' )
+			log_and_message( 'ERROR: Reason: ()'.format( err.reason ) )
 		elif hasattr(err, 'code'):
-			messager( 'ERROR: The server couldn\'t fulfill the request.' )
-			messager( 'ERROR: code: ()'.format( err.code ) )
+			log_and_message( 'ERROR: The server couldn\'t fulfill the request.' )
+			log_and_message( 'ERROR: code: ()'.format( err.code ) )
 		age = "0"
 		logger("WARNING: Read URL failed.  Assumed image age: {}".format( age ) )
 
@@ -1893,7 +1728,7 @@ def cmx_svc_runtime():
 		#@@@# print( "@@@" )
 		#@@@# print( lines )
 	except :
-		messager( "ERROR: From systemctl status: {}".format( sys.exc_info()[0] ) )
+		log_and_message( "ERROR: From systemctl status: {}".format( sys.exc_info()[0] ) )
 ####		lines[0] = "   Active: active (running) since DOWN; DOWN"
 ####		lines[1] = " Main PID: DOWN (mono)"
 
@@ -1903,7 +1738,6 @@ def cmx_svc_runtime():
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	#   Active: activating (auto-restart) (Result: signal) since Tue 2018-12-25 09:04:04 EST; 4s ago
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	#   
 	#   
 	#   $ sudo systemctl status cumulusmx
 	#   ● cumulusmx.service - CumulusMX service
@@ -1920,7 +1754,6 @@ def cmx_svc_runtime():
 	#   Oct 03 19:21:11 raspi-005 systemd[1]: Started CumulusMX service.
 	#   Oct 03 19:21:18 raspi-005 mono[576]: /home/pi/CumulusMX/CumulusMX.exe: Service CumulusService started
 	#
-	#   
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	for iii in range(0, len(lines)):
 		if re.search('Main PID:', lines[iii]) :
@@ -1984,7 +1817,7 @@ def webcamwatch_down():
 		output = subprocess.check_output(["/bin/systemctl", "status", "wxwatchdog"], text=True)
 		lines = re.split('\n', output)
 	except :
-####		messager( "ERROR: From systemctl status: {}".format( sys.exc_info()[0] ) )
+####		log_and_message( "ERROR: From systemctl status: {}".format( sys.exc_info()[0] ) )
 		lines[2] = ""
 
 
@@ -2041,7 +1874,7 @@ def mono_version():
 		tok = re.split(' +', line[0])
 		version = tok[4]
 	except :
-		messager( "ERROR: From mono version check: {}".format( sys.exc_info()[0] ) )
+		log_and_message( "ERROR: From mono version check: {}".format( sys.exc_info()[0] ) )
 		version = "Not found"
 
 	data['mono_version'] = version
@@ -2058,201 +1891,27 @@ if __name__ == '__main__':
 	#### if sys.argv[1] = "stop"
 	this_script = sys.argv[0]
 
-	print("\n\n\n\n\n")
+	log_string("\n\n\n\n\n")
 
-	messager("INFO: Starting " + this_script + "  PID=" + str(getpid()))
+	log_and_message("INFO: Starting " + this_script + "  PID=" + str(getpid()))
 
 	write_pid_file()
 	cmx_svc_runtime()	# This reads the PID for the main mono process
 
-	messager("INFO: Mono version: {}" .format( mono_version() ) )
+	log_and_message("INFO: Mono version: {}" .format( mono_version() ) )
 
-	messager("DEBUG: Logging to {}" .format( logger_file ) )
+	log_and_message("DEBUG: Logging to {}" .format( logger_file ) )
 
 	try:
 		main()
 	except KeyboardInterrupt :
-		messager("  Good bye from " + this_script)
+		log_and_message("  Good bye from " + this_script)
 #		destroy()
 
 # ----------------------------------------------------------------------------------------
-#   2.7.9 (default, Sep 17 2016, 20:26:04)
-#   [GCC 4.9.2]
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# NOTE: Examples from /mnt/root/home/pi/Cumulus_MX/MXdiags logs
-# ----------------------------------------------------------------------------------------
-# NOTE: Bad (out-of-range) data detected.  Probably result of RF issues.
-#   2018-03-03 19:36:00.941 WU Response: OK: success
 #
-#   2018-03-03 19:36:12.777 Ignoring bad data: pressure = 6381.9
-#   2018-03-03 19:36:12.778                    offset = 0
-#   2018-03-03 19:36:12.778 Sensor contact lost; ignoring outdoor data
-#   2018-03-03 19:37:01.194 WU Response: OK: success
 #
-# ----------------------------------------------------------------------------------------
-# NOTE: Very short period of "Sensor contact lost; ignoring outdoor data"
-#   2018-03-03 15:16:03.595 WU Response: OK: success
+#                       NOTE:   Tons of comments removed here
 #
-#   2018-03-03 15:16:12.714 Sensor contact lost; ignoring outdoor data
-#   2018-03-03 15:17:01.291 WU Response: OK: success
 #
-#   2018-03-03 15:18:01.087 WU Response: OK: success
-# ----------------------------------------------------------------------------------------
-# NOTE: At startup, communicating with various sites...
-#   2018-02-04 15:01:17.360 Creating WU URL #1
-#   2018-02-04 15:01:17.360 http://weatherstation.wunderground.com/weatherstation/updateweatherstation.php?ID=KPAMCMUR4&PASSWORD=**********&dateutc=2018-02-04+20%3A00%3A16&winddir=180&windspeedmph=1.6&windgustmph=3.8&windspdmph_avg2m=0.7&winddir_avg2m=195&humidity=82&tempf=37.0&rainin=0.00&dailyrainin=0.06&baromin=29.988&dewptf=32.1&indoortempf=68.5&indoorhumidity=36&softwaretype=Cumulus%20v3.0.0&action=updateraw
-#   2018-02-04 15:01:17.363 Creating PWS URL #1
-#   2018-02-04 15:01:17.363 http://www.pwsweather.com/pwsupdate/pwsupdate.php?ID=RADILLY&PASSWORD=**********&dateutc=2018-02-04+20%3A00%3A16&winddir=195&windspeedmph=0.7&windgustmph=3.8&humidity=82&tempf=37.0&rainin=0.00&dailyrainin=0.06&baromin=29.988&dewptf=32.1&softwaretype=Cumulus%20v3.0.0&action=updateraw
-#   2018-02-04 15:01:17.364 End processing history data
-#   2018-02-04 15:01:17.373 Start Timers
-#   2018-02-04 15:01:17.373 Starting 1-minute timer
-#   2018-02-04 15:01:17.376 Attempting realtime FTP connect
-#   2018-02-04 15:01:18.436 Starting Realtime timer, interval = 24 seconds
-#   2018-02-04 15:01:18.441 Uploading WU archive #1
-#   2018-02-04 15:01:18.626 Uploading PWS archive #1
-#   2018-02-04 15:01:18.988 PWS Response: OK: 
-#   <html>
-#   <head>
-#      <title>PWS Weather Station Update</title>
-#   </head>
-#   <body>
-#   Data Logged and posted in METAR mirror.
-#
-#   </body>
-#   </html>
-#   2018-02-04 15:01:18.989 End of PWS archive upload
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# NOTE: Looks like the network went down - Pi side as far as I can tell
-# ----------------------------------------------------------------------------------------
-#    Unexpected ERROR in camera_down: <type 'exceptions.IOError'>
-#    2018/06/07 12:28:46 DEBUG: content = "0 0 00:00:00_UTC " in camera_down()
-#    2018/06/07 12:28:46, 0, 0, 0,   0,    0.00, 0,    15, 104728, 11%,      0,  0%, 38.6c, 101.5f,  66.2f,   0.5%,     2.7983101852, 0, ,
-#
-#    Unexpected ERROR in server_stalled: <type 'exceptions.IOError'>
-#    Unexpected ERROR in last_realtime: <type 'exceptions.IOError'>
-#    2018/06/07 12:29:10 DEBUG: content = "00/00/00 00:00:00 45.5 80 39.7 0.0 0.7 360 0.00 0.05 30.14 N 0 mph ..." in last_realtime()
-#    Unexpected ERROR in camera_down: <type 'exceptions.IOError'>
-#    2018/06/07 12:29:10 DEBUG: content = "0 0 00:00:00_UTC " in camera_down()
-#    2018/06/07 12:29:10, 0, 0, 0,   0,    0.00, 0,    15, 107312, 11%,      0,  0%, 38.6c, 101.5f,  66.2f,   1.0%,     2.7985879630, 0, ,
-#
-#    Unexpected ERROR in server_stalled: <type 'exceptions.IOError'>
-#    Unexpected ERROR in last_realtime: <type 'exceptions.IOError'>
-#    2018/06/07 12:29:34 DEBUG: content = "00/00/00 00:00:00 45.5 80 39.7 0.0 0.7 360 0.00 0.05 30.14 N 0 mph ..." in last_realtime()
-#    Unexpected ERROR in camera_down: <type 'exceptions.IOError'>
-#
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-#
-#  2018/09/07 18:04:30, 0, 0, 0,  24,    0.00, 0,    15, 177552, 18%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.3%,    1.2285, 0, ,
-#  2018/09/07 18:04:55, 0, 0, 0,  24,    0.00, 0,    15, 177796, 18%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.5%,    1.2288, 0, ,
-#  2018/09/07 22:05:19 WARNING:  CumulusMX reports data_stopped (<#DataStopped> == 1).   (code 101)
-#  2018/09/07 18:05:19, 0, 1, 0,  24,    0.06, 0,    15, 194376, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   2.3%,    1.2290, 0, <<<<<,
-#  2018/09/07 18:05:44, 0, 1, 0,  24,    0.04, 0,    15, 194936, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.5%,    1.2293, 0, <<<<<,
-#  date-time, server_stalled, ws_data_stopped, rf_dropped, last_realtime, proc_load, camera_down, mono_threads, effective_used, mem_pct, swacpu_temp_c, cpu_temp_f, amb_temp, proc_pct, cmx_svc_runtime, webcamwatch_down,
-#  2018/09/07 22:06:08 WARNING:  CumulusMX reports data_stopped ... 49 sec
-#  2018/09/07 18:06:08, 0, 1, 0,  24,    0.02, 0,    15, 195060, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.3%,    1.2296, 0, <<<<<,
-#  2018/09/07 18:06:33, 0, 1, 0,  24,    0.01, 0,    15, 195136, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.4%,    1.2299, 0, <<<<<,
-#  2018/09/07 18:06:58, 0, 1, 0,  24,    0.01, 0,    15, 194916, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.2%,    1.2302, 0, <<<<<,
-#  2018/09/07 22:07:22 WARNING:  CumulusMX reports data_stopped ... 123 sec
-#  2018/09/07 22:07:22 INFO: "Data input appears to have stopped", USB likely disconnected.   (code 120)
-#  2018/09/07 18:07:22, 0, 1, 1,  24,    0.00, 0,    15, 195016, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.3%,    1.2305, 0, <<<<<,
-#  2018/09/07 22:07:46 INFO: "Data input appears to have stopped", USB likely disconnected.   (code 120)
-#  2018/09/07 18:07:47, 0, 1, 1,  24,    0.00, 0,    15, 195292, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.5%,    1.2308, 0, <<<<<,
-#  2018/09/07 18:08:11, 0, 1, 0,  24,    0.00, 0,    15, 195296, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.3%,    1.2310, 0, <<<<<,
-#  2018/09/07 22:08:36 WARNING:  CumulusMX reports data_stopped ... 197 sec
-#  2018/09/07 18:08:36, 0, 1, 0,  24,    0.00, 0,    15, 195152, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.4%,    1.2313, 0, <<<<<,
-#  2018/09/07 18:09:01, 0, 1, 0,  24,    0.13, 0,    15, 195404, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.3%,    1.2316, 0, <<<<<,
-#  2018/09/07 18:09:25, 0, 1, 0,  24,    0.10, 0,    15, 195056, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.3%,    1.2319, 0, <<<<<,
-#  2018/09/07 22:09:49 WARNING:  CumulusMX reports data_stopped ... 270 sec
-#  2018/09/07 18:09:50, 0, 1, 0,  24,    0.06, 0,    15, 195820, 20%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.4%,    1.2322, 0, <<<<<,
-#  2018/09/07 18:10:14, 0, 1, 0,  24,    0.17, 0,    16, 178240, 18%,   1120,  1%, 48.9c, 119.9f,  82.6f,   1.7%,    1.2325, 0, <<<<<,
-#  2018/09/07 18:10:39, 0, 1, 0,  24,    0.11, 0,    15, 178256, 18%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.9%,    1.2327, 0, <<<<<,
-#  2018/09/07 22:11:03 WARNING:  CumulusMX reports data_stopped ... 344 sec
-#  2018/09/07 18:11:04, 0, 1, 0,  24,    0.07, 0,    15, 178048, 18%,   1120,  1%, 48.9c, 119.9f,  82.6f,   0.3%,    1.2330, 0, <<<<<,
-#  2018/09/07 18:11:28, 0, 1, 0,  24,    0.05, 0,    15, 178048, 18%,   1120,  1%, 48.3c, 119.0f,  82.6f,   0.3%,    1.2333, 0, <<<<<,
-#  2018/09/07 18:11:53, 0, 1, 0,  24,    0.03, 0,    15, 178168, 18%,   1120,  1%, 48.9c, 119.9f,  82.6f,   0.4%,    1.2336, 0, <<<<<,
-#  date-time, server_stalled, ws_data_stopped, rf_dropped, last_realtime, proc_load, camera_down, mono_threads, effective_used, mem_pct, swacpu_temp_c, cpu_temp_f, amb_temp, proc_pct, cmx_svc_runtime, webcamwatch_down,
-#  2018/09/07 22:12:17 WARNING:   systemctl restart cumulusmx.   (code 999)
-#
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# 20181015  (and once before)
-#
-#   Traceback (most recent call last):
-#     File "/mnt/root/home/pi/watchdog.py", line 1811, in <module>
-#
-#     File "/mnt/root/home/pi/watchdog.py", line 378, in main
-#       server_stalled()
-#     File "/mnt/root/home/pi/watchdog.py", line 843, in server_stalled
-#       # Returms:
-#     File "/usr/lib/python2.7/urllib2.py", line 154, in urlopen
-#       return opener.open(url, data, timeout)
-#     File "/usr/lib/python2.7/urllib2.py", line 431, in open
-#       response = self._open(req, data)
-#     File "/usr/lib/python2.7/urllib2.py", line 449, in _open
-#       '_open', req)
-#     File "/usr/lib/python2.7/urllib2.py", line 409, in _call_chain
-#       result = func(*args)
-#     File "/usr/lib/python2.7/urllib2.py", line 1227, in http_open
-#       return self.do_open(httplib.HTTPConnection, req)
-#     File "/usr/lib/python2.7/urllib2.py", line 1200, in do_open
-#       r = h.getresponse(buffering=True)
-#     File "/usr/lib/python2.7/httplib.py", line 1111, in getresponse
-#       response.begin()
-#     File "/usr/lib/python2.7/httplib.py", line 444, in begin
-#       version, status, reason = self._read_status()
-#     File "/usr/lib/python2.7/httplib.py", line 408, in _read_status
-#       raise BadStatusLine(line)
-#   httplib.BadStatusLine: ''
-#   nohup: ignoring input
-#
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-#
-# NOTE: This doesn't seem like it was handled well.  Messaging timestamps are confusing.
-#
-#  2018/09/18 04:15:54, 0, 0, 0,  24,    0.04, 0,    15, 192640, 20%,   4700,  4%, 44.0c, 111.2f,  76.6f,   0.7%,   10.2629, 0, ,
-#  2018/09/18 04:16:19, 0, 0, 0,  24,    0.03, 0,    15, 192652, 20%,   4700,  4%, 44.5c, 112.2f,  76.6f,   0.4%,   10.2632, 0, ,
-#  2018/09/18 04:16:43, 0, 0, 0,  24,    0.02, 0,    15, 192136, 20%,   4700,  4%, 44.5c, 112.2f,  76.6f,   0.4%,   10.2635, 0, ,
-#  We failed to reach a server.
-#  Reason:  [Errno -2] Name or service not known
-#  Unexpected ERROR in last_realtime: <class 'urllib2.URLError'>
-#  2018/09/18 08:17:47 DEBUG: content = "00/00/00 00:00:00 45.5 80 39.7 0.0 0.7 360 0.00 0.05 30.14 N 0 mph ..." in last_realtime()
-#  2018/09/18 08:17:47 DEBUG: Got large negative value from record:
-#	00/00/00 00:00:00 45.5 80 39.7 0.0 0.7 360 0.00 0.05 30.14 N 0 mph ...
-#  2018/09/18 08:17:47 DEBUG: Likely the day rolled over as save date does not match...
-#  2018/09/18 08:17:47 DEBUG:    ... and seconds = 0
-#  2018/09/18 08:18:07 WARNING: Read URL failed.  Assumed image age: 0
-#  2018/09/18 04:18:08, 1, 0, 0, -15400,    0.00, 0,    16, 192848, 20%,   4700,  4%, 44.0c, 111.2f,  76.6f,   0.3%,   10.2644, 0, <<<<<,
-#  We failed to reach a server.
-#  Reason:  [Errno -2] Name or service not known
-#  46092	2018-09-18 04:18:19.970 Error connecting ftp - Could not resolve host 'dillys.org'
-#  46093	2018-09-18 04:18:34.983 Error uploading realtime.txt to realtime.txt : Could not resolve host 'dillys.org'
-#  46094	2018-09-18 04:18:39.991 Error connecting ftp - Could not resolve host 'dillys.org'
-#  46095	2018-09-18 04:18:40.622 WU update: The Task was canceled
-#  2018/09/18 08:18:42 WARNING:   "The Task was canceled"  from  /mnt/root/home/pi/Cumulus_MX/MXdiags/20180907-215720.txt
-#
-#  Unexpected ERROR in last_realtime: <class 'urllib2.URLError'>
-#  2018/09/18 08:18:42 DEBUG: content = "00/00/00 00:00:00 45.5 80 39.7 0.0 0.7 360 0.00 0.05 30.14 N 0 mph ..." in last_realtime()
-#  2018/09/18 08:18:42 WARNING: Read URL failed.  Assumed image age: 0
-#  2018/09/18 04:18:42, 1, 0, 0,   0,    0.04, 0,    18, 193080, 20%,   4700,  4%, 44.0c, 111.2f,  76.6f,   0.4%,   10.2648, 0, <<<<<,
-#  2018/09/18 08:19:06 WARNING: 15544 elapsed since realtime.txt was updated.
-#  2018/09/18 04:19:06, 0, 0, 0, 15544,    0.02, 0,    18, 190496, 20%,   4700,  4%, 44.5c, 112.2f,  76.6f,   0.9%,   10.2651, 0, ,
-#  2018/09/18 04:19:31, 0, 0, 0,  24,    0.02, 0,    18, 190644, 20%,   4700,  4%, 44.0c, 111.2f,  76.6f,   0.3%,   10.2654, 0, ,
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
