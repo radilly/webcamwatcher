@@ -1,4 +1,5 @@
-#!/usr/bin/python
+#!/usr/bin/python3
+# @@@
 #
 # Restart using...
 #   kill -9 `cat /mnt/root/home/pi/watchdog.PID` ; nohup /usr/bin/python -u /mnt/root/home/pi/watchdog.py >> /mnt/root/home/pi/watchdog.log 2>&1 &
@@ -37,6 +38,10 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20201004 RAD First pass rewritting for Python 3 and toward use as a service.
+#              Revision: 7604a3bb8a2097f4668a0aa136fa8cd6a7aaf00f was the version before
+#              I started this slash and burn.  This does work from the command line,
+#              though several columns are not working.
 # 20190722 RAD Added system_uptime.  Already issuing the command- just had to parse
 #              out that portion.
 # 20190529 RAD In server_stalled() initialized content = "1" to avoid the following.
@@ -160,11 +165,17 @@
 # import urllib
 # https://docs.python.org/2/howto/urllib2.html
 # https://docs.python.org/2/library/urllib2.html
-from urllib2 import urlopen, URLError, HTTPError
+# from urllib2 import urlopen, URLError, HTTPError
+from urllib.request import urlopen
+from urllib.error import URLError, HTTPError
 
 import re
 import datetime
-import RPi.GPIO as GPIO
+
+########################################  NOTE: See https://www.raspberrypi.org/documentation/usage/gpio/python/README.md
+########################################  NOTE: See https://www.raspberrypi.org/documentation/usage/gpio/
+########################################  >>>>>>>>>>>>>>>>>>>>>>>>>>>> import RPi.GPIO as GPIO
+
 import time
 from time import sleep
 import sys
@@ -196,12 +207,14 @@ ws_data_last_count = 0
 saved_contact_lost = -1     # Number of epoch secs when RF contact lost
 
 BASE_DIR =              "/mnt/root/home/pi/Cumulus_MX"
+BASE_DIR =              "/home/pi/CumulusMX"
 data_stop_file =        BASE_DIR + "/web/DataStoppedT.txttmp"
 ambient_temp_file =     BASE_DIR + "/web/ambient_tempT.txttmp"
 status_page =           BASE_DIR + "/web/status.html"
 events_page =           BASE_DIR + "/web/event_status.html"
 mxdiags_dir =           BASE_DIR + "/MXdiags"
 status_dir =            "/mnt/root/home/pi/status"
+status_dir =            "/home/pi/status"
 
 logger_file = sys.argv[0]
 logger_file = re.sub('\.py', '.log', logger_file)
@@ -317,7 +330,7 @@ thresholds = [
 	10.0,
 	4.0,
 	4.0,
-	20,
+	30,
 	-1,
 	15,
 	1024,
@@ -327,7 +340,7 @@ thresholds = [
 	100,
 	-1,
 	-1,
-	0
+	-1,
 	]
 	# amb_temp   {}
 
@@ -395,7 +408,7 @@ Prob_Track = [
 	0,
 	0,
 	0,
-	1,
+	0,
 	]
 
 
@@ -429,7 +442,7 @@ def main():
 			for jjj in range(0, len(CSV_keys)):
 				hdr = hdr + " {},".format( CSV_keys[jjj] )
 
-			print hdr
+			print(hdr)
 
 		# Capture the data by calling functions.  Ignore return values.
 		server_stalled()
@@ -454,7 +467,7 @@ def main():
 				if data[CSV_keys[jjj]] > 0 :
 					Prob_Flag = " <<<<<,"
 
-		print CSV_rec + Prob_Flag
+		print(CSV_rec + Prob_Flag)
 
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# NOTE: Would be great to output data and use highcharts
@@ -518,7 +531,8 @@ def proc_pct() :
 
 	lineList[0] = re.sub('\n', '', lineList[0])        # Remove any newline which might be left
 
-	tok = re.split(' *', lineList[0])
+# @@@
+	tok = re.split(' +', lineList[0])
 
 	idle = int(tok[4]) + int(tok[5])
 	busy = int(tok[1]) + int(tok[2]) + int(tok[3]) + int(tok[6]) + int(tok[7]) + int(tok[8])
@@ -557,6 +571,7 @@ def mono_threads():
 	global data
 
 	PID = str( data['mono_pid'] )
+# @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ #
 	if "DOWN" in PID :
 		return -1
 
@@ -581,7 +596,7 @@ def mono_threads():
 	fileHandle.close()
 
 	lineList[0] = re.sub('\n', '', lineList[0])        # Remove any newline which might be left
-	tok = re.split(' *', lineList[0])
+	tok = re.split(' +', lineList[0])
 
 	# NOTE:
 	#   See https://man7.org/linux/man-pages/man5/proc.5.html for /proc pseudo-filesystem
@@ -640,7 +655,7 @@ def log_event(ID, description, code):
 # ----------------------------------------------------------------------------------------
 def summarize():
 	timestamp = datetime.datetime.utcnow().strftime(strftime_FMT)
-	cmx_svc_runtime()
+########################################################################################################################################################################################################	cmx_svc_runtime()
 
 	FH = open(status_page , "w")
 
@@ -691,7 +706,7 @@ def summarize():
 	FH.write( "<P> &nbsp;\n" )
 	FH.write( "<center><table style=\"width:100%;border-collapse: collapse; border-spacing: 0;\" >\n" )
 	FH.write( " <!-- FOOTER -->\n" )
-  	FH.write( "  <tr>\n" )
+	FH.write( "  <tr>\n" )
 
 	FH.write( "    <td align=\"center\" class=\"td_navigation_bar\">:<a href=\"index.htm\">now</a>::<a href=\"gauges.htm\">gauges</a>:" + \
 		":<a href=\"today.htm\">today</a>::<a href=\"yesterday.htm\">yesterday</a>::<a href=\"thismonth.htm\">this&nbsp;month</a>:" + \
@@ -709,7 +724,7 @@ def summarize():
 		":<a href=\"procs.html\">Check&nbsp;Procs</a>:\n" + \
 		":<a TARGET=\"_blank\" HREF=\"https://www.wunderground.com/personal-weather-station/dashboard?ID=KPAMCMUR4\">KPAMCMUR4</a>:</td>\n" )
 
-  	FH.write( "  </tr>\n\n" )
+	FH.write( "  </tr>\n\n" )
 	FH.write( " </table></center>\n" )
 
 	FH.write( "<P> &nbsp;\n" )
@@ -763,14 +778,11 @@ def read_cpu_temp():
 # ----------------------------------------------------------------------------------------
 def logger(message):
 	# This is not being launched automatically and output is redirected to the log.
-	messager(message)
-#############################################################################
-####	timestamp = datetime.datetime.now().strftime(strftime_FMT)
-####
-####	FH = open(logger_file, "a")
-####	FH.write( "{} {}\n".format( timestamp, message) )
-####	FH.close
-#############################################################################
+	timestamp = datetime.datetime.now().strftime(strftime_FMT)
+
+	FH = open(logger_file, "a")
+	FH.write( "{} {}\n".format( timestamp, message) )
+	FH.close
 
 # ----------------------------------------------------------------------------------------
 # Print message with a leading timestamp.
@@ -778,7 +790,7 @@ def logger(message):
 # ----------------------------------------------------------------------------------------
 def messager(message):
 	timestamp = datetime.datetime.now().strftime(strftime_FMT)
-	print "{} {}".format( timestamp, message)
+	print("{} {}".format( timestamp, message))
 
 # ----------------------------------------------------------------------------------------
 # Print and log the message with a leading timestamp.
@@ -856,7 +868,7 @@ def ws_data_stopped():
 					'cumulusmx']
 
 				try :
-					restart = subprocess.check_output( restart_cmd, stderr=subprocess.STDOUT )
+					restart = subprocess.check_output( restart_cmd, stderr=subprocess.STDOUT, text=True)
 				except:
 					logger( "ERROR: Unexpected ERROR in restart: {}".format( sys.exc_info()[0] ) )
 
@@ -867,7 +879,7 @@ def ws_data_stopped():
 					logger( "DEBUG: restart returned data: \"" + restart + "\"" )
 ###########################################################################################################################################################################################################################################################################################################				exit()
 				sleep( 10 )
-				print "\n\n\n\n\n"
+				print("\n\n\n\n\n")
 				messager( "INFO: systemctl restarted cumulusmx.   (code 998)" )
 				log_event("", "systemctl restarted cumulusmx.", 998 )
 
@@ -975,7 +987,10 @@ def last_realtime():
 	# --------------------------------------------------------------------------------
 	try :
 		response = urlopen( realtime_URL )
-		content = response.read()
+# @@@ #
+#%%		content = response.read()
+		content = response.read().decode('utf-8')
+		content = content.rstrip()
 	except ( URLError, Exception ) as err :
 		messager( "ERROR: in last_realtime: {}".format( sys.exc_info()[0] ) )
 		# ------------------------------------------------------------------------
@@ -1095,6 +1110,8 @@ def last_realtime():
 def proc_load():
 	global data
 	load = subprocess.check_output('/usr/bin/uptime')
+	load = load.decode('utf-8')
+	# @@@ #
 	uptime = re.sub('.*up *', '', load)
 	uptime = re.sub(',.*', '', uptime)
 
@@ -1147,6 +1164,12 @@ def proc_load():
 #   Mem:        945512     307040     638472       6768      83880     128100
 #   -/+ buffers/cache:      95060     850452
 #   Swap:       102396          0     102396
+
+# Fri  2 Oct 14:36:54 EDT 2020
+#                 total        used        free      shared  buff/cache   available
+#   Mem:         948076      117092      563896       12292      267088      763808
+#   Swap:        102396           0      102396
+
 #
 #   0  945512
 #   1  311232
@@ -1167,46 +1190,105 @@ def proc_load():
 # ----------------------------------------------------------------------------------------
 def mem_usage():
 	global data
-	free = subprocess.check_output('/usr/bin/free')
+	free = subprocess.check_output('/usr/bin/free').decode('utf-8')
+#%%	print( "/usr/bin/free" )
+#%%	print( free )
 	#                       Remove all the text portions - we want just the numbers
-	free = re.sub('.*total *used *free *shared *buffers *cached\n.*Mem: *', '', free)
-	free = re.sub('\n.*buffers/cache: *', ' ', free)
-	free = re.sub('Swap: *', ' ', free)
-	free = re.sub('\n', ' ', free)                    # Remove any newline which might be left
-	free = re.sub(' +', ' ', free)                    # Reduce multiple spaces to 1
-	free = re.sub(' $', '', free)                     # Trim any trailing blank
-	words = re.split(' +', free)
+#%%	print( "/usr/bin/free" )
+	XXXXXX = re.split( '\n', free )
+#%%	for token in XXXXXX :
+#%%		if "total" in token :
+#%%			print( "HEADER -----------------" )
+#%%		if "Mem: " in token :
+#%%			print( "Mem ----------------------------------------------" )
+#%%		if "Swap: " in token :
+#%%			print( "Swap ----------------------------------------------" )
+#%%		print( token )
+	#                       Remove all the text portions - we want just the numbers
+#%%	free = re.sub('.*total *used *free *shared *buffers *cached\n.*Mem: *', '', free)
+#%%	print( "@@@" )
+#%%	print( free )
+#%%	if "buffers/cache" in free :
+#%%		free = re.sub('\n.*buffers/cache: *', ' ', free)
+#%%		print( free )
+#%%	free = re.sub('Swap: +', ' ', free)
+#%%	print( "- Swap" )
+#%%	print( free )
+#%%	free = re.sub('\n', ' ', free)                    # Remove any newline which might be left
+#%%	print( free )
+#%%	free = re.sub(' +', ' ', free)                    # Reduce multiple spaces to 1
+#%%	print( free )
+#%%	free = re.sub(' $', '', free)                     # Trim any trailing blank
+#%%	print( free )
+#%%	words = re.split(' +', free)
+#%%	print( words )
 
 	# free|945512|908692|36820|3732|244416|226828|437448|508064|102396|3064|99332
 
-	if (len(words)) < 11 :
-		messager( "WARNING:  Expecting 11 tokens from \"free\", but got " + str(mem_pct)  )
+#%%	if (len(words)) < 11 :
+#%%		messager( "WARNING:  Expecting 11 tokens from \"free\", but got " + str(mem_pct)  )
 
 	### for iii in range(0, len(words)):
 	### 	___print str(iii) + "  " + words[iii]
 
-	mem_total = int(words[0])
-	mem_used = int(words[1])
-	mem_free = int(words[2])
+#%%	mem_total = int(words[0])
+#%%	mem_used = int(words[1])
+#%%	mem_free = int(words[2])
 
-	shared = words[3]
-	buffers = words[4]
-	cached = words[5]
+#%%	shared = words[3]
+#%%	buffers = words[4]
+#%%	cached = words[5]
 
-	bu_ca_used = int(words[6])
-	bu_ca_free = int(words[7])
+#%%	bu_ca_used = int(words[6])
+#%%	bu_ca_free = int(words[7])
 
-	swap_total = int(words[8])
-	swap_used = int(words[9])
+#%%	swap_total = int(words[8])
+#%%	swap_used = int(words[9])
+
+
+# Fri  2 Oct 14:36:54 EDT 2020
+#                 total        used        free      shared  buff/cache   available
+#   Mem:         948076      117092      563896       12292      267088      763808
+#               mem_total
+#                         effective_used
+#
+#
+#
+#
+#   Swap:        102396           0      102396
+#                swap_total  swap_used   swap_free
+#
+#
+# @@@
+	for token in XXXXXX :
+#%%		if "total" in token :
+#%%			print( "HEADER -----------------" )
+		if "Mem: " in token :
+#%%			print( "Mem ----------------------------------------------" )
+			words = re.split(' +', token)
+			mem_total = int(words[1])
+			effective_used = int(words[2])
+		if "Swap: " in token :
+#%%			print( "Swap ----------------------------------------------" )
+			words = re.split(' +', token)
+			swap_total = int(words[1])
+			swap_used = int(words[2])
+
+
+
 	data['swap_used'] = swap_used
-	swap_free = int(words[10])
 
 	swap_pct = 100 * swap_used / swap_total
+	swap_pct = int( 100 * swap_used / swap_total )
 	data['swap_pct'] = swap_pct
-	effective_used = mem_total - bu_ca_free
+#####################################################################################################	effective_used = mem_total - bu_ca_free
+
+
 	data['effective_used'] = effective_used 
 	mem_pct = 100 * effective_used / mem_total
+	mem_pct = int( 100 * effective_used / mem_total )
 	data['mem_pct'] = mem_pct
+#%%	print( "DEBUG: {:6d}, {:2d}%, {:6d}, {:2d}%,".format(effective_used, mem_pct, swap_used, swap_pct) )
 	# This was misleading...
 	# mem_pct = 100 * mem_used / mem_total
 	if mem_pct > mem_usage_lim :
@@ -1370,7 +1452,7 @@ def rf_dropped() :
 				else :
 					logger_code =111
 
-				print ""
+				print("")
 				messager( "WARNING:  Cumulus MX Exception thrown:    exception_tstamp = " + \
 					exception_tstamp + "  (" + str(logger_code) + ")" )
 
@@ -1382,13 +1464,13 @@ def rf_dropped() :
 				log_fragment = "<BR><FONT SIZE=-1><PRE>\n"
 				for jjj in range(iii-3, 0, 1) :
 					# Number the lines in the file we read
-					print str(len(lineList)+jjj+1) + "\t" + lineList[jjj].rstrip()
+					print(str(len(lineList)+jjj+1) + "\t" + lineList[jjj].rstrip())
 					log_fragment = log_fragment + \
 						"{:06d}  {}\n".format( (len(lineList)+jjj+1), lineList[jjj].rstrip())
 
 				log_fragment = log_fragment + "</PRE></FONT>\n"
 				messager( "WARNING:    from  " + mxdiags_dir + "/" + log_file )
-				print ""
+				print("")
 
 				log_event(exception_tstamp, "Cumulus MX Exception thrown:" + log_fragment, logger_code )
 ###			else:
@@ -1519,13 +1601,13 @@ def rf_dropped() :
 			for jjj in range(iii-3, 0, 1) :
 				# Number the lines in the file we read
 				# Here we do NOT use the messager() function.
-				print str(len(lineList)+jjj+1) + "\t" + lineList[jjj].rstrip()
+				print(str(len(lineList)+jjj+1) + "\t" + lineList[jjj].rstrip())
 				log_fragment = log_fragment + \
 					"{:06d}  {}\n".format( (len(lineList)+jjj+1), lineList[jjj].rstrip())
 
 			log_fragment = log_fragment + "</PRE></FONT>\n"
 			messager( "WARNING:   \"The Task was canceled\"  from  " + mxdiags_dir + "/" + log_file )
-			print ""
+			print("")
 
 			log_event("", "Cumulus MX: \"The Task was canceled\"" + log_fragment, 118 )
 
@@ -1599,7 +1681,7 @@ def rf_dropped() :
 				messager( "WARNING:  Unknown status from  " + mxdiags_dir + "/" + log_file + "   (code 199)" )
 				for jjj in range(iii-3, 0, 1) :
 					# Number the lines in the file we read
-					print str(len(lineList)+jjj+1) + "\t" + lineList[jjj].rstrip()
+					print(str(len(lineList)+jjj+1) + "\t" + lineList[jjj].rstrip())
 				log_event("", "Unknown status from  " + mxdiags_dir + "/" + log_file, 199 )
 
 
@@ -1805,8 +1887,11 @@ def cmx_svc_runtime():
 	lines = [ "   Active: active (running) since DOWN; DOWN", " Main PID: DOWN (mono)" ]
 
 	try :
-		output = subprocess.check_output(["/bin/systemctl", "status", "cumulusmx"])
+		#@@@# output = subprocess.check_output(["/bin/systemctl", "status", "cumulusmx"])
+		output = subprocess.check_output(["/bin/systemctl", "status", "cumulusmx"], text=True)
 		lines = re.split('\n', output)
+		#@@@# print( "@@@" )
+		#@@@# print( lines )
 	except :
 		messager( "ERROR: From systemctl status: {}".format( sys.exc_info()[0] ) )
 ####		lines[0] = "   Active: active (running) since DOWN; DOWN"
@@ -1817,6 +1902,25 @@ def cmx_svc_runtime():
 	# Main PID: 3364 (mono)
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	#   Active: activating (auto-restart) (Result: signal) since Tue 2018-12-25 09:04:04 EST; 4s ago
+	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+	#   
+	#   
+	#   $ sudo systemctl status cumulusmx
+	#   ● cumulusmx.service - CumulusMX service
+	#      Loaded: loaded (/etc/systemd/system/cumulusmx.service; enabled; vendor preset: enabled)
+	#      Active: active (running) since Sat 2020-10-03 19:21:11 EDT; 2h 47min ago
+	#        Docs: https://cumuluswiki.org/a/Main_Page
+	#     Process: 571 ExecStart=/usr/bin/mono-service /home/pi/CumulusMX/CumulusMX.exe -service (code=exited, status=0/SUCC
+	#    Main PID: 576 (mono)
+	#       Tasks: 26 (limit: 2065)
+	#      CGroup: /system.slice/cumulusmx.service
+	#              └─576 /usr/bin/mono /usr/lib/mono/4.5/mono-service.exe /home/pi/CumulusMX/CumulusMX.exe -service
+	#
+	#   Oct 03 19:21:11 raspi-005 systemd[1]: Starting CumulusMX service...
+	#   Oct 03 19:21:11 raspi-005 systemd[1]: Started CumulusMX service.
+	#   Oct 03 19:21:18 raspi-005 mono[576]: /home/pi/CumulusMX/CumulusMX.exe: Service CumulusService started
+	#
+	#   
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	for iii in range(0, len(lines)):
 		if re.search('Main PID:', lines[iii]) :
@@ -1868,11 +1972,16 @@ def cmx_svc_runtime():
 # ----------------------------------------------------------------------------------------
 def webcamwatch_down():
 	global data
+
+	data['webcamwatch_down'] = "X"
+	return "X"
+
+
 	ret_val = 1
 	lines = [ "   Active: active (running) since DOWN; DOWN", "", "" ]
 
 	try :
-		output = subprocess.check_output(["/bin/systemctl", "status", "wxwatchdog"])
+		output = subprocess.check_output(["/bin/systemctl", "status", "wxwatchdog"], text=True)
 		lines = re.split('\n', output)
 	except :
 ####		messager( "ERROR: From systemctl status: {}".format( sys.exc_info()[0] ) )
@@ -1927,9 +2036,9 @@ def mono_version():
 	global data
 
 	try :
-		response = subprocess.check_output(["/usr/bin/mono", "-V"])
+		response = subprocess.check_output(["/usr/bin/mono", "-V"], text=True)
 		line = re.split('\n', response)
-		tok = re.split(' *', line[0])
+		tok = re.split(' +', line[0])
 		version = tok[4]
 	except :
 		messager( "ERROR: From mono version check: {}".format( sys.exc_info()[0] ) )
@@ -1949,7 +2058,7 @@ if __name__ == '__main__':
 	#### if sys.argv[1] = "stop"
 	this_script = sys.argv[0]
 
-	print "\n\n\n\n\n"
+	print("\n\n\n\n\n")
 
 	messager("INFO: Starting " + this_script + "  PID=" + str(getpid()))
 
