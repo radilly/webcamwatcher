@@ -14,6 +14,13 @@
 #         change to a parameter being tracked.  mono_threads comes to mind.
 #         It seems to change in "jumps."  Link more than 2X in a few minutes.
 #
+#   NOTE: see that following "Reason:" below. I noticed a cycle in the logging
+#         when there was a problem with the network or host being down. Search
+#         on "ERROR: in" to see it. There are 3 blocks of repeated code.  Not
+#         clear that would be reasonable to put in a routine, but once we've
+#         discovered a 'Temporary failure in name resolution', perhaps we
+#         should just take a break rather than hammering away.
+#
 #
 # This is a first hack to see if I can prove the concept of, basically a
 # watchdog running on a Pi that will detect when images stopped uploading
@@ -38,6 +45,39 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20201006 RAD Found in several places I had a pair of parens rather the curlies. You can
+#              see that following "Reason:" below. I noticed a cycle in the logging when
+#              there was a problem with the network or host being down. Search on
+#              "ERROR: in" to see it. There are 3 blocks of repeated code.  Not clear
+#              that would be reasonable to put in a routine, but once we've discovered
+#              a 'Temporary failure in name resolution', perhaps we should just take a
+#              break rather than hammering away.  Add to the wish list...
+#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+#     2020/10/05 02:06:35 2020/10/05 02:06:35, 0, 0, 0,  30,    0.06, 0,    23, 109584, 11%,      0,  0%, 41.3c, 106.4f,  51.3f,   3.3%,    1.2815, X, ,
+#
+#     2020/10/05 02:06:59 ERROR: in server_stalled: <class 'urllib.error.URLError'>
+#     2020/10/05 02:06:59 ERROR: We failed to reach a server.
+#     2020/10/05 02:06:59 ERROR: Reason: ()
+#     2020/10/05 02:06:59 WARNING:  unique_count =1; expected 12.  realtime.txt data was not updated recently (last 45 mins).
+#     2020/10/05 02:06:59 ERROR: in last_realtime: <class 'urllib.error.URLError'>
+#     2020/10/05 02:06:59 ERROR: type: <class 'urllib.error.URLError'>
+#     2020/10/05 02:06:59 ERROR: args: (gaierror(-3, 'Temporary failure in name resolution'),)
+#     2020/10/05 02:06:59 ERROR: We failed to reach a server.
+#     2020/10/05 02:06:59 ERROR: Reason: ()
+#     2020/10/05 02:06:59 DEBUG: content = "00/00/00 00:00:00 45.5 80 39.7 0.0 0.7 360 0.00 0.05 30.14 N 0 mph ..." in last_realtime()
+#     2020/10/05 02:06:59 DEBUG: Got large negative value from record:
+#     	00/00/00 00:00:00 45.5 80 39.7 0.0 0.7 360 0.00 0.05 30.14 N 0 mph ...
+#     2020/10/05 02:06:59 ERROR: in camera_down: <class 'urllib.error.URLError'>
+#     2020/10/05 02:06:59 ERROR: We failed to reach a server.
+#     2020/10/05 02:06:59 ERROR: Reason: ()
+#     2020/10/05 02:06:59 WARNING: Read URL failed.  Assumed image age: 0
+#     2020/10/05 02:06:59 2020/10/05 02:06:59, 1, 0, 0, -7593,    0.04, 0,    23, 109092, 11%,      0,  0%, 40.8c, 105.4f,  51.3f,   2.2%,    1.2818, X, <<<<<,
+#
+#     2020/10/05 02:07:23 ERROR: in server_stalled: <class 'urllib.error.URLError'>
+#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+
+
 # 20201004 RAD First pass rewritting for Python 3 and toward use as a service.
 #              Revision: 7604a3bb8a2097f4668a0aa136fa8cd6a7aaf00f was the version before
 #              I started this slash and burn.  This does work from the command line,
@@ -913,12 +953,12 @@ def server_stalled():
 		log_and_message( "ERROR: in server_stalled: {}".format( sys.exc_info()[0] ) )
 		if hasattr(err, 'reason'):
 			log_and_message( 'ERROR: We failed to reach a server.' )
-			log_and_message( 'ERROR: Reason: ()'.format( err.reason ) )
+			log_and_message( 'ERROR: Reason: {}'.format( err.reason ) )
 			# Avoid downstream issue working with this variable.
 			content = "1"
 		elif hasattr(err, 'code'):
 			log_and_message( 'ERROR: The server couldn\'t fulfill the request.' )
-			log_and_message( 'ERROR: code: ()'.format( err.code ) )
+			log_and_message( 'ERROR: code: {}'.format( err.code ) )
 			# Avoid downstream issue working with this variable.
 			content = "1"
 ####	else:
@@ -986,10 +1026,10 @@ def last_realtime():
 		log_and_message( "ERROR: args: {}".format( err.args ) )
 		if hasattr(err, 'reason'):
 			log_and_message( 'ERROR: We failed to reach a server.' )
-			log_and_message( 'ERROR: Reason: ()'.format( err.reason ) )
+			log_and_message( 'ERROR: Reason: {}'.format( err.reason ) )
 		elif hasattr(err, 'code'):
 			log_and_message( 'ERROR: The server couldn\'t fulfill the request.' )
-			log_and_message( 'ERROR: code: ()'.format( err.code ) )
+			log_and_message( 'ERROR: code: {}'.format( err.code ) )
 		# ------------------------------------------------------------------------
 		#  https://docs.python.org/2/tutorial/errors.html
 		#  https://docs.python.org/2/library/sys.html
@@ -1662,10 +1702,10 @@ def camera_down():
 		log_and_message( "ERROR: in camera_down: {}".format( sys.exc_info()[0] ) )
 		if hasattr(err, 'reason'):
 			log_and_message( 'ERROR: We failed to reach a server.' )
-			log_and_message( 'ERROR: Reason: ()'.format( err.reason ) )
+			log_and_message( 'ERROR: Reason: {}'.format( err.reason ) )
 		elif hasattr(err, 'code'):
 			log_and_message( 'ERROR: The server couldn\'t fulfill the request.' )
-			log_and_message( 'ERROR: code: ()'.format( err.code ) )
+			log_and_message( 'ERROR: code: {}'.format( err.code ) )
 		age = "0"
 		logger("WARNING: Read URL failed.  Assumed image age: {}".format( age ) )
 
