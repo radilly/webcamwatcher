@@ -82,6 +82,7 @@
 #              Revision: 7604a3bb8a2097f4668a0aa136fa8cd6a7aaf00f was the version before
 #              I started this slash and burn.  This does work from the command line,
 #              though several columns are not working.
+#              Used https://docs.python.org/3.0/library/2to3.html to get started.
 # 20190722 RAD Added system_uptime.  Already issuing the command- just had to parse
 #              out that portion.
 # 20190529 RAD In server_stalled() initialized content = "1" to avoid the following.
@@ -1014,7 +1015,9 @@ def last_realtime():
 	try :
 		response = urlopen( realtime_URL )
 # @@@ #
-#%%		content = response.read()
+		# NOTE: The decode() methed seemed required for Python 3.  See
+		#       https://stackoverflow.com/questions/31019854/typeerror-cant-use-a-string-pattern-on-a-bytes-like-object-in-re-findall
+		#       https://stackoverflow.com/questions/37722051/re-search-typeerror-cannot-use-a-string-pattern-on-a-bytes-like-object
 		content = response.read().decode('utf-8')
 		content = content.rstrip()
 	except ( URLError, Exception ) as err :
