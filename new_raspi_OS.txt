@@ -53,5 +53,27 @@ alias
 
 
 
+-----------------------------------------------------------------------------------------
+Notes on booting from a hard drive...
+
+OTP Bit (on hardware)
+https://www.raspberrypi.org/forums/search.php?keywords=set+the+OTP+bit&sid=20afe7743b768f7d66e8982ab750edbf
+https://www.raspberrypi.org/forums/viewtopic.php?f=62&t=287017&p=1735208&hilit=set+the+OTP+bit&sid=90a395e7f5a99105d661d491dec51277#p1735208
+https://www.raspberrypi.org/forums/viewtopic.php?f=63&t=285691&p=1733886&hilit=set+the+OTP+bit&sid=90a395e7f5a99105d661d491dec51277#p1733886
+
+Berry Boot
+https://www.youtube.com/watch?v=cZBNpxpdZzs&feature=youtu.be
+https://www.raspberrypi.org/documentation/hardware/raspberrypi/bootmodes/msd.md
+https://www.raspberrypi.org/documentation/hardware/raspberrypi/bootmodes/README.md
+
+
+https://www.raspberrypi.org/forums/viewtopic.php?f=29&t=196778
+https://www.raspberrypi.org/documentation/hardware/raspberrypi/bootmodes/msd.md
+https://www.raspberrypi.org/documentation/hardware/raspberrypi/bootmodes/bootflow.md
+
+https://www.makeuseof.com/tag/extend-life-raspberry-pis-sd-card/
+
+
+-----------------------------------------------------------------------------------------
 
 
