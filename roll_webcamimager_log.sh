@@ -2,6 +2,8 @@
 
 # Roll the webcamimager.log
 
+for DIR in N S ; do echo ${DIR} ; done
+
 OLD_FILE=`date +webcamimager.%Y%m%d.log`
 
 
