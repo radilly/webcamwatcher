@@ -1,8 +1,18 @@
 #!/bin/bash
 
-# Use in the Pi staging folder to delete older files.
+# Builds a web page of status looking for key processes and logs
+# which haven't been updated.  We've seen some "stale" processes
+# that seem to be running, but are hung up.
 #
-# KEEP controls how many we keep, typically a mulitple of 3
+# Intended to be run via crontab.  Example
+#    * * * * * /home/pi/webcamwatcher/process_to_status.sh >> /home/pi/process_to_status.log 2>&1
+
+# ##############################################################################
+#
+# NOTE: There are some additional bash scripts further down in this file
+#       for reference.
+#
+# ##############################################################################
 
 
 STAT_FILE="/mnt/root/home/pi/Cumulus_MX/web/procs.html"
@@ -99,22 +109,13 @@ echo "<a TARGET=\"_blank\" HREF=\"http://dilly.family/wx/\">WX Web Page</a>" >> 
 echo "&nbsp; &nbsp; - &nbsp; &nbsp;" >> ${WORK_FILE}
 echo "<a TARGET=\"_blank\" HREF=\"http://dilly.family/wx/webcam.html\">Webcams</a>" >> ${WORK_FILE}
 
-
-
 ## echo "<P ALIGN=center><a href=\"procs.html\">Check Procs</a>" >> ${WORK_FILE}
 ## echo "&nbsp; &nbsp; &nbsp; - &nbsp; &nbsp; &nbsp;" >> ${WORK_FILE}
 ## echo "<a href=\"event_status.html\">Pi Events</a>" >> ${WORK_FILE}
 ## echo "&nbsp; &nbsp; &nbsp; - &nbsp; &nbsp; &nbsp;" >> ${WORK_FILE}
 ## echo "<a href=\"status.html\">Pi Status</a>" >> ${WORK_FILE}
 
-
-
-# sleep 35
-
-
 mv -f ${WORK_FILE} ${STAT_FILE}
-
-
 
 exit
 exit
