@@ -992,7 +992,7 @@ def read_config( config_file ) :
 		# Not on first iteration.  Then increase the sleep time with each iteration.
 		#  With a 4 sec multiplier this comes to 112 seconds max...     (28 * 4)
 		if iii > 0 :
-			logger( "DEBUG: in push_to_server() sleep( {} )".format( iii * 15 ) )
+			logger( "DEBUG: in read_config() checking credentials sleep( {} )".format( iii * 15 ) )
 			sleep( iii * 15 )
 
 		try :
@@ -1625,6 +1625,34 @@ def get_stored_filename() :
 
 
 
+
+
+
+
+
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+#
+#  This selects the file transfer protocol we'll use.
+#
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+def push_to_server(local_file, remote_path) :
+
+	push_to_server_via_scp(local_file, remote_path)
+	return
+
+	push_to_server_via_ftp(local_file, remote_path)
+
+
+
+
 # ----------------------------------------------------------------------------------------
 #  T E S T
 #  T E S T
@@ -1644,7 +1672,7 @@ def get_stored_filename() :
 def push_to_server_via_scp(local_file, remote_path) :
 
 #	destination = "user@remotehost:remotepath"
-	destination = "dillwjfq@server162.web-hosting.com:public_html/wx/" + remote_path
+	destination = "dillwjfq@premium29.web-hosting.com:public_html/wx/" + remote_path
 	scp_failed = False
 
 #	logger( "DEBUG: subprocess.check_output([\"scp\", \"-q\", \"-P\", \"21098\", {}, {}])".format( local_file, destination ) )
@@ -1684,11 +1712,6 @@ def push_to_server_via_scp(local_file, remote_path) :
 
 
 
-
-
-
-
-
 # ----------------------------------------------------------------------------------------
 #  This pushes the specified file to the (hosted) web server via FTP.
 #
@@ -1704,11 +1727,11 @@ def push_to_server_via_scp(local_file, remote_path) :
 #    NOTE: 
 #    NOTE: 
 # ----------------------------------------------------------------------------------------
-def push_to_server(local_file, remote_path) :
+def push_to_server_via_ftp(local_file, remote_path) :
 	ftp_OK = False
 
-#DEBUG#	logger( "DEBUG: push_to_server( {}, {}, {} )".format( local_file, remote_path, server ) )
-#DEBUG#	logger( "DEBUG: push_to_server( {}, {}, {} )".format( local_file, remote_path, ftp_server ) )
+#DEBUG#	logger( "DEBUG: push_to_server_via_ftp( {}, {}, {} )".format( local_file, remote_path, server ) )
+#DEBUG#	logger( "DEBUG: push_to_server_via_ftp( {}, {}, {} )".format( local_file, remote_path, ftp_server ) )
 
 	if re.search('/', local_file) :
 		local_file_bare = re.sub(r'.*/', r'', local_file)
@@ -1729,7 +1752,7 @@ def push_to_server(local_file, remote_path) :
 		# Not on first iteration.  Then increase the sleep time with each iteration.
 		#  With a 4 sec multiplier this comes to 112 seconds max...     (28 * 4)
 		if iii > 0 :
-			logger( "DEBUG: in push_to_server() sleep( {} )".format( iii * 4 ) )
+			logger( "DEBUG: in push_to_server_via_ftp() sleep( {} )".format( iii * 4 ) )
 			sleep( iii * 4 )
 
 		try :
@@ -1747,7 +1770,7 @@ def push_to_server(local_file, remote_path) :
 			ftp_OK = True
 			break
 		except Exception as problem :
-			logger( "ERROR: in push_to_server() FTP (connect): {}".format( problem ) )
+			logger( "ERROR: in push_to_server_via_ftp() FTP (connect): {}".format( problem ) )
 
 			logger( "DEBUG: FTP credentials: s=\"{}\" l=\"{}\" p=\"{}\"".format( ftp_server, ftp_login, ftp_password ) )
 #@@@			if "authentication" in problem :
@@ -1835,7 +1858,7 @@ def push_to_server(local_file, remote_path) :
 #DEBUG#			logger( "DEBUG: FTP remote cd to {}".format( remote_path ) )
 			ftp.cwd( remote_path )
 		except Exception as problem :
-			logger( "ERROR: in push_to_server() ftp.cwd {}".format( problem ) )
+			logger( "ERROR: in push_to_server_via_ftp() ftp.cwd {}".format( problem ) )
 			ftp_OK = False
 	# --------------------------------------------------------------------------------
 	#  Not absolutely sure I want to do this, but sometimes the process is just hosed...
@@ -1869,7 +1892,7 @@ def push_to_server(local_file, remote_path) :
 	if ftp_OK :
 		for iii in range(8) :
 			if iii > 0 :
-				logger( "DEBUG: in push_to_server() sleep( {} )".format( iii * 4 ) )
+				logger( "DEBUG: in push_to_server_via_ftp() sleep( {} )".format( iii * 4 ) )
 				sleep( iii * 4 )
 
 			try :
@@ -1884,7 +1907,7 @@ def push_to_server(local_file, remote_path) :
 				break
 
 			except Exception as problem :
-				logger( "ERROR: in push_to_server() ftp.storbinary \"{}\"".format( problem ) )
+				logger( "ERROR: in push_to_server_via_ftp() ftp.storbinary \"{}\"".format( problem ) )
 				# --------------------------------------------------------
 				# --------------------------------------------------------
 				#                       if not catching_up and ( (file_list_len - line) > 2 ) :
@@ -1910,7 +1933,7 @@ def push_to_server(local_file, remote_path) :
 	try :
 		ftp.quit()
 	except Exception as problem :
-		logger( "ERROR: in push_to_server() ftp.quit {}".format( problem ) )
+		logger( "ERROR: in push_to_server_via_ftp() ftp.quit {}".format( problem ) )
 		ftp.close()
 
 
