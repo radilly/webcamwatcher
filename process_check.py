@@ -46,13 +46,24 @@ def ps_check():
 
 	FH = open(infile, "r")
 #	FH = open("rasp_cams.grep", "r")
-	pattern_list = FH.readlines()
+
+	# @@@ #######################################################################################################################################################################################################pattern_list = FH.readlines()
+	lines = FH.readlines()
 	FH.close
 
-
-	for iii in range(0, len(pattern_list)):
-		pattern_list[iii] = pattern_list[iii].rstrip()
-#		print pattern_list[iii]
+	# test_iii = 0
+	pattern_list = []
+	for line in lines :
+		if re.match( "\s*#", line ) :
+			continue
+		# Python3 ???????????
+		# if re.fullmatch( "\s*", line ) :
+		if re.match( "^\s*$", line ) :
+			continue
+		pattern_list.append( line.rstrip() )
+		# test_iii += 1
+		# print test_iii
+		# print pattern_list
 
 	patterns = len(pattern_list)
 

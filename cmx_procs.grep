@@ -1,4 +1,19 @@
+# NOTE: This alias requires setting up some links
+#    alias procs='~/bin/process_check.py ~/expected_procs.grep'
+#
+# NOTE: We link with a different filename based on the system
+#    ln -s /home/pi/webcamwatcher/cmx_procs.grep ~/expected_procs.grep
+#    ls -al expected_procs.grep 
+#
+#    mkdir bin
+#    cd bin
+#    ln -s /home/pi/webcamwatcher/process_check.py .
+#    procs
+#
+
 /usr/bin/mono .*/CumulusMX.exe
-/usr/bin/python .*/watchdog.py
-/usr/bin/python .*/statuscollector.py
-/usr/bin/python .*/webcamwatch.py
+# Might be python3... must be 1 char in between
+/usr/bin/python..*/watchdog.py
+/usr/bin/python..*/statuscollector.py
+/usr/bin/python..*/webcamwatch.py
+
