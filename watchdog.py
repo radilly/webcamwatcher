@@ -482,7 +482,7 @@ def main():
 			for jjj in range(0, len(CSV_keys)):
 				hdr = hdr + " {},".format( CSV_keys[jjj] )
 
-			logger(hdr)
+			logger_no_ts(hdr)
 
 		# Capture the data by calling functions.  Ignore return values.
 		server_stalled()
@@ -507,7 +507,7 @@ def main():
 				if data[CSV_keys[jjj]] > 0 :
 					Prob_Flag = " <<<<<,"
 
-		logger(CSV_rec + Prob_Flag)
+		logger_no_ts(CSV_rec + Prob_Flag)
 
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# NOTE: Would be great to output data and use highcharts
@@ -806,6 +806,19 @@ def logger(message):
 
 	FH = open(logger_file, "a")
 	FH.write( "{} {}\n".format( timestamp, message) )
+	FH.close
+
+# ----------------------------------------------------------------------------------------
+# Same as the above, but omits the leading timestamp.
+#
+# This script log lines in CVS format.  Those lines have their own leading timestamp
+# followed by a comma - with no space in between.
+#
+# ----------------------------------------------------------------------------------------
+def logger_no_ts(message):
+
+	FH = open(logger_file, "a")
+	FH.write( "{}\n".format( message) )
 	FH.close
 
 # ----------------------------------------------------------------------------------------
