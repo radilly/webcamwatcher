@@ -39,12 +39,27 @@ def log_check():
 
 	FH = open(infile, "r")
 #	FH = open("rasp_cams.grep", "r")
-	log_file_list = FH.readlines()
+	lines = FH.readlines()
 	FH.close
 
 
-	for iii in range(0, len(log_file_list)):
-		log_file_list[iii] = log_file_list[iii].rstrip()
+	# test_iii = 0
+	log_file_list = []
+	for line in lines :
+		if re.match( "\s*#", line ) :
+			continue
+		# Python3 ???????????
+		# if re.fullmatch( "\s*", line ) :
+		if re.match( "^\s*$", line ) :
+			continue
+		log_file_list.append( line.rstrip() )
+		# test_iii += 1
+		# print test_iii
+		# print log_file_list
+
+
+#########################	for iii in range(0, len(log_file_list)):
+#########################		log_file_list[iii] = log_file_list[iii].rstrip()
 #		print log_file_list[iii]
 #
 #		NOTE: Doesn't work because range is called just once above...

@@ -1,0 +1,3 @@
+# To be read by log_check.py
+/home/pi/status/statuscollector.log
+/home/pi/wxaux/watchdog.log
