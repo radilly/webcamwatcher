@@ -3,7 +3,7 @@
 #
 #   kill -9 `cat ./statuscollector.PID`
 #
-#   nohup /usr/bin/python -u ./statuscollector.py /mnt/root/home/pi/status &
+#   nohup /usr/bin/python -u ./statuscollector.py /home/pi/status &
 #
 #   Takes 1 argument - the path to the directory to monitor for new messages.
 #
@@ -32,6 +32,9 @@
 #
 # ========================================================================================
 # ========================================================================================
+# 20201021 RAD In the course of starting this up on a "clean" system, I made some
+#              assumptions about what would be in place when this script first ran.
+#              In part default values were added; ts = 0.0, found_prev_page = "".
 # 20190716 RAD Been running a month using scp so it looks good. Can apply this elsewhere
 #              but for now will check this in even though you'll see 'T E S T' in a few
 #              places.
@@ -379,6 +382,7 @@ def monitor_dir() :
 	file_list = listdir( work_dir )
 	file_list_len = len( file_list )
 	file_list.sort()
+	ts = 0.0
 
 	for iii in range( file_list_len ) :
 		filename = file_list[ iii ]
@@ -513,6 +517,7 @@ def find_prev_page() :
 	file_list = listdir( work_dir )
 	file_list_len = len( file_list )
 	file_list.sort()
+	found_prev_page = ""
 
 	for iii in range( file_list_len ) :
 		filename = file_list[ iii ]
@@ -741,7 +746,7 @@ def write_pid_file():
 # ----------------------------------------------------------------------------------------
 def store_file_data(tstamp) :
 #DEBUG#	messager( "DEBUG: write " + stored_dir_mtime )
-	FH = open( stored_dir_mtime, "w" )
+	FH = open( stored_dir_mtime, "a" )
 	FH.write( str(tstamp) + "\n" )
 	FH.close
 
@@ -750,11 +755,18 @@ def store_file_data(tstamp) :
 # ----------------------------------------------------------------------------------------
 def get_stored_ts() :
 #DEBUG#	messager( "DEBUG: read " + stored_dir_mtime )
-	FH = open( stored_dir_mtime, "r" )
-	content = FH.readlines()
-	FH.close
+	try:
+		FH = open( stored_dir_mtime, "r" )
+		content = FH.readlines()
+		FH.close
 
-	tstamp = str(content[0].strip("\n"))
+		tstamp = str(content[0].strip("\n"))
+	except:
+		logger( "WARNING: Creating new  \"{}\" file.".format( stored_dir_mtime ) )
+		tstamp = 0
+		store_file_data(tstamp)
+
+
 	logger( "DEBUG: Stored tstamp = \"{}\" from get_stored_ts()".format( tstamp ) )
 
 	return float(tstamp)
