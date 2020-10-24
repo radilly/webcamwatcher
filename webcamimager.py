@@ -1,4 +1,4 @@
-#!/usr/bin/python -u
+#!/usr/bin/python3 -u
 # @@@ ... 
 #    NOTE:
 #    NOTE:
@@ -383,7 +383,8 @@ import subprocess
 # check_output
 # check_call
 
-import ConfigParser
+# Casing changed from 2 to 3.  Was camel-cased.
+import configparser
 
 # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 import datetime
@@ -407,7 +408,8 @@ from os import listdir, getpid, stat, unlink
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 import os
 from ftplib import FTP
-from urllib2 import urlopen, URLError, HTTPError
+from urllib.request import urlopen
+# from urllib.error import URLError, HTTPError
 import shutil
 import re
 
@@ -569,7 +571,7 @@ def process_new_image( source, target) :
 			'-resize', '30%',
 			thumbnail_file ]
 	try :
-		convert = subprocess.check_output( convert_cmd, stderr=subprocess.STDOUT )
+		convert = subprocess.check_output( convert_cmd, stderr=subprocess.STDOUT ).decode('utf-8')
 	except:
 		logger( "ERROR: Unexpected ERROR in convert: {}".format( sys.exc_info()[0] ) )
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -908,7 +910,7 @@ def check_log_age( ) :
 				]
 
 		try:
-			reply = subprocess.check_output( restart_cmd, stderr=subprocess.STDOUT )
+			reply = subprocess.check_output( restart_cmd, stderr=subprocess.STDOUT ).decode('utf-8')
 			logger( "DEBUG: Result from {}: Returned = {} bytes.".format( restart_cmd, len(reply) ) )
 		except Exception as problem :
 			log_and_message( "ERROR: Unexpected ERROR in {}: {}".format( restart_cmd, sys.exc_info()[0] ) )
@@ -938,7 +940,7 @@ def read_config( config_file ) :
 	global other_systemctl
 
 # 	# https://docs.python.org/2/library/configparser.html
-	config = ConfigParser.RawConfigParser()
+	config = configparser.RawConfigParser()
 	# This was necessary to avoid folding variable names to all lowercase.
 	# https://stackoverflow.com/questions/19359556/configparser-reads-capital-keys-and-make-them-lower-case
 	config.optionxform = str
@@ -1145,7 +1147,7 @@ def midnight_process(date_string) :
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	if not os.path.exists( arc_dir ) :
 		logger( "INFO: Created {}.  HAPPY NEW YEAR.".format( arc_dir) )
-		os.mkdir( arc_dir, 0755 )
+		os.mkdir( arc_dir, 0o755 )
 		os.symlink( "/home/pi/webcamwatcher/rm_older_files.sh", arc_dir + "/rm_older_files.sh" )
 
 	if os.path.isfile( tar_file ) :
@@ -1248,7 +1250,7 @@ def generate_video(date_string, mp4_out) :
 	log_and_message( "DEBUG: Creating mp4 using cmd: " + ffmpeg_cmd )
 	ffmpeg = ""
 	try:
-		ffmpeg = subprocess.check_output(ffmpeg_cmd , shell=True)
+		ffmpeg = subprocess.check_output(ffmpeg_cmd , shell=True).decode('utf-8')
 		ffmpeg_failed = False
 	except Exception as problem :
 		log_and_message( "ERROR: Unexpected ERROR in ffmpeg: {}".format( problem ) )
@@ -1352,7 +1354,7 @@ def tar_dailies(date_string) :
 			tar_file ]
 	try:
 ##		reply = subprocess.check_call(tar_cmd, shell=True)
-		reply = subprocess.check_output( tar_cmd, stderr=subprocess.STDOUT )
+		reply = subprocess.check_output( tar_cmd, stderr=subprocess.STDOUT ).decode('utf-8')
 ##		print reply
 ##		logger( "DEBUG: tar -tzf members = {}".format( len(reply) ) )
 		logger( "DEBUG: tar -tzf {} checked.  Returned = {} bytes.".format( tar_file, len(reply) ) )
@@ -1450,7 +1452,7 @@ def daily_thumbnail( date_string, working_dir ) :
 		logger( "DEBUG: convert cmd = \"{}\"".format( convert_cmd ) )
 
 		try :
-			convert = subprocess.check_output( convert_cmd, stderr=subprocess.STDOUT )
+			convert = subprocess.check_output( convert_cmd, stderr=subprocess.STDOUT ).decode('utf-8')
 		except:
 			logger( "ERROR: Unexpected ERROR in convert: {}".format( sys.exc_info()[0] ) )
 
@@ -1593,12 +1595,18 @@ def store_file_data(ts, filename) :
 def get_stored_ts() :
 	global image_data_file
 #DEBUG#	messager( "DEBUG: read " + image_data_file )
-	FH = open(image_data_file, "r")
-	content = FH.readlines()
-	FH.close
+	try:
+		FH = open(image_data_file, "r")
+		content = FH.readlines()
+		FH.close
 
-	ts = str(content[0].strip("\n"))
-	logger( "DEBUG: Stored ts = " + ts )
+		ts = str(content[0].strip("\n"))
+	except:
+		ts = 0.0
+		filename = "snapshot-2000-01-01-01-01-01.jpg"
+		store_file_data(ts, filename)
+
+	logger( "DEBUG: Stored ts = {}".format( ts ) )
 
 	return ts
 
@@ -1608,12 +1616,19 @@ def get_stored_ts() :
 def get_stored_filename() :
 	global image_data_file
 #DEBUG#	messager( "DEBUG: read " + image_data_file )
-	FH = open(image_data_file, "r")
-	content = FH.readlines()
-	FH.close
 
-	filename = str(content[1].strip("\n"))
-	logger( "DEBUG: Stored filename = " + filename )
+	try:
+		FH = open(image_data_file, "r")
+		content = FH.readlines()
+		FH.close
+
+		filename = str(content[1].strip("\n"))
+	except:
+		ts = 0.0
+		filename = "snapshot-2000-01-01-01-01-01.jpg"
+		store_file_data(ts, filename)
+
+	logger( "DEBUG: Stored filename = {}".format( filename ) )
 
 	return filename
 
@@ -1681,8 +1696,8 @@ def push_to_server_via_scp(local_file, remote_path) :
 	# Before I got the logic right with an "or" below, I saw...
 	#   DEBUG: #0 ""
 	try :
-		output = subprocess.check_output(["scp", "-q", "-P", "21098", local_file, destination], stderr=subprocess.STDOUT )
-	except subprocess.CalledProcessError, e :
+		output = subprocess.check_output(["scp", "-q", "-P", "21098", local_file, destination], stderr=subprocess.STDOUT ).decode('utf-8')
+	except subprocess.CalledProcessError as e :
 		scp_failed = True
 		# lines = []
 		# lines[0] = ""
@@ -1954,7 +1969,7 @@ def read_FTP_config( config_file ) :
 #	------------------------------------------------
 
 # @@@	# https://docs.python.org/2/library/configparser.html
-	config = ConfigParser.RawConfigParser()
+	config = configparser.RawConfigParser()
 	# This was necessary to avoid folding variable names to all lowercase.
 	# https://stackoverflow.com/questions/19359556/configparser-reads-capital-keys-and-make-them-lower-case
 	config.optionxform = str
@@ -2016,7 +2031,7 @@ def logger(message):
 # ----------------------------------------------------------------------------------------
 def messager(message):
 	timestamp = datetime.datetime.now().strftime(strftime_FMT)
-	print "{} {}".format( timestamp, message)
+	print("{} {}".format( timestamp, message))
 
 # ----------------------------------------------------------------------------------------
 # Print and log the message with a leading timestamp.
@@ -2059,7 +2074,7 @@ def mono_version():
 ###	global data
 
 	try :
-		response = subprocess.check_output(["/usr/bin/mono", "-V"])
+		response = subprocess.check_output(["/usr/bin/mono", "-V"]).decode('utf-8')
 		line = re.split('\n', response)
 		tok = re.split(' *', line[0])
 		version = tok[4]
@@ -2086,7 +2101,7 @@ def wait_ffmpeg() :
 	for iii in range(35) :
 #		messager( "DEBUG: iteration {}".format( iii ) )
 		try:
-			response = subprocess.check_output(["/bin/ps", "-ef"])
+			response = subprocess.check_output(["/bin/ps", "-ef"]).decode('utf-8')
 			line = re.split('\n', response)
 		except :
 			logger( "ERROR: Unexpected ERROR in ps -ef: {}".format( sys.exc_info()[0] ) )
@@ -2228,7 +2243,7 @@ def push_to_test(local_file, remote_path) :
 			# Yes, that's a return that's not at the funtion end
 			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 			return
-		except socket.error, e :
+		except socket.error as e :
 			iii += 1
 			log_and_message( "FTP Socket Error %d: %s" % (e.args[0], e.args[1]) )
 			for jjj in range(0, len(e.args) - 1) :
@@ -2323,13 +2338,13 @@ if __name__ == '__main__':
 def do_midnight() :
 	global work_dir, remote_dir
 	if len(sys.argv) < 3 :
-		print "Too few arguments"
-		print "Example:"
-		print "S 2020-01-13"
+		print("Too few arguments")
+		print("Example:")
+		print("S 2020-01-13")
 		### print "S 2020-01-13 ~/S/south.cfg"
 		exit()
 
-	print "{} arguments".format(len(sys.argv)-1)
+	print("{} arguments".format(len(sys.argv)-1))
 
 	### config_file = sys.argv[3]
 	date_string = sys.argv[2]
@@ -2346,7 +2361,7 @@ def do_midnight() :
 		work_dir = "/home/pi/S/South"
 		config_file = "/home/pi/S/south.cfg"
 	else :
-		print "Arg #1 is bad.  Use N or S"
+		print("Arg #1 is bad.  Use N or S")
 		exit()
 
 	read_FTP_config( config_file )
