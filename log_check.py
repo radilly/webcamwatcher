@@ -38,10 +38,8 @@ def log_check():
 	found = 0
 
 	FH = open(infile, "r")
-#	FH = open("rasp_cams.grep", "r")
 	lines = FH.readlines()
 	FH.close
-
 
 	# test_iii = 0
 	log_file_list = []
@@ -56,15 +54,6 @@ def log_check():
 		# test_iii += 1
 		# print test_iii
 		# print log_file_list
-
-
-#########################	for iii in range(0, len(log_file_list)):
-#########################		log_file_list[iii] = log_file_list[iii].rstrip()
-#		print log_file_list[iii]
-#
-#		NOTE: Doesn't work because range is called just once above...
-#		if re.search('^#', log_file_list[iii]) :
-#			log_file_list.pop( iii )
 
 	log_files = len(log_file_list)
 
@@ -89,26 +78,33 @@ def log_check():
 			age_limit = token[1]
 			log_file_list[iii] = token[0]
 #		print "DEBUG: pattern {} \"{}\"".format( iii, log_file_list[iii] )
-		log_mtime = stat( log_file_list[iii] ).st_mtime
+		try :
+			log_mtime = stat( log_file_list[iii] ).st_mtime
+		except :
+			log_mtime = 0
+
 		age = now - log_mtime
 #		print "DEBUG: mtime = {}".format( log_mtime )
 
+		msg = "DEBUG: age = {:8.2f}  max = {:8.2f}  {}".format( age, float(age_limit), log_file_list[iii] )
 		if use_html :
 			print "<TR><TD BGCOLOR=green>"
-			print "<PRE>DEBUG: age = {:8.2f}  max = {:8.2f}  {}</PRE>".format( age, float(age_limit), log_file_list[iii] )
+			print "<PRE>{}</PRE>".format( msg )
 			print "</TD></TR>"
 		else :
-			print "DEBUG: age = {:8.2f}  max = {:8.2f}  {}".format( age, float(age_limit), log_file_list[iii] )
+			print msg
 
 
 		if age > float(age_limit) :
+			msg = "ERROR: log file {} is age = {:8.2f} seconds old (beyond {:8.2f} )".format(
+				log_file_list[iii], age, float(age_limit) )
 
 			if use_html :
 				print "<TR><TD BGCOLOR=red>"
-				print "<PRE>ERROR: log file {} is age = {:8.2f} seconds old (beyond {:8.2f} )</PRE>".format( log_file_list[iii], age, float(age_limit) )
+				print "<PRE>{}</PRE>".format( msg )
 				print "</TD></TR>"
 			else :
-				print "ERROR: log file {} is age = {:8.2f} seconds old (beyond {:8.2f} )".format( log_file_list[iii], age, float(age_limit) )
+				print msg
 
 	if use_html :
 		print "</TABLE>"

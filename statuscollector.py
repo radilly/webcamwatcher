@@ -1,9 +1,9 @@
-#!/usr/bin/python -u
+#!/usr/bin/python3 -u
 # @@@ ... Restart using...
 #
 #   kill -9 `cat ./statuscollector.PID`
 #
-#   nohup /usr/bin/python -u ./statuscollector.py /home/pi/status &
+#   nohup /usr/bin/python3 -u ./statuscollector.py /home/pi/status &
 #
 #   Takes 1 argument - the path to the directory to monitor for new messages.
 #
@@ -83,7 +83,8 @@ import subprocess
 # check_output
 # check_call
 
-import ConfigParser
+# Python 2 to 3
+import configparser
 
 # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 import datetime
@@ -107,7 +108,10 @@ import sys
 import os
 from os import listdir, getpid, stat, unlink
 from ftplib import FTP
-from urllib2 import urlopen, URLError, HTTPError
+# Python 2 to 3
+# from urllib2 import urlopen, URLError, HTTPError
+from urllib.request import urlopen
+from urllib.error import URLError, HTTPError
 import re
 
 ### import shutil
@@ -566,7 +570,7 @@ def push_to_server_via_scp(local_file, remote_path, server) :
 
 	if len(lines) > 1 :
 		for jjj in range( len(lines) ) :
-			print "DEBUG: #{} \"{}\"".format( jjj, lines[jjj] )
+			print( "DEBUG: #{} \"{}\"".format( jjj, lines[jjj] ) )
 	
 	return
 
@@ -706,7 +710,7 @@ def log_string(text):
 # ----------------------------------------------------------------------------------------
 def messager(message):
 	timestamp = datetime.datetime.now().strftime(strftime_FMT)
-	print "{} {}".format( timestamp, message)
+	print( "{} {}".format( timestamp, message) )
 
 # ----------------------------------------------------------------------------------------
 # Print message with a leading timestamp.
@@ -714,7 +718,7 @@ def messager(message):
 # ----------------------------------------------------------------------------------------
 def log_and_message(message):
 	timestamp = datetime.datetime.now().strftime(strftime_FMT)
-	print "{} {}".format( timestamp, message)
+	print( "{} {}".format( timestamp, message) )
 
 	FH = open(logger_file, "a")
 	FH.write( "{} {}\n".format( timestamp, message) )
