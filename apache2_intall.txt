@@ -1,3 +1,45 @@
+========================================================================================
+========================================================================================
+ 1977  sudo apt-get update && sudo apt-get upgrade
+ 1978  sudo apt-get install apache2
+ 1979  ifconfig
+
+ 1984  sudo ls -al /root
+
+ 1988  sudo cp /home/pi/.vimrc /root
+ 1989  sudo vi /etc/apache2/conf-available/serve-cgi-bin.conf
+
+
+This did not work...
+ 1996  sudo ln -s /home/pi/webcamwatcher/pi_health.py  /usr/lib/cgi-bin/
+ 1997  ls -la /usr/lib/cgi-bin/
+
+Ch3eck error log...
+       less /var/log/apache2/error.log
+
+May not be necessary...
+ 1998  sudo reboot
+
+ 2015  sudo a2enmod cgi
+ 2016  sudo systemctl -l restart apache2
+ 
+ 2018  sudo ln -s /home/pi/webcamwatcher/pi_health.py  /usr/lib/cgi-bin/
+Did not work
+ 2019  sudo rm /usr/lib/cgi-bin/pi_health.py 
+ 2020  sudo cp /home/pi/webcamwatcher/pi_health.py  /usr/lib/cgi-bin/
+Worked!!
+
+
+ 2023  systemctl -l status apache2
+ 2024  ls -al /var/log/apache2/
+ 2025  ls -la /usr/lib/cgi-bin/
+
+       curl localhost/cgi-bin/pi_health.py
+
+
+========================================================================================
+========================================================================================
+
     1  passwd
     2  ls -al
     3  ls /etc/ssh
