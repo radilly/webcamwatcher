@@ -1,3 +1,4 @@
 # To be read by log_check.py
-/home/pi/status/statuscollector.log
-/home/pi/wxaux/watchdog.log
+/home/pi/status/statuscollector.log    50.0
+/home/pi/wxaux/watchdog.log            50.0
+/home/pi/webcamwatch.log              500.0
