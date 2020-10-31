@@ -148,3 +148,15 @@ WantedBy=multi-user.target
 #---  #   /dev/mmcblk0p6     67434    21530     45904  32% /boot
 #---  #   tmpfs              94776        0     94776   0% /run/user/1000
 #---  #   /dev/sda1      244196348 38457960 205738388  16% /media/pi/Marie
+
+
+##############################################################################
+# Outline of commands...
+#
+#  sudo cp -p cumulusmx.service /lib/systemd/system
+#  sudo systemctl daemon-reload
+#  sudo systemctl enable cumulusmx
+#  sudo systemctl start cumulusmx
+#  systemctl status cumulusmx
+#  sudo systemctl stop cumulusmx
+##############################################################################
