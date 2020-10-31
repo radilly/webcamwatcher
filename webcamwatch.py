@@ -80,7 +80,7 @@ from urllib2 import urlopen, URLError, HTTPError
 
 import re
 import datetime
-import time
+# --------------------------------------- import time
 import RPi.GPIO as GPIO
 from time import sleep
 import sys
