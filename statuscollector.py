@@ -561,8 +561,21 @@ def push_to_server_via_scp(local_file, remote_path, server) :
 	destination = "dillwjfq@server162.web-hosting.com:" + remote_path
 	destination = "dillwjfq@premium29.web-hosting.com:" + remote_path
 
+	cmd = ["scp", "-q", "-P", "21098", local_file, destination]
+	### DEBUG
+	### DEBUG
+	temp = "DEBUG: in push_to_server_via_scp :: "
+	for iii in cmd :
+		temp = "{} {}".format( temp, iii )
+
+	print( temp )
+	### DEBUG
+	### DEBUG
+
+
 	try :
-		output = subprocess.check_output(["scp", "-q", "-P", "21098", local_file, destination])
+		########## output = subprocess.check_output(["scp", "-q", "-P", "21098", local_file, destination])
+		output = subprocess.check_output( cmd )
 		lines = re.split('\n', output)
 	except :
 		lines = {}

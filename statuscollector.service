@@ -1,0 +1,58 @@
+# Service for starting SOUTH webcam ftp'ed image handler
+#
+# Installed file: /lib/systemd/system/webcam_*****.service
+#
+# Outline: http://www.diegoacuna.me/how-to-run-a-script-as-a-service-in-raspberry-pi-raspbian-jessie/
+# freedesktop.org
+#  https://www.freedesktop.org/wiki/Software/systemd/
+#  https://www.freedesktop.org/software/systemd/man/systemd.service.html
+#  https://www.freedesktop.org/software/systemd/man/systemd.unit.html
+#  https://www.freedesktop.org/software/systemd/man/systemd.syntax.html
+# ----------------------------------------------------------------------------
+[Unit]
+Description=Status Collection and Publishing Service
+After=multi-user.target
+
+
+# ----------------------------------------------------------------------------
+# https://www.freedesktop.org/software/systemd/man/systemd.service.html
+# ----------------------------------------------------------------------------
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/status
+ExecStart=/usr/bin/python3 -u /home/pi/status/statuscollector.py /home/pi/status
+
+Restart=always
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# https://www.freedesktop.org/software/systemd/man/systemd.unit.html#id-1.9
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# https://unix.stackexchange.com/questions/316114/service-start-request-repeated-too-quickly-refusing-to-start
+# https://unix.stackexchange.com/questions/289629/systemd-restart-always-is-not-honored
+#
+RestartSec=60
+# StartLimitIntervalSec=interval, StartLimitBurst=burst
+StartLimitInterval=7000
+StartLimitBurst=100
+#  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# https://serverfault.com/questions/736624/systemd-service-automatic-restart-after-startlimitinterval
+#  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+[Install]
+RequiredBy=multi-user.target
+
+# ----------------------------------------------------------------------------
+# Other references:
+#  http://sandaysoft.com/forum/viewtopic.php?f=27&t=16087
+# ----------------------------------------------------------------------------
+##############################################################################
+# Outline of commands...
+#
+#  sudo cp -p statuscollector.service /lib/systemd/system 
+#  sudo systemctl daemon-reload
+#  sudo systemctl enable statuscollector
+#  sudo systemctl start statuscollector
+#  systemctl status statuscollector
+#  sudo systemctl stop statuscollector
+##############################################################################
