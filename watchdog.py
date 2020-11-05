@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# @@@
+# NOTE: @@@
 #
 # Restart using...
 #   kill -9 `cat /mnt/root/home/pi/watchdog.PID` ; nohup /usr/bin/python -u /mnt/root/home/pi/watchdog.py >> /mnt/root/home/pi/watchdog.log 2>&1 &
@@ -45,6 +45,16 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20201031 RAD Turns out that realtime.txt is not really used for anything on the web
+#              server and there is now an option to avoid uploading it.  I did try
+#              turning that off, but that triggered this message:
+#                      ERROR: in last_realtime: <class 'urllib.error.HTTPError'>
+#              In addition I've been considering writing some Python to handle
+#              updating the web server via scp (password-less). An rsynch of directory
+#              CumulusMX/web/ would be simple. For some reason realtime.txt is not
+#              in that directory. Turns out the same timestamp we consider in
+#              last_realtime as of the same format, although it starts at the third
+#              token.  In multiple places "last_realtime" was renamed to "last_upload".
 # 20201006 RAD Found in several places I had a pair of parens rather the curlies. You can
 #              see that following "Reason:" below. I noticed a cycle in the logging when
 #              there was a problem with the network or host being down. Search on
@@ -263,7 +273,7 @@ WEB_URL = "http://dillys.org/wx"
 WEB_URL = "http://dilly.family/wx"
 
 WS_Updates_URL = 	WEB_URL + "/WS_Updates.txt"
-realtime_URL = 		WEB_URL + "/realtime.txt"
+realtime_URL = 		WEB_URL + "/index.htm"
 
 # NOTE We now have 2 cameras...
 image_age_S_URL = 	WEB_URL + "/South/S_age.txt"
@@ -307,7 +317,7 @@ data_keys = [
 	"ws_data_stopped",
 	"rf_dropped",
 	"camera_down",
-	"last_realtime",
+	"last_upload",
 	"proc_pct",
 	"proc_load",
 	"proc_load_5m",
@@ -393,7 +403,7 @@ CSV_keys = [
 	"server_stalled",
 	"ws_data_stopped",
 	"rf_dropped",
-	"last_realtime",
+	"last_upload",
 	"proc_load",
 	"camera_down",
 	"mono_threads",
@@ -460,7 +470,7 @@ Prob_Track = [
 #
 #
 #  To Do:
-#		last_realtime() return value should be leveraged <<<  OBSOLETE???????????????
+#		last_upload() return value should be leveraged <<<  OBSOLETE???????????????
 # ----------------------------------------------------------------------------------------
 def main():
 	global data
@@ -488,7 +498,7 @@ def main():
 		server_stalled()
 		ws_data_stopped()
 		rf_dropped()
-		last_realtime()
+		last_upload()
 		proc_load()
 		proc_pct()
 		camera_down()
@@ -555,7 +565,6 @@ def proc_pct() :
 
 	lineList[0] = re.sub('\n', '', lineList[0])        # Remove any newline which might be left
 
-# @@@
 	tok = re.split(' +', lineList[0])
 
 	idle = int(tok[4]) + int(tok[5])
@@ -595,7 +604,7 @@ def mono_threads():
 	global data
 
 	PID = str( data['mono_pid'] )
-# @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ ## @@@ #
+# @@@ #
 	if "DOWN" in PID :
 		return -1
 
@@ -941,6 +950,8 @@ def ws_data_stopped():
 	data['ws_data_stopped'] = data_status
 	return data_status
 
+
+
 # ----------------------------------------------------------------------------------------
 # Code on the server records checksum of the past 12 values of realtime.txt (after
 # stripping off the timestamp). WS_Updates.txt is a count of the unique checksums
@@ -960,7 +971,7 @@ def server_stalled():
 	try:
 		response = urlopen( WS_Updates_URL )
 		content = response.read()
-#@@@#
+
 	except ( URLError, Exception ) as err :
 	### >>>> except URLError as err :
 	# At one point got "httplib.BadStatusLine: ''" (unhandled) - See below
@@ -1015,7 +1026,7 @@ def server_stalled():
 #              Return value should be like status, 0 or 1, FALSE or TRUE
 #
 # ----------------------------------------------------------------------------------------
-def last_realtime():
+def last_upload():
 	global data
 	global last_secs
 	global last_date
@@ -1027,14 +1038,15 @@ def last_realtime():
 	# --------------------------------------------------------------------------------
 	try :
 		response = urlopen( realtime_URL )
-# @@@ #
+
 		# NOTE: The decode() methed seemed required for Python 3.  See
 		#       https://stackoverflow.com/questions/31019854/typeerror-cant-use-a-string-pattern-on-a-bytes-like-object-in-re-findall
 		#       https://stackoverflow.com/questions/37722051/re-search-typeerror-cannot-use-a-string-pattern-on-a-bytes-like-object
 		content = response.read().decode('utf-8')
 		content = content.rstrip()
+
 	except ( URLError, Exception ) as err :
-		log_and_message( "ERROR: in last_realtime: {}".format( sys.exc_info()[0] ) )
+		log_and_message( "ERROR: in last_upload: {}".format( sys.exc_info()[0] ) )
 		# ------------------------------------------------------------------------
 		#  See https://docs.python.org/2/tutorial/errors.html (~ middle)
 		# ------------------------------------------------------------------------
@@ -1043,9 +1055,15 @@ def last_realtime():
 		if hasattr(err, 'reason'):
 			log_and_message( 'ERROR: We failed to reach a server.' )
 			log_and_message( 'ERROR: Reason: {}'.format( err.reason ) )
+
 		elif hasattr(err, 'code'):
 			log_and_message( 'ERROR: The server couldn\'t fulfill the request.' )
 			log_and_message( 'ERROR: code: {}'.format( err.code ) )
+
+		else:
+			log_and_message( 'ERROR: Reason: {}'.format( err.reason ) )
+			log_and_message( 'ERROR: code: {}'.format( err.code ) )
+
 		# ------------------------------------------------------------------------
 		#  https://docs.python.org/2/tutorial/errors.html
 		#  https://docs.python.org/2/library/sys.html
@@ -1054,33 +1072,49 @@ def last_realtime():
 		#
 		#  https://stackoverflow.com/questions/8238360/how-to-save-traceback-sys-exc-info-values-in-a-variable
 		# ------------------------------------------------------------------------
-		content = "00/00/00 00:00:00 45.5 80 39.7 0.0 0.7 360 0.00 0.05 30.14 N 0 mph ..."
-		logger( "DEBUG: content = \"" + content + "\" in last_realtime()" )
+		content = "00/00/00 00:00:00 45.5 80 NEEDS TO BE FIXED   0 0.05 30.14 N 0 mph ..."
+		content = "Page updated 00/00/0000 00:00:00<br />"
+		logger( "DEBUG: content = \"" + content + "\" in last_upload()" )
 
-	words = re.split(' +', content)
+
+	#---# logger( "DEBUG: len(content) = {}".format( len(content) ) )
+	lines = re.split( '\n', content )
+	#---# logger( "DEBUG: len(lines) = {}".format( len(lines) ) )
 
 	# --------------------------------------------------------------------------------
-	#  20170815 14:38:55 Zulu
-	#  server_stalled() = 0
-	#  ws_data_stopped = 0
-	#  Traceback (most recent call last):
-  	#  File "./watchdog.py", line 166, in <module>
-    	#  main()
-  	#  File "./watchdog.py", line 156, in main
-    	#  last_realtime()
-  	#  File "./watchdog.py", line 124, in last_realtime
-    	#  timestamp = words[1]
-	#  IndexError: list index out of range
-	#       *** File may not have been completely written
+	# Find the first line with "Page updated" which should be followed by a timestamp.
 	# --------------------------------------------------------------------------------
+	for line in lines :
+		if "Page updated" in line :
+			#---# logger( "DEBUG: = {}".format( line ) )
+			break
+
+	scrubbed_line = re.sub('<.*', '', line)
+	#---# logger( "DEBUG: = {}".format( scrubbed_line ) )
+
+	scrubbed_line = re.sub('.*Page updated *', '', scrubbed_line)
+	#---# logger( "DEBUG: = {}".format( scrubbed_line ) )
+
+	# --------------------------------------------------------------------------------
+	#   NOTE: index.htm has a 4-digit year, where realtime.txt used 2-digit
+	#      WEB_URL + "/realtime.txt"
+	#      03/11/20 20:34:22 47.7 56 32.7 . . . . .
+	#      WEB_URL + "/index.htm"
+	#      03/11/2020 20:16:00   <<=========  Notice the 4 digit year
+	#   The above should be what remains in scrubbed_line
+	# --------------------------------------------------------------------------------
+	words = re.split(' +', scrubbed_line)
+
 	if (len(words)) < 2 :
-		date_str = "00/00/00"
+		date_str = "00/00/0000"
 		timestamp = "00:00:00"
 		seconds = last_secs
 		diff_secs = -1
 	else:
 		date_str = words[0]
-		ddd = re.split('/', date_str)
+		# Not used...
+		# ddd = re.split('/', date_str)
+
 		timestamp = words[1]
 		########## ___print timestamp
 		words = re.split(':', timestamp)
@@ -1088,31 +1122,23 @@ def last_realtime():
 		diff_secs = seconds - last_secs
 
 	# --------------------------------------------------------------------------------
-	#  date-time, server_stalled, ws_data_stopped, rf_dropped, last_realtime, proc_load, 
-	#  2017/09/17 22:11:59 GMT,  0,  0,  0,  -65471,  0.0,  101244,  10%,  0,  0%,
-	#  free|945512|560184|385328|6768|317368|141572|101244|844268|102396|0|102396
-	#  WARNING: 65543 elapsed since realtime.txt was updated.
-	#  2017/09/17 22:12:24 GMT,  0,  0,  0,  65543,  0.0,  101148,  10%,  0,  0%,
-	#  free|945512|560088|385424|6768|317368|141572|101148|844364|102396|0|102396
-	#  
-    	#  Because above, when we get an incomplete file, lacking a timestamp
-    	#  we set the time to "00:00:00" and we get a weird number for
-	#  last_realtime.  The nominal value we expect is 24, or perhaps
-	#  48 - 48 being the transmit interval for the remote sensors.
-	#  
+	#  Mostly we're expecting the age to change by the "Upload interval", that is
+	#  Settings >> Internet Settings >> Web/FTP Settings >> Upload interval
+	#  The expected exception is at day rollover (or startup with sentinal 999999).
+	#  That's the first case below, in which case we report the diff as -1
 	# --------------------------------------------------------------------------------
 	if last_secs == 999999 :
 		stat_text = "ok"
 		status = 0
-		diff_secs = -2
-	elif diff_secs > 200 :
+		diff_secs = -1
+	elif diff_secs > 300 :
 		stat_text = "NOT UPDATED"
 		status = 1
 		logger( "WARNING: " + str(diff_secs) + " elapsed since realtime.txt was updated." )
 	elif diff_secs < -2000 :
 		stat_text = "NOT UPDATED"
 		status = -1
-		logger( "DEBUG: Got large negative value from record:\n\t" + content )
+		logger( "DEBUG: Got large negative value from record:{}\n\t".format( line ) )
 #		for item in content :
 #			___print "    " + item
 		if last_date != date_str :
@@ -1121,7 +1147,8 @@ def last_realtime():
 			#  -----------------------------------------------------
 			logger( "DEBUG: Likely the day rolled over as save date does not match..." )
 			if seconds < 300 :
-				logger( "DEBUG:    ... and seconds = " + str(seconds) )
+				logger( "DEBUG:    ... and seconds (of day) from timestamp = ".format( seconds ) )
+				logger( "DEBUG:    ... and diff_secs = ".format( diff_secs ) )
 			if diff_secs == -86376 :
 				logger( "DEBUG:    ... yep, the date on the Pi rolled over" )
 			last_date = date_str
@@ -1130,9 +1157,9 @@ def last_realtime():
 		status = 0
 
 
-	#########################  ___print "  {}    {}    {}   {}".format(timestamp,seconds,diff_secs,status)
+	#########################  print( "DEBUG: . . . .  {}    {}    {}   {}".format(timestamp,seconds,diff_secs,status) )
 	last_secs = seconds
-	data['last_realtime'] = diff_secs
+	data['last_upload'] = diff_secs
 	return diff_secs       # For now we track this number. Later should return status.
 
 
@@ -1153,7 +1180,6 @@ def proc_load():
 	global data
 	load = subprocess.check_output('/usr/bin/uptime')
 	load = load.decode('utf-8')
-	# @@@ #
 	uptime = re.sub('.*up *', '', load)
 	uptime = re.sub(',.*', '', uptime)
 
@@ -1778,7 +1804,6 @@ def cmx_svc_runtime():
 	lines = [ "   Active: active (running) since DOWN; DOWN", " Main PID: DOWN (mono)" ]
 
 	try :
-		#@@@# output = subprocess.check_output(["/bin/systemctl", "status", "cumulusmx"])
 		output = subprocess.check_output(["/bin/systemctl", "status", "cumulusmx"], text=True)
 		lines = re.split('\n', output)
 		#@@@# print( "@@@" )
