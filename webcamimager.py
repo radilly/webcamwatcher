@@ -2144,11 +2144,72 @@ def camera_down():
 
 	age = "0"
 
-	try:
+	# --------------------------------------------------------------------------------
+	# --------------------------------------------------------------------------------
+	# --------------------------------------------------------------------------------
+	# --------------------------------------------------------------------------------
+	# --------------------------------------------------------------------------------
+	try :
+#>>>		response = urlopen( realtime_URL )
+		response = urlopen( image_age_URL )
+
+		# NOTE: The decode() methed seemed required for Python 3.  See
+		#       https://stackoverflow.com/questions/31019854/typeerror-cant-use-a-string-pattern-on-a-bytes-like-object-in-re-findall
+		#       https://stackoverflow.com/questions/37722051/re-search-typeerror-cannot-use-a-string-pattern-on-a-bytes-like-object
+		content = response.read().decode('utf-8')
+# NOTE: I think unneeded
+#>>>		content = content.rstrip()
+
+	except ( URLError, Exception ) as err :
+		log_and_message( "ERROR: in camera_down: {}".format( sys.exc_info()[0] ) )
+		# ------------------------------------------------------------------------
+		#  See https://docs.python.org/2/tutorial/errors.html (~ middle)
+		# ------------------------------------------------------------------------
+		log_and_message( "ERROR: type: {}".format( type(err) ) )
+		log_and_message( "ERROR: args: {}".format( err.args ) )
+		if hasattr(err, 'reason'):
+			log_and_message( 'ERROR: We failed to reach a server.' )
+			log_and_message( 'ERROR: Reason: {}'.format( err.reason ) )
+
+		elif hasattr(err, 'code'):
+			log_and_message( 'ERROR: The server couldn\'t fulfill the request.' )
+			log_and_message( 'ERROR: code: {}'.format( err.code ) )
+
+		else:
+			log_and_message( 'ERROR: Reason: {}'.format( err.reason ) )
+			log_and_message( 'ERROR: code: {}'.format( err.code ) )
+
+		# ------------------------------------------------------------------------
+		#  https://docs.python.org/2/tutorial/errors.html
+		#  https://docs.python.org/2/library/sys.html
+		#  https://docs.python.org/3/library/traceback.html
+		#  https://docs.python.org/2/library/traceback.html
+		#
+		#  https://stackoverflow.com/questions/8238360/how-to-save-traceback-sys-exc-info-values-in-a-variable
+		# ------------------------------------------------------------------------
+		content = "-1\n-1"
+		logger( "DEBUG: content = \"" + content + "\" in camera_down()" )
+
+######	logger( "DEBUG: content = \"" + content + "\" in camera_down()" )
+
+	#---# logger( "DEBUG: len(content) = {}".format( len(content) ) )
+	lines = re.split( '\n', content )
+	#---# logger( "DEBUG: len(lines) = {}".format( len(lines) ) )
+
+	age = int( lines[0] )
+	seconds = int( lines[1] )
+
+	# --------------------------------------------------------------------------------
+	# --------------------------------------------------------------------------------
+	# --------------------------------------------------------------------------------
+	# --------------------------------------------------------------------------------
+	# --------------------------------------------------------------------------------
+	# --------------------------------------------------------------------------------
+#>>	try:
 
 #DEBUG#		logger("DEBUG: reading: \"{}\"".format( image_age_URL ) )
-		response = urlopen( image_age_URL )
-		age = response.read()
+#>>		response = urlopen( image_age_URL )
+#>>		age = response.read()
 #DEBUG#		logger("DEBUG: image age read from web: \"{}\"".format( age ) )
 		# ------------------------------------------------------------------
 		# The file contains at least a trailing newline ... I've not looked
@@ -2157,18 +2218,18 @@ def camera_down():
 		# systemd seems to complain about urlopen failing in restart...
 		#     Maybe content = "0 0 00:00:00_UTC" if urlopen fails??
 		# ------------------------------------------------------------------
-	except:
+#>>	except:
 #		age = "0"
-		logger("WARNING: Could not access {}.  Assume image age: {}".format( image_age_URL, age ) )
+#>>		logger("WARNING: Could not access {}.  Assume image age: {}".format( image_age_URL, age ) )
 
 	# --------------------------------------------------------------------------------
 	# Avoid ... "ValueError: invalid literal for int() with base 10: ''"
 	# --------------------------------------------------------------------------------
-	if len( age ) < 1 :
+#>>	if len( age ) < 1 :
 #		age = "0"
-		logger("WARNING: Zero-length value from {}.  Assume image age: {}".format( image_age_URL, age ) )
+#>>		logger("WARNING: Zero-length value from {}.  Assume image age: {}".format( image_age_URL, age ) )
 
-	age = int( age.rstrip() )
+#>>	age = int( age.rstrip() )
 #	##DEBUG## ___print words[0], words[2]
 #
 #	# Periodically put a record into the log for reference.
