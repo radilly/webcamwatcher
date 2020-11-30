@@ -1,8 +1,186 @@
 
 
+=========================================================================================
+Setting up a Pi Zero replacement for the pond box...
+Sat Nov 28 11:03:52 EST 2020
+-----------------------------------------------------------------------------------------
+Modifications to Raspberry Pi Imager created SD card using raspberrypi_03
+
+# Specific steps marked thusly
+#>>> ... description ...
+
+ls -al /dev/sd*
+lsblk
+sudo mount /dev/sda1 /mnt/pi/boot
+sudo mount /dev/sda2 /mnt/pi/root
+
+sudo touch /mnt/pi/boot/ssh
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+# This should work for our network
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Before copying over ...
+pi@raspb_01_Cams:~ $ sudo diff /etc/wpa_supplicant/wpa_supplicant.conf /mnt/pi/root/etc/wpa_supplicant/wpa_supplicant.conf
+3,8d2
+< country=US
+<
+< network={
+<         ssid="Manasquan"
+<         psk=d5f141e9b8f948a7cd37a452d38baaaac014e3582b2d78331296e2b18d2d716d
+< }
+ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+sudo cp -p /etc/wpa_supplicant/wpa_supplicant.conf /mnt/pi/root/etc/wpa_supplicant/
+
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#>>> Change the hostname
+#   https://www.raspberrypi-spy.co.uk/2012/11/how-to-rename-your-raspberry-pi/
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+ls -al /mnt/pi/root/etc/host*
+sudo sed -i'.BAK' 's/raspberrypi/raspberrypi_03/' /mnt/pi/root/etc/host*[es]
+ls -al /mnt/pi/root/etc/host*
+cat -n /mnt/pi/root/etc/hosts
+cat -n /mnt/pi/root/etc/hostname
+
+ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+#>>> After updating
+pi@raspb_01_Cams:~ $ cat /mnt/pi/root/etc/hostname
+raspberrypi_03
+
+pi@raspb_01_Cams:~ $ cat /mnt/pi/root/etc/hosts
+127.0.0.1       localhost
+::1             localhost ip6-localhost ip6-loopback
+ff02::1         ip6-allnodes
+ff02::2         ip6-allrouters
+
+127.0.1.1       raspberrypi_03
+ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#>>> These may be helpful
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+cp -p ~/.bash_aliases ~/.vimrc /mnt/pi/root/home/pi/
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#>>> Needed only for the pond box Pi
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+cp -p ~/*grep /mnt/pi/root/home/pi/
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#>>> Set up .ssh directory and copy in authorized_keys
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+mkdir /mnt/pi/root/home/pi/.ssh
+chmod 700 /mnt/pi/root/home/pi/.ssh
+cp -p ~/.ssh/authorized_keys /mnt/pi/root/home/pi/.ssh
+ls -al /mnt/pi/root/home/pi/.ssh
+
+
+
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#>>> Make a backup image of the device
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+sudo dd if=/dev/sda of=~/SDCardBackup.img
+
+
+=================================== After First Boot  ===================================
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#>>> Change the password for user pi or you'll see this on the console:
+#
+#     SSH is enabled and the default password for the 'pi' user has not been changed.
+#     This is a security risk - please login as the 'pi' user and type 'passwd' to set a new password.
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+ $ passwd
+ $ sudo find /etc /usr -mmin -5 -ls
+    16001      4 drwxr-xr-x  79 root     root         4096 Nov 29 20:19 /etc
+    23772      4 -rw-r-----   1 root     shadow        912 Nov 29 20:19 /etc/shadow
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#>>> Set up timezone
+#   dpkg-reconfigure has a curses interface ... "GUI"
+#   https://peppe8o.com/change-timezone-in-raspberry-pi-os-lite-from-terminal/
+#   https://delightlylinux.wordpress.com/2016/10/24/reconfigure-timezone-from-the-command-line/
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+cat /mnt/pi/root/etc/timezone
+ls -al /mnt/pi/root/etc/localtime
+ls -al /mnt/pi/root/usr/share/zoneinfo/America/New_York
+sudo dpkg-reconfigure tzdata
+cat /mnt/pi/root/etc/timezone
+ls -al /mnt/pi/root/etc/localtime
+
+ $ sudo dpkg-reconfigure tzdata
+
+ Current default time zone: 'US/Eastern'
+ Local time is now:      Sun Nov 29 15:21:20 EST 2020.
+ Universal Time is now:  Sun Nov 29 20:21:20 UTC 2020.
+
+ $ sudo find /etc /usr -mmin -5 -ls
+    16001      4 drwxr-xr-x  79 root     root         4096 Nov 29 15:21 /etc
+     1063      4 -rw-r--r--   1 root     root           11 Nov 29 15:21 /etc/timezone
+    23772      4 -rw-r-----   1 root     shadow        912 Nov 29 15:19 /etc/shadow
+    23266      0 lrwxrwxrwx   1 root     root           30 Nov 29 15:21 /etc/localtime -> /usr/share/zoneinfo/US/Eastern
+      895      4 -rw-r--r--   1 root     root           20 Nov 29 15:17 /etc/fake-hwclock.data
+
+
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#>>> For pass-word-less-login, run ssh-keygen
+#
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+Run ssh-keygen if necessary - - - accept the default (no passphrase)
+	>>> Set the hostname first do the public key will be labeled.
+	>>>>>> "pi@rasp95" in the example below...
+
+
+ $ ssh-keygen
+Generating public/private rsa key pair.
+Enter file in which to save the key (/home/pi/.ssh/id_rsa):
+Created directory '/home/pi/.ssh'.
+Enter passphrase (empty for no passphrase):
+Enter same passphrase again:
+Your identification has been saved in /home/pi/.ssh/id_rsa.
+Your public key has been saved in /home/pi/.ssh/id_rsa.pub.
+The key fingerprint is:
+SHA256:55DgchL5OIDa2P3VDyI8Ctl0QCIQVcPA9AogehC59Aw pi@rasp95
+The key's randomart image is:
++---[RSA 2048]----+
+|XB===            |
+|=E.o.+           |
+|=.* = o          |
+|o* X B . o       |
+|o * B B S +      |
+|   . B + = o     |
+|    . .   . .    |
+|                 |
+|                 |
++----[SHA256]-----+
+
+
+
+:~/.ssh $ vi authorized_keys
+	### Copy in id_rsa.pub from other systems you wish to log in from.
+:~/.ssh $ chmod 600 authorized_keys
+:~/.ssh $ ls -l
+total 16
+-rw------- 1 pi pi 1206 Dec 29 21:42 authorized_keys
+-rw------- 1 pi pi 1811 Dec 29 21:37 id_rsa
+-rw-r--r-- 1 pi pi  391 Dec 29 21:37 id_rsa.pub
+-rw-r--r-- 1 pi pi  222 Dec 29 21:42 known_hosts
+
+$ cat id_rsa.pub | tr "ABCDQTPKYNEFRUI" "_"
+ssh-rsa _____3_za_1yc2_________________hyrG0p6Jy_4_S6_g_v___x5nx1_gy40mnnd_j_zgxx_bgJ___29MZ6y_W+79r_aHzWOJWu_dGxkM_HW_S_6l__ZwxJi3_u0+__8rqXr_h/aZ+c2_bXcjV_1y_3k_q7edJteh_dsl_fS_z_quf_e__a_h88en9tncn_tisc4/5_le/_t_0/_cb_xW_+6_Oc1V___9_hs4Gt__7jm9MchVx_2_zXm39oaV_W+j_ul4rWW+0w_nr4p8dHa7/4npg_84u__H3_Sepv39ZOcO+_o80JJm_wL3_1bsrHh_/_h_lMr__cqby_hppi9u/Lw_hwkO2+Xz__Jq+hHL_p88eeZ2j pi@rasp95
+
+
+
+
+=========================================================================================
+=========================================================================================
 Setting up pi-005-zero-b
 Sun 27 Sep 16:31:27 EDT 2020
------------------------------------------------------------------------------------------
+=========================================================================================
 
 sudo raspi-config
 - Set password

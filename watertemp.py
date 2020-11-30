@@ -75,6 +75,7 @@ maxT = -999.0
 minT = +999.0
 rangeT = -1.0
 scaleT = -1.0
+columnWidth = 525
 
 
 # ----------------------------------------------------------------------------------------
@@ -111,7 +112,9 @@ def main():
 		maxT = max( maxT, temp )
 		minT = min( minT, temp )
 	rangeT = maxT - minT
-	scaleT = 500 / rangeT
+	scaleT = int( columnWidth * 0.95 / rangeT )
+
+	timestamp = datetime.datetime.now().strftime(strftime_FMT)
 
         print "Content-type: text/html\n\n\n\n"
         print "<META HTTP-EQUIV=\"refresh\" CONTENT=\"300\">"
@@ -127,7 +130,7 @@ def main():
 	print "<link rel = \"icon\" type = \"image/png\" href = \"/WX_Blue_Green_32x32.png\">"
 	print "</HEAD>"
 	print "<H1 Align=left> Pond Water Temp </H1>"
-	print "<BR> &nbsp; &nbsp; &nbsp; <I>- page automatically reloads -</I>"
+	print "<BR> &nbsp; &nbsp; &nbsp; <I>- page automatically reloads : last run {} -</I>".format( timestamp )
 	print "<BR> Min Temp = {:5.2f}&deg;".format( minT )
 	print "<BR> Max Temp = {:5.2f}&deg;".format( maxT )
 	print "<BR> records checked = {}".format( -1 * limit )
@@ -184,22 +187,25 @@ def table_line( text_in ) :
 
 	# --------------------------------------------------------------------------------
 	# NOTE: code %23 maps to '#' sign
+	#    https://www.w3schools.com/tags/ref_urlencode.ASP
+	#    https://www.geeksforgeeks.org/html-td-width-attribute/ for cell width
 	# --------------------------------------------------------------------------------
+
 	barWidth = int( 1 + (temp - minT) * scaleT )
 	if temp < 40.0 :
 ###		print "<!-- DEBUG: temp < 40.0 -->"
 		bgcolor = " BGCOLOR=\"#FF5555\""
-		img = "<TD WIDTH=525 BGCOLOR=#000000><IMG SRC=\"/1_pixel_%23FF5555.jpg\" HEIGHT=8 WIDTH={}>".format( barWidth )
+		img = "<TD WIDTH={} BGCOLOR=#000000><IMG SRC=\"/1_pixel_%23FF5555.jpg\" HEIGHT=8 WIDTH={}>".format( columnWidth, barWidth )
 ###		print "<!-- DEBUG: bgcolor = \"{}\" -->".format( bgcolor )
 	elif temp < 50.0 :
 ###		print "<!-- DEBUG: temp < 50.0 -->"
 		bgcolor = " BGCOLOR=\"yellow\""
-		img = "<TD WIDTH=525 BGCOLOR=#000000><IMG SRC=\"/1_pixel_Yellow.jpg\" HEIGHT=8 WIDTH={}>".format( barWidth )
+		img = "<TD WIDTH={} BGCOLOR=#000000><IMG SRC=\"/1_pixel_Yellow.jpg\" HEIGHT=8 WIDTH={}>".format( columnWidth, barWidth )
 ###		print "<!-- DEBUG: bgcolor = \"{}\" -->".format( bgcolor )
 	else :
 ###		print "<!-- DEBUG: else clause -->"
 		bgcolor = " BGCOLOR=\"#00F900\""
-		img = "<TD WIDTH=525 BGCOLOR=#000000><IMG SRC=\"/1_pixel_%2300F900.jpg\" HEIGHT=8 WIDTH={}>".format( barWidth )
+		img = "<TD WIDTH={} BGCOLOR=#000000><IMG SRC=\"/1_pixel_%2300F900.jpg\" HEIGHT=8 WIDTH={}>".format( columnWidth, barWidth )
 ###		print "<!-- DEBUG: bgcolor = \"{}\" -->".format( bgcolor )
 
 ###	print "<!-- DEBUG: bgcolor = {} -->".format( bgcolor )
