@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# NOTE: @@@
+# NOTE: @@@  @@@@@@
 #
 # Restart using...
 #   kill -9 `cat /mnt/root/home/pi/watchdog.PID` ; nohup /usr/bin/python -u /mnt/root/home/pi/watchdog.py >> /mnt/root/home/pi/watchdog.log 2>&1 &
@@ -1735,30 +1735,77 @@ def camera_down():
 	age = ""
 	is_down = 1
 
-	try:
+	# --------------------------------------------------------------------------------
+	# --------------------------------------------------------------------------------
+	# --------------------------------------------------------------------------------
+# -----------------------------------------  @@@@@@  --------------------------------------------
+	# --------------------------------------------------------------------------------
+	# --------------------------------------------------------------------------------
+	try :
+#>>>		response = urlopen( realtime_URL )
 		response = urlopen( image_age_URL )
-		age = response.read()
-		age = age.rstrip()
+
+		# NOTE: The decode() methed seemed required for Python 3.  See
+		#       https://stackoverflow.com/questions/31019854/typeerror-cant-use-a-string-pattern-on-a-bytes-like-object-in-re-findall
+		#       https://stackoverflow.com/questions/37722051/re-search-typeerror-cannot-use-a-string-pattern-on-a-bytes-like-object
+		content = response.read().decode('utf-8')
+# NOTE: I think unneeded
+#>>>		content = content.rstrip()
+
 	except ( URLError, Exception ) as err :
-	### >>>> except URLError as err :
 		log_and_message( "ERROR: in camera_down: {}".format( sys.exc_info()[0] ) )
+		# ------------------------------------------------------------------------
+		#  See https://docs.python.org/2/tutorial/errors.html (~ middle)
+		# ------------------------------------------------------------------------
+		log_and_message( "ERROR: type: {}".format( type(err) ) )
+		log_and_message( "ERROR: args: {}".format( err.args ) )
 		if hasattr(err, 'reason'):
 			log_and_message( 'ERROR: We failed to reach a server.' )
 			log_and_message( 'ERROR: Reason: {}'.format( err.reason ) )
+
 		elif hasattr(err, 'code'):
 			log_and_message( 'ERROR: The server couldn\'t fulfill the request.' )
 			log_and_message( 'ERROR: code: {}'.format( err.code ) )
-		age = "0"
-		logger("WARNING: Read URL failed.  Assumed image age: {}".format( age ) )
+
+		else:
+			log_and_message( 'ERROR: Reason: {}'.format( err.reason ) )
+			log_and_message( 'ERROR: code: {}'.format( err.code ) )
+
+		# ------------------------------------------------------------------------
+		#  https://docs.python.org/2/tutorial/errors.html
+		#  https://docs.python.org/2/library/sys.html
+		#  https://docs.python.org/3/library/traceback.html
+		#  https://docs.python.org/2/library/traceback.html
+		#
+		#  https://stackoverflow.com/questions/8238360/how-to-save-traceback-sys-exc-info-values-in-a-variable
+		# ------------------------------------------------------------------------
+		content = "-1\n-1"
+		logger( "DEBUG: content = \"" + content + "\" in camera_down()" )
+
+#>>>	logger( "DEBUG: content = \"" + content + "\" in camera_down()" )
+
+	#---# logger( "DEBUG: len(content) = {}".format( len(content) ) )
+	lines = re.split( '\n', content )
+	#---# logger( "DEBUG: len(lines) = {}".format( len(lines) ) )
+
+	age = int( lines[0] )
+	age_secs = int( lines[1] )
+
+	# --------------------------------------------------------------------------------
+	# --------------------------------------------------------------------------------
+	# --------------------------------------------------------------------------------
+	# --------------------------------------------------------------------------------
+	# --------------------------------------------------------------------------------
+	# --------------------------------------------------------------------------------
 
 
 	# --------------------------------------------------------------------------------
 	# Keep as string up until this point, because of...
 	#      TypeError: object of type 'int' has no len()
 	# --------------------------------------------------------------------------------
-	if len( age ) < 1 :
-		age = "0"
-		logger("WARNING: Read null.  Assumed image age: {}".format( age ) )
+#>>>	if len( age ) < 1 :
+#>>>		age = "0"
+#>>>		logger("WARNING: Read null.  Assumed image age: {}".format( age ) )
 
 	# --------------------------------------------------------------------------------
 	#
