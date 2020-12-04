@@ -21,7 +21,7 @@ import datetime
 from time import sleep
 import time
 import sys
-from os import listdir, getpid, stat, unlink
+from os import getpid, stat
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 #  In this code I use os.path.isfile() in a few places.  Actually os.path.exists() might
 #  be a better choice for the way I use it, however may be affected by permissions. I was
@@ -38,11 +38,14 @@ from os import listdir, getpid, stat, unlink
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 import os
 from ftplib import FTP
+# https://docs.python.org/3.2/library/urllib.request.html
+# https://docs.python.org/3.2/library/urllib.error.html
 from urllib.request import urlopen
-# from urllib.error import URLError, HTTPError
+from urllib.error import URLError, HTTPError
 import re
 
 mon_log = ""
+log_HOST = "pi@127.0.0.1"
 mon_max_age = 300
 
 relay_GPIO = -1
@@ -69,7 +72,7 @@ ftp_server = ""
 
 current_filename = ""
 
-sleep_for = 8
+sleep_for = 15
 
 # strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
 # Could not get %Z to work. "empty string if the the object is naive" ... which now() is...
@@ -87,6 +90,7 @@ cfg_parameters = [
 	"relay2_GPIO",
 	"relay_HOST",
 	"mon_log",
+	"log_HOST",
 	"mon_max_age",
 	"other_systemctl",
 	]
@@ -132,6 +136,7 @@ def main():
 	log_and_message( "INFO: relay_GPIO = \"{}\"".format( relay_GPIO ) )
 	log_and_message( "INFO: relay2_GPIO = \"{}\"".format( relay2_GPIO ) )
 	log_and_message( "INFO: mon_log = \"{}\"".format( mon_log ) )
+	log_and_message( "INFO: log_HOST = \"{}\"".format( log_HOST ) )
 	log_and_message( "INFO: mon_max_age = \"{}\"".format( mon_max_age ) )
 	log_and_message( "INFO: other_systemctl = \"{}\"".format( other_systemctl ) )
 	log_and_message( "." )
@@ -148,8 +153,7 @@ def main():
 
 		age = camera_down()
 		if old > -1 and old != age :
-			log_and_message( "DEBUG: image age changed" )
-		log_and_message( "DEBUG: image age = {}".format( age ) )
+			log_and_message( "DEBUG: image: age changed!!!" )
 		old = age
 		sleep(sleep_for)
 
@@ -174,6 +178,7 @@ def main():
 # ----------------------------------------------------------------------------------------
 def check_log_age( ) :
 	global mon_log, mon_max_age
+	global log_HOST
 
 
 # @@@ here
@@ -268,9 +273,9 @@ def camera_down():
 		#  https://stackoverflow.com/questions/8238360/how-to-save-traceback-sys-exc-info-values-in-a-variable
 		# ------------------------------------------------------------------------
 		content = "-1\n-1"
-		logger( "DEBUG: content = \"" + content + "\" in camera_down()" )
+		#DEBUG# logger( "DEBUG: content = \"" + content + "\" in camera_down()" )
 
-	logger( "DEBUG: content = \"" + content + "\" in camera_down()" )
+	#DEBUG# logger( "DEBUG: content = \"" + content + "\" in camera_down()" )
 
 	#---# logger( "DEBUG: len(content) = {}".format( len(content) ) )
 	lines = re.split( '\n', content )
@@ -283,7 +288,8 @@ def camera_down():
 	# --------------------------------------------------------------------------------
 	# --------------------------------------------------------------------------------
 
-	ssh_cmd = ["ssh", "pi@127.0.0.1", "/bin/date", "+%s", "-r", "/home/pi/N/webcamimager.log"]
+#	ssh_cmd = ["ssh", "pi@127.0.0.1", "/bin/date", "+%s", "-r", "/home/pi/N/webcamimager.log"]
+	ssh_cmd = ["ssh", log_HOST, "/bin/date", "+%s", "-r", mon_log]
 
 #	logger( "DEBUG: subprocess.check_output([\"scp\", \"-q\", \"-P\", \"21098\", {}, {}])".format( local_file, destination ) )
 
@@ -312,21 +318,23 @@ def camera_down():
 
 
 	log_mtime = int( output )
-	log_and_message( "DEBUG: log_mtime = {} - - - {}".format( log_mtime, now_secs - log_mtime ) )
+	log_and_message( "DEBUG:   log: log_mtime = {}  []===>  {}".format( log_mtime, now_secs - log_mtime ) )
 
 	lines = re.split('\n', output)
 
-
-
-
 	calculated = now_secs - age_secs
 
-	logger( "DEBUG: Server image age = {}".format(age) )
+	log_and_message( "DEBUG: image: server age = {}   epoch secs = {}   age calculated = {}".format( age, age_secs, calculated ) )
 	# return "{} / {}  calc: {}".format( age, age_secs, calculated )
 	return age_secs
 
 
 
+	# ================================================================================
+	# ================================================================================
+	# ================================================================================
+	# ================================================================================
+	# ================================================================================
 	# ================================================================================
 	#
 	# ================================================================================
