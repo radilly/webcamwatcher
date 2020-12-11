@@ -85,6 +85,7 @@ sudo dd if=/dev/sda of=~/SDCardBackup.img
 
 
 =================================== After First Boot  ===================================
+Note the IP address if needed - or ifconfig
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 #>>> Change the password for user pi or you'll see this on the console:
@@ -97,6 +98,23 @@ sudo dd if=/dev/sda of=~/SDCardBackup.img
  $ sudo find /etc /usr -mmin -5 -ls
     16001      4 drwxr-xr-x  79 root     root         4096 Nov 29 20:19 /etc
     23772      4 -rw-r-----   1 root     shadow        912 Nov 29 20:19 /etc/shadow
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#>>> Set up Localisation
+#
+# For command line ....  https://gist.github.com/adoyle/71803222aff301da9662
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#  >>>>>>>>>> NOT TRIED YET <<<<<<<<<<
+# Set locale to en_US.UTF-8
+cp /etc/locale.gen /etc/locale.gen.dist
+sed -i -e "/^[^#]/s/^/#/" -e "/en_US.UTF-8/s/^#//" /etc/locale.gen
+
+cp /var/cache/debconf/config.dat /var/cache/debconf/config.dat.dist
+sed -i -e "/^Value: en_GB.UTF-8/s/en_GB/en_US/" \
+       -e "/^ locales = en_GB.UTF-8/s/en_GB/en_US/" /var/cache/debconf/config.dat
+locale-gen
+update-locale LANG=en_US.UTF-8
+#  >>>>>>>>>> NOT TRIED YET <<<<<<<<<<
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 #>>> Set up timezone
@@ -123,18 +141,43 @@ ls -al /mnt/pi/root/etc/localtime
     23772      4 -rw-r-----   1 root     shadow        912 Nov 29 15:19 /etc/shadow
     23266      0 lrwxrwxrwx   1 root     root           30 Nov 29 15:21 /etc/localtime -> /usr/share/zoneinfo/US/Eastern
       895      4 -rw-r--r--   1 root     root           20 Nov 29 15:17 /etc/fake-hwclock.data
+ $ cat /etc/timezone
+      US/Eastern
 
 
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-#>>> For pass-word-less-login, run ssh-keygen
+#>>> If not logged in C:\Users\Bob\Documents\Computer\raspberry_pi\__NOTES.txt
+# Run this command:
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+cat /proc/cpuinfo | sed -n '/Hardware/,$p'
+
+
+
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#
+#>>> Start working on packages, but do an update / upgrade first
 #
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-Run ssh-keygen if necessary - - - accept the default (no passphrase)
-	>>> Set the hostname first do the public key will be labeled.
-	>>>>>> "pi@rasp95" in the example below...
+sudo apt-get update && sudo apt-get upgrade && sudo apt-get dist-upgrade
 
 
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+# This is not strictly needed if you only need to login to this system remotely
+# although if you intend to interact with github you'll need ~/ssh/id_rsa.pub.
+# Copying in ~/.ssh/authorized_keys previously may set up remote access for you.
+#
+#>>> For password-less-login, run ssh-keygen - also needed for git
+#
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+# Run ssh-keygen if necessary - - - accept the default (no passphrase)
+#	>>> Set the hostname first so the public key will be labeled.
+#	>>>>>> "pi@rasp95" in the example below...
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
  $ ssh-keygen
 Generating public/private rsa key pair.
 Enter file in which to save the key (/home/pi/.ssh/id_rsa):
@@ -159,7 +202,6 @@ The key's randomart image is:
 +----[SHA256]-----+
 
 
-
 :~/.ssh $ vi authorized_keys
 	### Copy in id_rsa.pub from other systems you wish to log in from.
 :~/.ssh $ chmod 600 authorized_keys
@@ -172,6 +214,10 @@ total 16
 
 $ cat id_rsa.pub | tr "ABCDQTPKYNEFRUI" "_"
 ssh-rsa _____3_za_1yc2_________________hyrG0p6Jy_4_S6_g_v___x5nx1_gy40mnnd_j_zgxx_bgJ___29MZ6y_W+79r_aHzWOJWu_dGxkM_HW_S_6l__ZwxJi3_u0+__8rqXr_h/aZ+c2_bXcjV_1y_3k_q7edJteh_dsl_fS_z_quf_e__a_h88en9tncn_tisc4/5_le/_t_0/_cb_xW_+6_Oc1V___9_hs4Gt__7jm9MchVx_2_zXm39oaV_W+j_ul4rWW+0w_nr4p8dHa7/4npg_84u__H3_Sepv39ZOcO+_o80JJm_wL3_1bsrHh_/_h_lMr__cqby_hppi9u/Lw_hwkO2+Xz__Jq+hHL_p88eeZ2j pi@rasp95
+ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+
 
 
 
@@ -201,16 +247,26 @@ sudo apt-get install vim
 #             set hlsearch" > ~/.vimrc
 #        OR      printf "syntax enable\nset hlsearch\n" > ~/.vimrc
 
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#>>> Install and configure git
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 sudo apt-get install git
 
 -----------------------------------------------------------------------------------------
+cd ~
 git clone https://github.com/radilly/webcamwatcher
+git clone https://github.com/radilly/cmxaux
 
-cd webcamwatcher
+cd ~/webcamwatcher
 
 git remote set-url origin git@github.com:radilly/webcamwatcher.git
 git config --global user.name "Bob Dilly"
 git config --global user.email "GitHub@radilly.org"
+
+cd ~/cmxaux
+git remote set-url origin git@github.com:radilly/cmxaux.git
+
 
 Add ssh key to https://github.com/settings/keys
 	Run ssh-keygen if necessary
