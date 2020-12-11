@@ -87,6 +87,9 @@ ls -al /mnt/pi/root/home/pi/.ssh
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 #>>> Make a backup image of the device
+#
+# Consider whether you want to disable the partition resize
+#
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 sudo dd if=/dev/sda of=~/SDCardBackup.img
 
