@@ -154,6 +154,18 @@ cat /proc/cpuinfo | sed -n '/Hardware/,$p'
 
 
 
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+# I can work around it, but I really like have the full VIM installed.
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+sudo apt-get install vim
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+# Found I needed this for python3
+#   May want to look at https://gpiozero.readthedocs.io/en/stable/
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+sudo apt-get install python3-dev python3-rpi.gpio
+###   sudo apt install python3-gpiozero
+
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 #
