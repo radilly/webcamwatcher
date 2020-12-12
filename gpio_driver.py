@@ -2,6 +2,17 @@
 #
 # Script to operate an output pin on a Raspberry Pi
 #
+# If needed (Raspberry OS Lite versions), install rpi.gpio (for python3)
+#  https://www.raspberrypi-spy.co.uk/2012/05/install-rpi-gpio-python-library/
+#
+#
+#
+#
+#  https://www.caretech.io/2018/01/20/using-the-rpi-gpio-module-with-python-3/
+#
+#      sudo apt install python3-rpi.gpio
+#
+#
 #
 # ========================================================================================
 # 20201204 RAD Gutted unused code from this, which was hacked from light_timer.py.
