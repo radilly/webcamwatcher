@@ -93,6 +93,9 @@ ls -al /mnt/pi/root/home/pi/.ssh
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 #>>> Make a backup image of the device
+#
+# Consider whether you want to disable the partition resize
+#
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 sudo dd if=/dev/sda of=~/SDCardBackup.img
 
@@ -430,6 +433,46 @@ hardware_lookup = [
 
 
 
+
+-----------------------------------------------------------------------------------------
+
+
+-----------------------------------------------------------------------------------------
+Working with USB-connected harddrive..
+
+   64  df
+   65  lsblk
+   66  ls /dev/sd*
+Had to unplug and replug
+   67  lsblk
+   68  dmesg
+   69  ls /dev/sd*
+   70  lsblk
+   71  sudo blkid
+   72  ls /mnt
+   73  ls /mnt/tmp
+   74  ls /mnt/tmp/root/
+   75  sudo mount /dev/sda2 /mnt/tmp/root
+   76  ls /mnt/tmp/root/
+   77  ls -al /mnt/tmp/root/
+   78  df -h
+
+   79  rsync / /mnt/tmp/root
+   80  sudo rsync / /mnt/tmp/root
+This failed with a message about .
+
+
+   81  cat /sys/firmware/devicetree/base/model
+   89  cat /etc/os-release
+
+   98  sudo blkid
+
+   99  echo "907af7d0-02"
+  100  ls -al /mnt/tmp/boot/cmd*
+  101  sudo cp -p /mnt/tmp/boot/cmdline.txt /mnt/tmp/boot/cmdline.txt.MODS
+  102  vi /mnt/tmp/boot/cmdline.txt 
+  103  sudo vi /mnt/tmp/boot/cmdline.txt 
+  104  sed 's/907af7d0-02/907af7d0-02/' /mnt/tmp/boot/cmdline.txt.MODS 
 
 -----------------------------------------------------------------------------------------
 
