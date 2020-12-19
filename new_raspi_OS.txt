@@ -13,6 +13,9 @@ lsblk
 sudo mount /dev/sda1 /mnt/pi/boot
 sudo mount /dev/sda2 /mnt/pi/root
 
+NOTE: >>> If you want to edit the mount point, in vi ... :/pi\/.oot
+NOTE: >>> Most of the work is in the ROOT filesystem
+
 sudo touch /mnt/pi/boot/ssh
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -32,7 +35,7 @@ pi@raspb_01_Cams:~ $ sudo diff /etc/wpa_supplicant/wpa_supplicant.conf /mnt/pi/r
 < }
  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 sudo cp -p /etc/wpa_supplicant/wpa_supplicant.conf /mnt/pi/root/etc/wpa_supplicant/
-# NOTE: You might still have to force this.  raspi-config probably handles it.
+# NOTE: You might still have to force this after boot.  raspi-config probably handles it.
 sudo rfkill list all
 ifconfig
 sudo rfkill unblock 0
@@ -85,14 +88,21 @@ ls -al /mnt/pi/root/home/pi/.ssh
 
 
 
+
+
+
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 #>>> Make a backup image of the device
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 sudo dd if=/dev/sda of=~/SDCardBackup.img
 
 
+=========================================================================================
 =================================== After First Boot  ===================================
-Note the IP address if needed - or ifconfig
+=================================== After First Boot  ===================================
+=================================== After First Boot  ===================================
+=========================================================================================
+Note the IP address on console if needed - or use ifconfig
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 #>>> Change the password for user pi or you'll see this on the console:
@@ -113,14 +123,25 @@ Note the IP address if needed - or ifconfig
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 #  >>>>>>>>>> NOT TRIED YET <<<<<<<<<<
 # Set locale to en_US.UTF-8
-cp /etc/locale.gen /etc/locale.gen.dist
-sed -i -e "/^[^#]/s/^/#/" -e "/en_US.UTF-8/s/^#//" /etc/locale.gen
+sudo cp /etc/locale.gen /etc/locale.gen.dist
+sudo sed -i'.BAK' -e "/^[^#]/s/^/#/" -e "/en_US.UTF-8/s/^#//" /etc/locale.gen
 
-cp /var/cache/debconf/config.dat /var/cache/debconf/config.dat.dist
-sed -i -e "/^Value: en_GB.UTF-8/s/en_GB/en_US/" \
+sudo cp /var/cache/debconf/config.dat /var/cache/debconf/config.dat.dist
+sudo sed -i'.BAK' -e "/^Value: en_GB.UTF-8/s/en_GB/en_US/" \
        -e "/^ locales = en_GB.UTF-8/s/en_GB/en_US/" /var/cache/debconf/config.dat
-locale-gen
-update-locale LANG=en_US.UTF-8
+sudo locale-gen
+	Generating locales (this might take a while)...
+	   en_US.UTF-8... done
+	Generation complete.
+sudo update-locale LANG=en_US.UTF-8
+	perl: warning: Setting locale failed.
+	perl: warning: Please check that your locale settings:
+        	LANGUAGE = (unset),
+        	LC_ALL = (unset),
+        	LANG = "en_GB.UTF-8"
+    	are supported and installed on your system.
+	perl: warning: Falling back to the standard locale ("C").
+
 #  >>>>>>>>>> NOT TRIED YET <<<<<<<<<<
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -129,9 +150,13 @@ update-locale LANG=en_US.UTF-8
 #   https://peppe8o.com/change-timezone-in-raspberry-pi-os-lite-from-terminal/
 #   https://delightlylinux.wordpress.com/2016/10/24/reconfigure-timezone-from-the-command-line/
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+!!!! >>>>  Some of this looks like before the first boot...
+    -------------------------------------------------------
 cat /mnt/pi/root/etc/timezone
 ls -al /mnt/pi/root/etc/localtime
 ls -al /mnt/pi/root/usr/share/zoneinfo/America/New_York
+
+ls -al /usr/share/zoneinfo/US/Eastern
 sudo dpkg-reconfigure tzdata
 cat /mnt/pi/root/etc/timezone
 ls -al /mnt/pi/root/etc/localtime
@@ -243,8 +268,13 @@ ssh-rsa _____3_za_1yc2_________________hyrG0p6Jy_4_S6_g_v___x5nx1_gy40mnnd_j_zgx
 =========================================================================================
 =========================================================================================
 =========================================================================================
-# Setting up USB hard drive
+#>>> Setting up USB hard drive
  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Mounting a storage device | Setting up automatic mounting
+#   https://www.raspberrypi.org/documentation/configuration/external-storage.md
+# Cheat Sheet - USB drives
+#   https://www.raspberrypi.org/forums/viewtopic.php?t=38429
+
  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # https://raspberrypi.stackexchange.com/questions/75027/whats-the-difference-between-uuid-and-partuuid
 # https://askubuntu.com/questions/1026746/how-do-i-use-a-partuuid-in-fstab
@@ -319,8 +349,8 @@ alias
 
 
 
------------------------------------------------------------------------------------------
-Notes on booting from a hard drive...
+=========================================================================================
+#>>> Notes on booting from a hard drive...
 
 OTP Bit (on hardware)
 https://www.raspberrypi.org/forums/search.php?keywords=set+the+OTP+bit&sid=20afe7743b768f7d66e8982ab750edbf
@@ -340,7 +370,8 @@ https://www.raspberrypi.org/documentation/hardware/raspberrypi/bootmodes/bootflo
 https://www.makeuseof.com/tag/extend-life-raspberry-pis-sd-card/
 
 
------------------------------------------------------------------------------------------
+=========================================================================================
+#>>> Hardware Details
 https://www.raspberrypi.org/documentation/hardware/raspberrypi/revision-codes/README.md
 
 cat /proc/cpuinfo | tail -3
