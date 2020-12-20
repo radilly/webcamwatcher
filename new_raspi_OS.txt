@@ -277,6 +277,35 @@ ssh-rsa _____3_za_1yc2_________________hyrG0p6Jy_4_S6_g_v___x5nx1_gy40mnnd_j_zgx
 #   https://www.raspberrypi.org/documentation/configuration/external-storage.md
 # Cheat Sheet - USB drives
 #   https://www.raspberrypi.org/forums/viewtopic.php?t=38429
+#
+#	sudo blkid
+#		/dev/mmcblk0p1: LABEL="boot" UUID="3725-1C05" TYPE="vfat" PARTUU...
+#		/dev/mmcblk0p2: LABEL="rootfs" UUID="fd695ef5-f047-44bd-b159-2a7...
+#		/dev/sda1: LABEL="Crucial 250" UUID="2E37-7CA3" TYPE="exfat" PAR...
+#	ls -al /etc/fs*
+#	sudo cp -p /etc/fstab /etc/fstab.BAK
+#	sudo vi /etc/fstab
+#		UUID=2E37-7CA3        /mnt/ssd        exfat   defaults,auto,users,rw,nofail 0 0
+#	ls -al /etc/fs*
+ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# ALTERNATE EXAMPLE
+#
+#  $ sudo blkid
+#    /dev/mmcblk0p1: LABEL="boot" UUID="3725-1C05" TYPE="vfat" PARTUUID="5767e863-01"
+#    /dev/mmcblk0p2: LABEL="rootfs" UUID="fd695ef5-f047-44bd-b159-2a78c53af20a" TYPE="ext4" PARTUUID="5767e863-02"
+#    /dev/sda1: UUID="c8f773c4-6bd2-42ca-9a58-1b5e24f9dc55" TYPE="ext4" PARTUUID="936348fe-01"
+#    /dev/mmcblk0: PTUUID="5767e863" PTTYPE="dos"
+#
+#
+#    UUID=c8f773c4-6bd2-42ca-9a58-1b5e24f9dc55 /mnt/ssd ext4 defaults,auto,users,rw,nofail 0 0
+#
+#
+#
+ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+
+
 
  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # https://raspberrypi.stackexchange.com/questions/75027/whats-the-difference-between-uuid-and-partuuid
