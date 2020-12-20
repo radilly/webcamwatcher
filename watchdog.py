@@ -4,11 +4,13 @@
 # Restart using...
 #   kill -9 `cat /mnt/root/home/pi/watchdog.PID` ; nohup /usr/bin/python -u /mnt/root/home/pi/watchdog.py >> /mnt/root/home/pi/watchdog.log 2>&1 &
 #
-# Stop with ... 
+# Stop with ...
 #   kill -9 `cat watchdog.PID`
 #
 # Start with ...
 #   nohup /usr/bin/python -u /mnt/root/home/pi/watchdog.py >> /mnt/root/home/pi/watchdog.log 2>&1 &
+#
+#   NOTE: check_file_ages needs to be finished.
 #
 #   NOTE: It would be interesting to see if we could log any "significant"
 #         change to a parameter being tracked.  mono_threads comes to mind.
@@ -45,6 +47,9 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20201220 Added check_file_ages after disabling CMX realtime file generation since it
+#          isn't required for the site. Not surrently called. Started prepping to move
+#          the working dir back to an SSD.
 # 20201031 RAD Turns out that realtime.txt is not really used for anything on the web
 #              server and there is now an option to avoid uploading it.  I did try
 #              turning that off, but that triggered this message:
@@ -62,7 +67,7 @@
 #              that would be reasonable to put in a routine, but once we've discovered
 #              a 'Temporary failure in name resolution', perhaps we should just take a
 #              break rather than hammering away.  Add to the wish list...
-#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #     2020/10/05 02:06:35 2020/10/05 02:06:35, 0, 0, 0,  30,    0.06, 0,    23, 109584, 11%,      0,  0%, 41.3c, 106.4f,  51.3f,   3.3%,    1.2815, X, ,
 #
 #     2020/10/05 02:06:59 ERROR: in server_stalled: <class 'urllib.error.URLError'>
@@ -84,7 +89,7 @@
 #     2020/10/05 02:06:59 2020/10/05 02:06:59, 1, 0, 0, -7593,    0.04, 0,    23, 109092, 11%,      0,  0%, 40.8c, 105.4f,  51.3f,   2.2%,    1.2818, X, <<<<<,
 #
 #     2020/10/05 02:07:23 ERROR: in server_stalled: <class 'urllib.error.URLError'>
-#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
 
@@ -98,7 +103,7 @@
 # 20190529 RAD In server_stalled() initialized content = "1" to avoid the following.
 #              Frankly not super-well tought out at 10:30 PM, but I wanted to take
 #              a quick stab at a fix rather tha ignote it.
-#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #		Traceback (most recent call last):
 #		  File "/mnt/root/home/pi/watchdog.py", line 1970, in <module>
 #		    main()
@@ -107,12 +112,12 @@
 #		  File "/mnt/root/home/pi/watchdog.py", line 936, in server_stalled
 #		    content = content.rstrip()
 #		UnboundLocalError: local variable 'content' referenced before assignment
-#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # 20181229 RAD Got the following (untrapped) error:
-#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #                Traceback (most recent call last):
 #                  File "/mnt/root/home/pi/watchdog.py", line 1924, in <module>
-#      
+#
 #                  File "/mnt/root/home/pi/watchdog.py", line 393, in main
 #                    camera_down()
 #                  File "/mnt/root/home/pi/watchdog.py", line 1711, in camera_down
@@ -129,7 +134,7 @@
 #                  File "/usr/lib/python2.7/socket.py", line 476, in readline
 #                    data = self._sock.recv(self._rbufsize)
 #                socket.error: [Errno 110] Connection timed out
-#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #              Changed several occurances of "except URLError as err :" to
 #              "except ( URLError, Exception ) as err :".
 # 20181116 RAD WU_Cancels added to count when CMX cancels the WU update. When
@@ -256,24 +261,26 @@ ws_data_last_secs = 0       # Number of epoch secs at outage start
 ws_data_last_count = 0
 saved_contact_lost = -1     # Number of epoch secs when RF contact lost
 
-BASE_DIR =              "/mnt/root/home/pi/Cumulus_MX"
-BASE_DIR =              "/home/pi/CumulusMX"
-data_stop_file =        BASE_DIR + "/web/DataStoppedT.txttmp"
-ambient_temp_file =     BASE_DIR + "/web/ambient_tempT.txttmp"
-status_page =           BASE_DIR + "/web/status.html"
-events_page =           BASE_DIR + "/web/event_status.html"
-mxdiags_dir =           BASE_DIR + "/MXdiags"
-status_dir =            "/mnt/root/home/pi/status"
-status_dir =            "/home/pi/status"
+BASE_DIR =              "/mnt/wx"  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+BASE_DIR =              "/home/pi"  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+data_stop_file =        BASE_DIR + "/CumulusMX/web/DataStoppedT.txttmp"
+ambient_temp_file =     BASE_DIR + "/CumulusMX/web/ambient_tempT.txttmp"
+status_page =           BASE_DIR + "/CumulusMX/web/status.html"
+events_page =           BASE_DIR + "/CumulusMX/web/event_status.html"
+mxdiags_dir =           BASE_DIR + "/CumulusMX/MXdiags"
+
+
+status_dir =            BASE_DIR + "/status"
 
 logger_file = sys.argv[0]
 logger_file = re.sub('\.py', '.log', logger_file)
 
-WEB_URL = "http://dillys.org/wx"
 WEB_URL = "http://dilly.family/wx"
 
 WS_Updates_URL = 	WEB_URL + "/WS_Updates.txt"
 realtime_URL = 		WEB_URL + "/index.htm"
+fileages_URL = 		WEB_URL + "/fileages.txt"
 
 # NOTE We now have 2 cameras...
 image_age_S_URL = 	WEB_URL + "/South/S_age.txt"
@@ -480,8 +487,11 @@ def main():
 	python_version = re.sub(' *\n *', '<BR>', python_version )
 	python_version = re.sub(' *\(', '<BR>(', python_version )
 
-	logger("INFO: Python version: " + str(sys.version))
+	logger("INFO: Python version: ".format(sys.version) )
 	data['python_version'] = python_version
+
+	logger("DEBUG: BASE_DIR = \"{}\"".format( BASE_DIR ) )
+	logger("DEBUG: status_dir = \"{}\"".format( status_dir ) )
 
 	iii = 0
 	while True:
@@ -538,6 +548,176 @@ def main():
 
 
 
+# ----------------------------------------------------------------------------------------
+#
+#   NOTE:   Hacked from last_upload()
+#   NOTE:   Hacked from last_upload()
+#   NOTE:   Hacked from last_upload()
+#   NOTE:   Hacked from last_upload()
+#   NOTE:   Hacked from last_upload()
+#   NOTE:   Hacked from last_upload()
+#   NOTE:   Hacked from last_upload()
+#   NOTE:   Hacked from last_upload()
+#   NOTE:   Hacked from last_upload()
+#   NOTE:   Hacked from last_upload()
+#   NOTE:   Hacked from last_upload()
+#
+# Detemines if the expected files from Cumulus MX are getting uploaded tothe server.
+# Detemines if the expected files from Cumulus MX are getting uploaded tothe server.
+# Detemines if the expected files from Cumulus MX are getting uploaded tothe server.
+#
+# Reads fileages_URL (https://dilly.family/wx/fileages.txt) which is generated by
+# wx_worker.sh on the web server which gives the ages of some files of interest.
+# These files are listed in public_html/wx/files2mon.txt.
+#
+#
+#
+#
+# @@@  @@@@@@
+# ----------------------------------------------------------------------------------------
+def check_file_ages():
+	global data
+	global last_secs
+	global last_date
+	# --------------------------------------------------------------------------------
+	#  09/10/17 12:02:47 73.0 92 70.6 3.1 4.5 270 ...
+	#  09/10/17 12:03:11 73.0 92 70.6 3.1 4.5 270 ...
+	#  Search for "20181015" to see an odd error I've gotten several times...
+	#         BadStatusLine
+	# --------------------------------------------------------------------------------
+	try :
+		response = urlopen( fileages_URL )
+
+		# NOTE: The decode() methed seemed required for Python 3.  See
+		#       https://stackoverflow.com/questions/31019854/typeerror-cant-use-a-string-pattern-on-a-bytes-like-object-in-re-findall
+		#       https://stackoverflow.com/questions/37722051/re-search-typeerror-cannot-use-a-string-pattern-on-a-bytes-like-object
+		content = response.read().decode('utf-8')
+		content = content.rstrip()
+
+	except ( URLError, Exception ) as err :
+		log_and_message( "ERROR: in last_upload: {}".format( sys.exc_info()[0] ) )
+		# ------------------------------------------------------------------------
+		#  See https://docs.python.org/2/tutorial/errors.html (~ middle)
+		# ------------------------------------------------------------------------
+		log_and_message( "ERROR: type: {}".format( type(err) ) )
+		log_and_message( "ERROR: args: {}".format( err.args ) )
+		if hasattr(err, 'reason'):
+			log_and_message( 'ERROR: We failed to reach a server.' )
+			log_and_message( 'ERROR: Reason: {}'.format( err.reason ) )
+
+		elif hasattr(err, 'code'):
+			log_and_message( 'ERROR: The server couldn\'t fulfill the request.' )
+			log_and_message( 'ERROR: code: {}'.format( err.code ) )
+
+		else:
+			log_and_message( 'ERROR: Reason: {}'.format( err.reason ) )
+			log_and_message( 'ERROR: code: {}'.format( err.code ) )
+
+		# ------------------------------------------------------------------------
+		#  https://docs.python.org/2/tutorial/errors.html
+		#  https://docs.python.org/2/library/sys.html
+		#  https://docs.python.org/3/library/traceback.html
+		#  https://docs.python.org/2/library/traceback.html
+		#
+		#  https://stackoverflow.com/questions/8238360/how-to-save-traceback-sys-exc-info-values-in-a-variable
+		# ------------------------------------------------------------------------
+		content = [ "0 foo", "1 bar", "2 slam", "3 dunk" ]
+		content = "0 foo\n1 bar\n2 slam\n3 dunk"
+		logger( "DEBUG: content = \"{}\" in last_upload()".format( content ) )
+
+
+	#---# logger( "DEBUG: len(content) = {}".format( len(content) ) )
+	lines = re.split( '\n', content )
+	#---# logger( "DEBUG: len(lines) = {}".format( len(lines) ) )
+
+	# --------------------------------------------------------------------------------
+	# Find the first line with "Page updated" which should be followed by a timestamp.
+	# --------------------------------------------------------------------------------
+	for line in lines :
+		logger( "DEBUG: line = \"{}\"".format( line ) )
+
+
+		if "Page updated" in line :
+			#---# logger( "DEBUG: = {}".format( line ) )
+			break
+
+	scrubbed_line = re.sub('<.*', '', line)
+	#---# logger( "DEBUG: = {}".format( scrubbed_line ) )
+
+	scrubbed_line = re.sub('.*Page updated *', '', scrubbed_line)
+	#---# logger( "DEBUG: = {}".format( scrubbed_line ) )
+
+	# --------------------------------------------------------------------------------
+	#   NOTE: index.htm has a 4-digit year, where realtime.txt used 2-digit
+	#      WEB_URL + "/realtime.txt"
+	#      03/11/20 20:34:22 47.7 56 32.7 . . . . .
+	#      WEB_URL + "/index.htm"
+	#      03/11/2020 20:16:00   <<=========  Notice the 4 digit year
+	#   The above should be what remains in scrubbed_line
+	# --------------------------------------------------------------------------------
+	words = re.split(' +', scrubbed_line)
+
+	if (len(words)) < 2 :
+		date_str = "00/00/0000"
+		timestamp = "00:00:00"
+		seconds = last_secs
+		diff_secs = -1
+	else:
+		date_str = words[0]
+		# Not used...
+		# ddd = re.split('/', date_str)
+
+		timestamp = words[1]
+		########## ___print timestamp
+		words = re.split(':', timestamp)
+		seconds = int(words[2]) + 60 * ( int(words[1]) + ( 60 * int(words[0]) ) )
+		diff_secs = seconds - last_secs
+
+	# --------------------------------------------------------------------------------
+	#  Mostly we're expecting the age to change by the "Upload interval", that is
+	#  Settings >> Internet Settings >> Web/FTP Settings >> Upload interval
+	#  The expected exception is at day rollover (or startup with sentinal 999999).
+	#  That's the first case below, in which case we report the diff as -1
+	# --------------------------------------------------------------------------------
+	if last_secs == 999999 :
+		stat_text = "ok"
+		status = 0
+		diff_secs = -1
+	elif diff_secs > 300 :
+		stat_text = "NOT UPDATED"
+		status = 1
+		logger( "WARNING: " + str(diff_secs) + " elapsed since realtime.txt was updated." )
+	elif diff_secs < -2000 :
+		stat_text = "NOT UPDATED"
+		status = -1
+		logger( "DEBUG: Got large negative value from record:{}\n\t".format( line ) )
+#		for item in content :
+#			___print "    " + item
+		if last_date != date_str :
+			#  -----------------------------------------------------
+			#  Timestamp in realtime.txt is in "local" time.
+			#  -----------------------------------------------------
+			logger( "DEBUG: Likely the day rolled over as save date does not match..." )
+			if seconds < 300 :
+				logger( "DEBUG:    ... and seconds (of day) from timestamp = ".format( seconds ) )
+				logger( "DEBUG:    ... and diff_secs = ".format( diff_secs ) )
+			if diff_secs == -86376 :
+				logger( "DEBUG:    ... yep, the date on the Pi rolled over" )
+			last_date = date_str
+	else:
+		stat_text = "ok"
+		status = 0
+
+
+	#########################  print( "DEBUG: . . . .  {}    {}    {}   {}".format(timestamp,seconds,diff_secs,status) )
+	last_secs = seconds
+	data['last_upload'] = diff_secs
+	return diff_secs       # For now we track this number. Later should return status.
+
+
+
+
+
 
 
 # ----------------------------------------------------------------------------------------
@@ -577,7 +757,7 @@ def proc_pct() :
 		pct_util = float(busy * 100) / float(idle + busy)
 
 	else :
-		delta_busy = busy - proc_stat_busy 
+		delta_busy = busy - proc_stat_busy
 		delta_idle = idle - proc_stat_idle
 		timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 		pct_util = float(delta_busy * 100) / float(delta_idle + delta_busy)
@@ -597,7 +777,7 @@ def proc_pct() :
 
 # ----------------------------------------------------------------------------------------
 # Count the mono threads running
-# 
+#
 #  NOTE: 15 is s good number, but this seems to grow after a few weeks...
 # ----------------------------------------------------------------------------------------
 def mono_threads():
@@ -915,7 +1095,7 @@ def ws_data_stopped():
 			logger( "WARNING:  CumulusMX reports data_stopped (<#DataStopped> == 1).   (code 101)" )
 			log_event("", "CumulusMX reports data_stopped (<#DataStopped> == 1).", 101 )
 		else:
-			elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  ws_data_last_secs 
+			elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  ws_data_last_secs
 			if elapsed > 400 :
 				logger( "WARNING:   systemctl restart cumulusmx.   (code 999)" )
 				log_event("", "systemctl restart cumulusmx.", 999 )
@@ -1034,7 +1214,7 @@ def last_upload():
 	#  09/10/17 12:02:47 73.0 92 70.6 3.1 4.5 270 ...
 	#  09/10/17 12:03:11 73.0 92 70.6 3.1 4.5 270 ...
 	#  Search for "20181015" to see an odd error I've gotten several times...
-	#         BadStatusLine 
+	#         BadStatusLine
 	# --------------------------------------------------------------------------------
 	try :
 		response = urlopen( realtime_URL )
@@ -1287,7 +1467,7 @@ def mem_usage():
 	data['swap_pct'] = swap_pct
 
 
-	data['effective_used'] = effective_used 
+	data['effective_used'] = effective_used
 
 	mem_pct = 100 * effective_used / mem_total
 	mem_pct = int( 100 * effective_used / mem_total )
@@ -1306,10 +1486,10 @@ def mem_usage():
 
 
 # ----------------------------------------------------------------------------------------
-# 
+#
 # NOTE: This is sort of a hack.  WU has been behaving badly so I'm not tracking it...
-# 
-# 
+#
+#
 # ----------------------------------------------------------------------------------------
 def WX_RF_Restored(cur_line, lineList):
 	global saved_contact_lost
@@ -1354,7 +1534,7 @@ def WX_RF_Restored(cur_line, lineList):
 #   2017-09-15 20:26:45.616 Sensor contact lost; ignoring outdoor data
 #   2017-09-15 20:26:55.616 Sensor contact lost; ignoring outdoor data
 #   2017-09-15 20:27:00.666 WU Response: OK: success
-#   
+#
 # ----------------------------------------------------------------------------------------
 def rf_dropped() :
 	global saved_exception_tstamp
@@ -1397,7 +1577,7 @@ def rf_dropped() :
 		# ------------------------------------------------------------------------
 		# We may print the same exception multiple times.  It could be identified
 		# by the timestamp...
-		# 
+		#
 		#     2017-09-22 22:24:00.485
 		#     -----------------------
 		# ------------------------------------------------------------------------
@@ -1432,7 +1612,7 @@ def rf_dropped() :
 				if "WU update:    at System.Net.WebConnection.HandleError(WebExceptionStatus" in lineList[iii] :
 #WU# This whole if block is never executed if saved_exception_tstamp never changes
 #WU#					logger_code =110
-#WU#					saved_exception_tstamp = exception_tstamp 
+#WU#					saved_exception_tstamp = exception_tstamp
 #@@@#					pass
 					pass
 				else :
@@ -1471,10 +1651,10 @@ def rf_dropped() :
 		#   2017-09-15 20:26:45.616 Sensor contact lost; ignoring outdoor data
 		#   2017-09-15 20:26:55.616 Sensor contact lost; ignoring outdoor data
 		#   2017-09-15 20:27:00.666 WU Response: OK: success
-		#   
+		#
 		#   2017-09-15 20:28:00.677 WU Response: OK: success
-		#   
-		# See example block below. It is possible to see the good message in 
+		#
+		# See example block below. It is possible to see the good message in
 		# the middle of a period of disconnect because CumulusMX continues to
 		# report to Weather Underground. (Only the indoor data is valid.)
 		# ------------------------------------------------------------------------
@@ -1491,7 +1671,7 @@ def rf_dropped() :
 					"Press \"V\" button on WS console   (code 115)" )
 				log_event("", "Sensor RF contact lost; ignoring outdoor data.", 115 )
 			else:
-				elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  saved_contact_lost 
+				elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  saved_contact_lost
 				# Shorter message while this status continues
 				logger( "WARNING:  Sensor RF contact lost; ... " + str(elapsed) + " sec" )
 
@@ -1537,7 +1717,7 @@ def rf_dropped() :
 		# 77267	
 		# 77268	2018-11-15 13:33:40.825 WU update: The Task was canceled
 		# 2018/11/15 13:33:45 WARNING:   "The Task was canceled"  from  /mnt/root/home/pi/Cumulus_MX/MXdiags/20181028-223154.txt
-		# 
+		#
 		#   * * * * *  almost 700 of this in MXdiags  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 		#
 		# 79363	2018-11-16 12:30:02.904 WeatherCloud Response: OK: 200
@@ -1642,7 +1822,7 @@ def rf_dropped() :
 				# See the block below with starts:
 				# --------------------------------------------------------
 				if saved_contact_lost > 2 :
-					elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  saved_contact_lost 
+					elapsed = int( datetime.datetime.utcnow().strftime("%s") ) -  saved_contact_lost
 					log_event("", "Sensor RF contact RESTORED; receiving telemetry again. " + str(elapsed) + " sec", 116 )
 					logger( "INFO:  Sensor RF contact RESTORED; ... lost for " + str(elapsed) + " sec   (code 116)" )
 				saved_contact_lost = -1
@@ -1665,7 +1845,7 @@ def rf_dropped() :
 	#   Not sure what to do with "None", or where exactly this comes from.
 	#   Added return_value to make sure there is a value returned.
 	#   Increased the number of records checked too.
-	#   
+	#
 	#  2017/09/20 12:50:21 GMT,  0,  0,  None,  24,  0.16,  0,  122740,  12%,  0,  0%,
 	#  free|945512|664316|281196|6764|392848|148728|122740|822772|102396|0|102396
 	#  2017/09/20 12:50:46 GMT,  0,  0,  None,  24,  0.1,  0,  122608,  12%,  0,  0%,
@@ -1695,10 +1875,10 @@ def rf_dropped() :
 	#  2018-02-26 05:55:00.513 Latest reading: 75B0: 18 36 B6 00 FF FF FF 6D 26 FF FF FF 80 45 0E C0
 	#  2018-02-26 06:00:00.539 Latest reading: 75B0: 1D 36 B7 00 FF FF FF 6D 26 FF FF FF 80 45 0E C0
 	#                                                            ^^^^^^^^
-	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 	#  2018-02-26 05:51:00.979 WU Response: OK: success
-	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-	# 
+	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+	#
 	# Maybe we can't conclude the RF has restarted unless we see a minimum
 	# of two "WU Response: OK: success" records in a row.  Or, if we do see
 	# such a record, the one before cannot be "Sensor contact lost." But there
@@ -1706,7 +1886,7 @@ def rf_dropped() :
 	# record, we still might have dropped RF.  Its also possible a
 	# "WeatherCloud Response" record could be in there depending on the
 	# response time from the server.
-	# 
+	#
 	# --------------------------------------------------------------------------------
 
 
@@ -1734,6 +1914,7 @@ def camera_down():
 	global pcyc_holdoff_time
 	age = ""
 	is_down = 1
+
 
 	# --------------------------------------------------------------------------------
 	# --------------------------------------------------------------------------------
@@ -1866,7 +2047,7 @@ def cmx_svc_runtime():
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	#   Active: activating (auto-restart) (Result: signal) since Tue 2018-12-25 09:04:04 EST; 4s ago
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	#   
+	#
 	#   $ sudo systemctl status cumulusmx
 	#   ● cumulusmx.service - CumulusMX service
 	#      Loaded: loaded (/etc/systemd/system/cumulusmx.service; enabled; vendor preset: enabled)
@@ -1924,10 +2105,10 @@ def cmx_svc_runtime():
 
 
 # ----------------------------------------------------------------------------------------
-# Return status of wxwatchdog service 
+# Return status of wxwatchdog service
 #
 # ----------------------------------------------------------------------------------------
-#   $ systemctl status wxwatchdog 
+#   $ systemctl status wxwatchdog
 #     Active: active (running) since Thu 2017-10-19 17:34:34 EDT; 2 weeks 3 days ago
 #     Active: inactive (dead) (Result: exit-code) since Tue 2018-01-16 12:54:10 EST; 8h ago
 # ----------------------------------------------------------------------------------------
@@ -1973,7 +2154,7 @@ def webcamwatch_down():
 #
 # Returns an HTML string generated from ambient_tempT.txt which contains:
 #    <#intemp> <#tempunit>
-# or     
+# or
 #    <#intemp> <#tempunitnodeg>
 #
 # ----------------------------------------------------------------------------------------
