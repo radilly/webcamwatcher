@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -u
-# @@@ ... 
+# @@@ ...
 #    NOTE:
 #    NOTE:
 #    NOTE:
@@ -30,8 +30,8 @@
 #    NOTE:
 #    NOTE:
 #    NOTE:
-# 
-# This script is started by 2 services - for for north- and south-facing cameras: 
+#
+# This script is started by 2 services - for for north- and south-facing cameras:
 #	webcam_north.service
 #	webcam_south.service
 #
@@ -187,6 +187,10 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20201220 RAD Rewrote check_stable_size(). Either scp_dest has to be configure or
+#              ftp_login does,  If ftp_login is "" SCP is used instead of FTP.
+#              If mon_log is empty, log monitoring is bypassed. Similarly, if relay_GPIO
+#              is a negative value, power-cycling is disabled.
 #
 # 20200207 RAD Looks like the video generation process takes on the order of 1 minute.
 #              We could drive it from a date change on the snapshot being processed.
@@ -415,9 +419,11 @@ import re
 
 import socket
 import calendar
+import traceback
 
 mon_log = ""
 mon_max_age = 300
+same_count_min = 5
 
 
 relay_GPIO = -1
@@ -441,6 +447,8 @@ logger_file = re.sub('\.py', '.log', this_script)
 
 # Real mtime will always be larger
 last_image_dir_mtime = 0.0
+
+USE_SCP = True
 
 ftp_login = ""
 ftp_password = ""
@@ -503,12 +511,15 @@ def main():
 
 	read_FTP_config( config_file )
 
-	log_and_message( "INFO: ftp_server = \"{}\"".format(ftp_server) )
-	log_and_message( "INFO: ftp_login = \"{}\"".format(ftp_login) )
-	log_and_message( "INFO: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  ftp_password = \"{}\"".format(ftp_password) )
+	log_and_message( "INFO: USE_SCP = \"{}\"".format(USE_SCP) )
+	if not USE_SCP :
+		log_and_message( "INFO: ftp_login = \"{}\"".format(ftp_login) )
+		log_and_message( "INFO: ftp_server = \"{}\"".format(ftp_server) )
+		log_and_message( "INFO: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  ftp_password = \"{}\"".format(ftp_password) )
 
 	read_config( config_file )
 
+	log_and_message( "INFO: scp_dest = \"{}\"".format(scp_dest) )
 	log_and_message( "INFO: work_dir = \"{}\"".format(work_dir) )
 	log_and_message( "INFO: main_image = \"{}\"".format(main_image) )
 	log_and_message( "INFO: thumbnail_image = \"{}\"".format(thumbnail_image) )
@@ -521,7 +532,7 @@ def main():
 	log_and_message( "INFO: mon_log = \"{}\"".format( mon_log ) )
 	log_and_message( "INFO: mon_max_age = \"{}\"".format( mon_max_age ) )
 	log_and_message( "INFO: other_systemctl = \"{}\"".format( other_systemctl ) )
-	log_and_message( "." )
+	log_and_message( "" )
 
 	nvers = mono_version()
 	log_and_message("INFO: Mono version: {}" .format( nvers ) )
@@ -529,6 +540,7 @@ def main():
 	python_version = "v " + str(sys.version)
 	python_version = re.sub(r'\n', r', ', python_version )
 	log_and_message( "INFO: Python version: {}".format( python_version ) )
+	log_and_message( "" )
 
 	while True:
 		next_image_file()
@@ -553,15 +565,15 @@ def main():
 # ----------------------------------------------------------------------------------------
 def process_new_image( source, target) :
 
-	logger( "INFO: Process {}".format(source) )
+	jpg_size = stat( source ).st_size
+
+	logger( "INFO: Process {} - {:7.1f} KB".format(source,jpg_size/1024) )
 #DEBUG#	logger( "DEBUG: Called process_new_image(\n\t {},\n\t {} )".format(source, target) )
 
 	camera_down()     # TESTING
 
 	shutil.copy2( source, target )
 	push_to_server( target, remote_dir )
-#@@@	push_to_server_via_scp( target, remote_dir )
-	# push_to_test( target, "REMOVE_ME/" + remote_dir )
 
 	thumbnail_file = work_dir + '/' + thumbnail_image
 #DEBUG#	logger( "DEBUG: Create thumbnail {} and upload to {}".format(thumbnail_file, remote_dir ) )
@@ -583,8 +595,6 @@ def process_new_image( source, target) :
 #		logger( "DEBUG: convert returned data: \"{}\"".format( convert ) )
 
 	push_to_server( thumbnail_file, remote_dir )
-#@@@	push_to_server_via_scp( thumbnail_file, remote_dir )
-	# push_to_test( thumbnail_file, "REMOVE_ME/" + remote_dir )
 
 #DEBUG#	logger( "DEBUG: done" )
 
@@ -606,7 +616,6 @@ def process_new_image( source, target) :
 #  NOTE: On startup, this reprocesses the last file processed.  That was unintended but
 #  I decided it was not harmful.  As a result you always see "||  (0)" in the log.
 # ----------------------------------------------------------------------------------------
-# @@@
 #
 #  * If we're in catch-up mode keep at it until we get to the last file....
 #	Possibly "process" every 10th file so that the web server sees activity???
@@ -813,6 +822,7 @@ def next_image_file() :
 			logger( "DEBUG: file {} of {} !!!!!! Skip processing {} (in Catch-up)".format( line+1, file_list_len, file_list[line] ) )
 		else :
 			log_string( "||  ({})\n".format( dot_counter ) )
+
 			process_new_image( source_file, target_file )
 			# First '.' right after processing is done...
 			if not date_rollover :
@@ -887,6 +897,9 @@ def next_image_file() :
 def check_log_age( ) :
 	global mon_log, mon_max_age
 
+	if len(mon_log) < 2 :
+		return
+
 
 # @@@ here
 	mtime = stat( mon_log ).st_mtime
@@ -911,7 +924,7 @@ def check_log_age( ) :
 
 		try:
 			reply = subprocess.check_output( restart_cmd, stderr=subprocess.STDOUT ).decode('utf-8')
-			logger( "DEBUG: Result from {}: Returned = {} bytes.".format( restart_cmd, len(reply) ) )
+			logger( "DEBUG: Result from {}: Returned = {:7.1f} bytes.".format( restart_cmd, len(reply) ) )
 		except Exception as problem :
 			log_and_message( "ERROR: Unexpected ERROR in {}: {}".format( restart_cmd, sys.exc_info()[0] ) )
 			log_and_message( "ERROR: systemctl restart: {}".format( problem ) )
@@ -979,33 +992,31 @@ def read_config( config_file ) :
 	#
 	#  NOTE:  See also similar code in def check_FTP_config()
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	ftp_OK = False
+	if not USE_SCP :
+		ftp_OK = False
 
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	#    2019/12/20 09:38:15 ERROR: Unexpected ERROR in FTP connect: <class 'socket.error'>
 	#    2019/12/20 09:38:15 ERROR: FTP (connect): [Errno 110] Connection timed out
 	#    2019/12/20 09:38:15 ERROR: Quitting due to FTP error(s) above.  Exiting in 30 seconds ...
 	#    2019/12/20 09:38:45   Good bye from /home/pi/N/webcamimager.py
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	# --------------------------------------------------------------------------------
-	for iii in range(8) :
+		for iii in range(8) :
 		# Not on first iteration.  Then increase the sleep time with each iteration.
 		#  With a 4 sec multiplier this comes to 112 seconds max...     (28 * 4)
-		if iii > 0 :
-			logger( "DEBUG: in read_config() checking credentials sleep( {} )".format( iii * 15 ) )
-			sleep( iii * 15 )
+			if iii > 0 :
+				logger( "DEBUG: in read_config() checking credentials sleep( {} )".format( iii * 15 ) )
+				sleep( iii * 15 )
 
-		try :
+			try :
 #DEBUG#			messager( "DEBUG: FTP connect to {}".format( server ) )
-			ftp = FTP( ftp_server, ftp_login, ftp_password )
-			ftp_OK = True
-			break
-		except Exception as problem :
-			log_and_message( "ERROR: Unexpected ERROR in FTP connect: {}".format( sys.exc_info()[0] ) )
-			log_and_message( "ERROR: in read_config() FTP (connect): {}".format( problem ) )
-			log_and_message( "DEBUG: FTP credentials: s=\"{}\" l=\"{}\" p=\"{}\"".format( ftp_server, ftp_login, ftp_password ) )
+				ftp = FTP( ftp_server, ftp_login, ftp_password )
+				ftp_OK = True
+				break
+			except Exception as problem :
+				log_and_message( "ERROR: Unexpected ERROR in FTP connect: {}".format( sys.exc_info()[0] ) )
+				log_and_message( "ERROR: in read_config() FTP (connect): {}".format( problem ) )
+				log_and_message( "DEBUG: FTP credentials: s=\"{}\" l=\"{}\" p=\"{}\"".format( ftp_server, ftp_login, ftp_password ) )
 #@@@			if "authentication" in problem :
 #@@@				logger( "DEBUG: FTP credentials: s=\"{}\" l=\"{}\" p=\"{}\"".format( ftp_server, ftp_login, ftp_password ) )
 
@@ -1034,37 +1045,45 @@ def read_config( config_file ) :
 		# ----------------------------------------------------------------------------------------
 		# ----------------------------------------------------------------------------------------
 
-	if ftp_OK :
-		try :
-			ftp.cwd( remote_dir )
-		except :
-			ftp_OK = False
-			log_and_message( "ERROR: Unexpected ERROR in FTP cwd: {}".format( sys.exc_info()[0] ) )
-			log_and_message( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
+		if ftp_OK :
+			try :
+				ftp.cwd( remote_dir )
+			except :
+				ftp_OK = False
+				log_and_message( "ERROR: Unexpected ERROR in FTP cwd: {}".format( sys.exc_info()[0] ) )
+				log_and_message( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
 
-		try :
-			ftp.quit()
-		except :
-			ftp_OK = False
-			log_and_message( "ERROR: Unexpected ERROR in FTP quit: {}".format( sys.exc_info()[0] ) )
-			log_and_message( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
+			try :
+				ftp.quit()
+			except :
+				ftp_OK = False
+				log_and_message( "ERROR: Unexpected ERROR in FTP quit: {}".format( sys.exc_info()[0] ) )
+				log_and_message( "ERROR: remote_dir = \"{}\" is likely bad.".format(remote_dir) )
 
 
-	if not ftp_OK :
-		log_and_message( "ERROR: Quitting due to FTP error(s) above.  Exiting in 30 seconds ..." )
-		sleep( 240 )
-		log_and_message("  Good bye from " + this_script )
-		log_string( "\n" )
-		exit()
+		if not ftp_OK :
+			log_and_message( "ERROR: Quitting due to FTP error(s) above.  Exiting in 30 seconds ..." )
+			sleep( 240 )
+			log_and_message("  Good bye from " + this_script )
+			log_string( "\n" )
+			exit()
 
-	try:
+		try:
 
 #DEBUG#		logger("DEBUG: reading: \"{}\"".format( image_age_URL ) )
-		response = urlopen( image_age_URL )
+			response = urlopen( image_age_URL )
 #DEBUG#		logger("DEBUG: image age read from web: \"{}\"".format( age ) )
-	except:
-		log_and_message( "ERROR: Unexpected ERROR in urlopen: {}".format( sys.exc_info()[0] ) )
-		log_and_message( "ERROR: image_age_URL = \"{}\" is likely bad.".format(image_age_URL) )
+		except:
+			log_and_message( "ERROR: Unexpected ERROR in urlopen: {}".format( sys.exc_info()[0] ) )
+			log_and_message( "ERROR: image_age_URL = \"{}\" is likely bad.".format(image_age_URL) )
+
+
+	if USE_SCP  and  len(scp_dest) < 3 :
+		log_and_message( "ERROR: scp_dest = \"{}\"".format(scp_dest) )
+		log_and_message( "ERROR: ftp_login = \"{}\"".format(ftp_login) )
+		log_and_message( "ERROR: One of these needs to be specified in the config file." )
+		exit()
+
 
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	# We could handle these more generally.  If a value contains digits, convert to
@@ -1074,9 +1093,10 @@ def read_config( config_file ) :
 
 	relay2_GPIO = int( relay2_GPIO )
 
-	if not os.path.exists( mon_log ) :
+	if len(mon_log) > 0  and  not os.path.exists(mon_log) :
 		log_and_message( "ERROR: mon_log \"{}\" not found.".format( mon_log ) )
-		exit()
+		if len(mon_log) > 1 :
+			exit()
 
 	mon_max_age = int( mon_max_age )
 
@@ -1086,10 +1106,14 @@ def read_config( config_file ) :
 # ----------------------------------------------------------------------------------------
 # Cycle the power on the relay / GPIO.
 # The off time can be specified.  Here in secs.
+# Setting relay_GPIO to less than zero disables this function.
 #
 # From a quick test, the (South) RSX-3211 webam seems to take around 32 secs to reboot.
 # ----------------------------------------------------------------------------------------
 def power_cycle( interval ):
+
+	if relay_GPIO < 0 :
+		return
 
 	cmd = "ssh {} /home/pi/webcamwatcher/power_cycle.py {}".format( relay_HOST, relay_GPIO )
 
@@ -1169,8 +1193,6 @@ def midnight_process(date_string) :
 	tnf = daily_thumbnail( date_string, work_dir )
 	if len(tnf) > 0 :
 		push_to_server( tnf, remote_dir )
-#@@@		push_to_server_via_scp( tnf, remote_dir )
-		# push_to_test( tnf, "REMOVE_ME/" + remote_dir )
 
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	# To make the daylight image, delete most of the dark overnight images.
@@ -1184,8 +1206,6 @@ def midnight_process(date_string) :
 
 	if not ffmpeg_failed :
 		push_to_server( mp4_file_daylight, remote_dir )
-#@@@		push_to_server_via_scp( mp4_file_daylight, remote_dir )
-		# push_to_test( mp4_file_daylight, "REMOVE_ME/" + remote_dir )
 
 
 
@@ -1384,21 +1404,34 @@ def tar_dailies(date_string) :
 #
 # ----------------------------------------------------------------------------------------
 def check_stable_size( filename ) :
+#DEBUG#	log_string( "DEBUG: \n" )
 
+	# Need to get same_count_min sizes the same in a row to decide that we're stable
+	same_count = 0
 	last_size = -1
-	for iii in range(15) :
+	for iii in range(30) :
 		file_size = stat( filename ).st_size
+###		logger( "DEBUG: {} file_size = {} last_size = {}.".format(filename, file_size, last_size) )
+
 		if file_size == last_size :
-			break
+			same_count += 1
+			if same_count > 5 :
+				logger( "DEBUG-WARNING: {} == {}   same_count = {}  iii = {}".format(file_size, last_size, same_count, iii ) )
+#DEBUG#			else :
+#DEBUG#				logger( "DEBUG: {} == {}   same_count = {}  iii = {}".format(file_size, last_size, same_count, iii ) )
+			if same_count >= same_count_min :
+				break
+		else :
+			same_count = 0
 
 		last_size = file_size
-		if iii > 0 :
+		if iii >= same_count_min :
 			log_string( "\n" )
-			logger( "DEBUG: check_stable_size wait #{}.  {} bytes.".format(iii+1, file_size) )
-		sleep( 4 )
+			logger( "DEBUG: check_stable_size wait #{}.  {} bytes  same_count = {}.".format(iii+1, file_size, same_count) )
+
+		sleep( 0.3 )
 
 	return last_size
-
 
 
 # ----------------------------------------------------------------------------------------
@@ -1636,44 +1669,23 @@ def get_stored_filename() :
 
 
 
-
-
-
-
-
-
-
-
-
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 #
 #  This selects the file transfer protocol we'll use.
 #
 # ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
 def push_to_server(local_file, remote_path) :
 
-	push_to_server_via_scp(local_file, remote_path)
-	return
-
-	push_to_server_via_ftp(local_file, remote_path)
+	if USE_SCP :
+		push_to_server_via_scp(local_file, remote_path)
+	else :
+		push_to_server_via_ftp(local_file, remote_path)
 
 
 
 
 # ----------------------------------------------------------------------------------------
-#  T E S T
-#  T E S T
-#  T E S T
-#  T E S T
-#  T E S T
+#  This pushes the specified file to the (hosted) web server via SCP.
 #
 #  References:
 #   https://stackoverflow.com/questions/68335/how-to-copy-a-file-to-a-remote-server-in-python-using-scp-or-ssh
@@ -1681,13 +1693,11 @@ def push_to_server(local_file, remote_path) :
 #
 #   https://stackoverflow.com/questions/68335/how-to-copy-a-file-to-a-remote-server-in-python-using-scp-or-ssh
 #   https://stackoverflow.com/questions/68335/how-to-copy-a-file-to-a-remote-server-in-python-using-scp-or-ssh
-#
-# @@@
 # ----------------------------------------------------------------------------------------
 def push_to_server_via_scp(local_file, remote_path) :
 
-#	destination = "user@remotehost:remotepath"
-	destination = "dillwjfq@premium29.web-hosting.com:public_html/wx/" + remote_path
+#	scp_dest = "user@remotehost:remotepath"
+	destination = scp_dest + remote_path
 	scp_failed = False
 
 #	logger( "DEBUG: subprocess.check_output([\"scp\", \"-q\", \"-P\", \"21098\", {}, {}])".format( local_file, destination ) )
@@ -1719,7 +1729,7 @@ def push_to_server_via_scp(local_file, remote_path) :
 	lines = re.split('\n', output)
 	# if len(lines[0]) > 0 or len(lines) > 1 :
 	if scp_failed and len(lines) > 1 :
-		logger( "DEBUG: scp stdout output:\n".format( e.output ) )
+		logger( "DEBUG: scp stdout output:\n".format( output ) )
 		for jjj in range( len(lines) ) :
 			logger( "DEBUG: #{} \"{}\"".format( jjj, lines[jjj] ) )
 	
@@ -1736,11 +1746,11 @@ def push_to_server_via_scp(local_file, remote_path) :
 #
 #  https://pythonspot.com/en/ftp-client-in-python/
 #  https://docs.python.org/2/library/ftplib.html
-#    NOTE: 
-#    NOTE: 
+#    NOTE:
+#    NOTE:
 #    NOTE: The third argument, server, is no longer needed...
-#    NOTE: 
-#    NOTE: 
+#    NOTE:
+#    NOTE:
 # ----------------------------------------------------------------------------------------
 def push_to_server_via_ftp(local_file, remote_path) :
 	ftp_OK = False
@@ -1788,83 +1798,11 @@ def push_to_server_via_ftp(local_file, remote_path) :
 			logger( "ERROR: in push_to_server_via_ftp() FTP (connect): {}".format( problem ) )
 
 			logger( "DEBUG: FTP credentials: s=\"{}\" l=\"{}\" p=\"{}\"".format( ftp_server, ftp_login, ftp_password ) )
-#@@@			if "authentication" in problem :
-#@@@				logger( "DEBUG: FTP credentials: s=\"{}\" l=\"{}\" p=\"{}\"".format( ftp_server, ftp_login, ftp_password ) )
+#			if "authentication" in problem :
+#				logger( "DEBUG: FTP credentials: s=\"{}\" l=\"{}\" p=\"{}\"".format( ftp_server, ftp_login, ftp_password ) )
 
 		# ----------------------------------------------------------------------------------------
-		# ----------------------------------------------------------------------------------------
-		#   ......................||  (22)
-		#   2019/09/06 04:48:39 INFO: Process /home/pi/N/North/snapshot-2019-09-06-04-48-38.jpg
-		#   2019/09/06 04:48:53 ERROR: in push_to_server() FTP (connect): 530 Login authentication failed
-		#   2019/09/06 04:49:08 ERROR: in push_to_server() FTP (connect): 530 Login authentication failed
-		#   2019/09/06 04:49:08 DEBUG: in push_to_server() sleep( 8 )
-		#   2019/09/06 04:49:31 ERROR: in push_to_server() FTP (connect): 530 Login authentication failed
-		#   2019/09/06 04:49:31 DEBUG: in push_to_server() sleep( 12 )
-		#   2019/09/06 04:49:58 ERROR: in push_to_server() FTP (connect): 530 Login authentication failed
-		#   2019/09/06 04:49:58 DEBUG: in push_to_server() sleep( 16 )
-		#   2019/09/06 04:50:30 ERROR: in push_to_server() FTP (connect): 530 Login authentication failed
-		#   2019/09/06 04:50:30 DEBUG: in push_to_server() sleep( 20 )
-		#   2019/09/06 04:53:01 ERROR: in push_to_server() FTP (connect): [Errno 110] Connection timed out
-		#   2019/09/06 04:53:01 DEBUG: in push_to_server() sleep( 24 )
-		#   2019/09/06 04:55:34 ERROR: in push_to_server() FTP (connect): [Errno 110] Connection timed out
-		#   2019/09/06 04:55:34 DEBUG: in push_to_server() sleep( 28 )
-		#   2019/09/06 04:58:13 ERROR: in push_to_server() FTP (connect): [Errno 110] Connection timed out
 		#
-		#
-		#
-		#
-		#   2019/09/06 04:59:13 INFO: Starting /home/pi/N/webcamimager.py   PID=26365
-		# ----------------------------------------------------------------------------------------
-		# ----------------------------------------------------------------------------------------
-		# ----------------------------------------------------------------------------------------
-		#.......................||  (23)
-		#  2019/07/24 09:13:03 INFO: Process /home/pi/S/South/snapshot-2019-07-24-09-12-57.jpg
-		#  2019/07/24 09:13:04 DEBUG: FTP STOR S.jpg from  /home/pi/S/South/S.jpg
-		#  2019/07/24 09:13:05 DEBUG: convert returned data: ""
-		#  2019/07/24 09:13:06 DEBUG: FTP STOR S_thumb.jpg from  /home/pi/S/South/S_thumb.jpg
-		#  ......................||  (22)
-		#  2019/07/24 09:15:20 WARNING: Assumed image age: 0
-		#  2019/07/24 09:15:20 INFO: Process /home/pi/S/South/snapshot-2019-07-24-09-14-57.jpg
-		#  2019/07/24 09:15:40 ERROR: in push_to_server() FTP (connect): [Errno -3] Temporary failure in name resolution
-		#  2019/07/24 09:16:01 ERROR: in push_to_server() FTP (connect): [Errno -3] Temporary failure in name resolution
-		#  2019/07/24 09:16:01 DEBUG: in push_to_server() sleep( 8 )
-		#  2019/07/24 09:16:29 ERROR: in push_to_server() FTP (connect): [Errno -3] Temporary failure in name resolution
-		#  2019/07/24 09:16:29 DEBUG: in push_to_server() sleep( 12 )
-		#  2019/07/24 09:17:01 ERROR: in push_to_server() FTP (connect): [Errno -3] Temporary failure in name resolution
-		#  2019/07/24 09:17:01 DEBUG: in push_to_server() sleep( 16 )
-		#  2019/07/24 09:17:37 ERROR: in push_to_server() FTP (connect): [Errno -3] Temporary failure in name resolution
-		#  2019/07/24 09:17:37 DEBUG: in push_to_server() sleep( 20 )
-		#  2019/07/24 09:18:17 ERROR: in push_to_server() FTP (connect): [Errno -3] Temporary failure in name resolution
-		#  2019/07/24 09:18:17 DEBUG: in push_to_server() sleep( 24 )
-		#  2019/07/24 09:18:41 DEBUG: FTP STOR S.jpg from  /home/pi/S/South/S.jpg
-		#  2019/07/24 09:18:42 DEBUG: convert returned data: ""
-		#  2019/07/24 09:18:43 DEBUG: FTP STOR S_thumb.jpg from  /home/pi/S/South/S_thumb.jpg
-		#  .||  (1)
-		#  2019/07/24 09:18:53 INFO: Process /home/pi/S/South/snapshot-2019-07-24-09-16-57.jpg
-		#  2019/07/24 09:18:53 DEBUG: FTP STOR S.jpg from  /home/pi/S/South/S.jpg
-		#  2019/07/24 09:18:55 DEBUG: convert returned data: ""
-		#  2019/07/24 09:18:55 DEBUG: FTP STOR S_thumb.jpg from  /home/pi/S/South/S_thumb.jpg
-		#  .||  (1)
-		#  2019/07/24 09:19:05 INFO: Process /home/pi/S/South/snapshot-2019-07-24-09-18-57.jpg
-		#  2019/07/24 09:19:05 DEBUG: FTP STOR S.jpg from  /home/pi/S/South/S.jpg
-		#  2019/07/24 09:19:07 DEBUG: convert returned data: ""
-		#
-		#
-		#  2019/07/24 21:33:45 INFO: Starting /home/pi/S/webcamimager.py   PID=11573
-		#  2019/07/24 21:33:45 INFO: reading "/home/pi/S/south.cfg"
-		#  2019/07/24 21:33:45 INFO: ftp_server = "ftp.dilly.family"
-		#  2019/07/24 21:33:45 INFO: ftp_login = "camdilly@dilly.family"
-		#  2019/07/24 21:33:46 INFO: work_dir = "/home/pi/S/South"
-		#  2019/07/24 21:33:46 INFO: main_image = "S.jpg"
-		#  2019/07/24 21:33:46 INFO: thumbnail_image = "S_thumb.jpg"
-		#  2019/07/24 21:33:46 INFO: remote_dir = "South"
-		#  2019/07/24 21:33:46 INFO: image_age_URL = "http://dilly.family/wx/South/S_age.txt"
-		#  2019/07/24 21:33:46 INFO: cam_host = "192.168.1.10"
-		#  2019/07/24 21:33:46 INFO: relay_HOST = "pi@192.168.1.10"
-		#  2019/07/24 21:33:46 INFO: relay_GPIO = "23"
-		#  2019/07/24 21:33:46 INFO: relay2_GPIO = "-1"
-		#  2019/07/24 21:33:46 .
-		#  2019/07/24 21:33:46 WARNING: From mono version check: <type 'exceptions.OSError'>
 		# ----------------------------------------------------------------------------------------
 
 
@@ -1894,12 +1832,6 @@ def push_to_server_via_ftp(local_file, remote_path) :
 	# --------------------------------------------------------------------------------
 	#  2019/09/10 17:36:36 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
 	#  2019/09/10 19:28:36 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
-	#  2019/09/11 01:30:38 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
-	#  2019/09/11 04:06:42 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
-	#  2019/09/11 08:40:45 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
-	#  2019/09/11 11:06:42 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
-	#  2019/09/11 11:44:47 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
-	#  2019/09/11 11:58:47 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
 	#  2019/09/11 12:26:47 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
 	#  2019/09/11 13:12:50 ERROR: in push_to_server() ftp.storbinary 425 Unable to identify the local data socket: Address already in use
 	# --------------------------------------------------------------------------------
@@ -1926,7 +1858,7 @@ def push_to_server_via_ftp(local_file, remote_path) :
 				# --------------------------------------------------------
 				# --------------------------------------------------------
 				#                       if not catching_up and ( (file_list_len - line) > 2 ) :
-				# @@@
+				#
 				# Should wait and retry when problem =
 				#
 				# 425 Unable to identify the local data socket: Address already in use
@@ -1968,7 +1900,7 @@ def read_FTP_config( config_file ) :
 #	NOTE: Copied from def read_config( config_file )
 #	------------------------------------------------
 
-# @@@	# https://docs.python.org/2/library/configparser.html
+# 	# https://docs.python.org/2/library/configparser.html
 	config = configparser.RawConfigParser()
 	# This was necessary to avoid folding variable names to all lowercase.
 	# https://stackoverflow.com/questions/19359556/configparser-reads-capital-keys-and-make-them-lower-case
@@ -1986,7 +1918,11 @@ def read_FTP_config( config_file ) :
 
 	globals().update(parameter)  #Make them availible globally
 
-	check_FTP_config()
+	if len(ftp_login) < 1 :
+		USE_SCP = True
+		log_and_message( "INFO: ftp_login = \"{}\" - - Setting USE_SCP = {}".format(ftp_login, USE_SCP) )
+	else :
+		check_FTP_config()
 
 
 # ----------------------------------------------------------------------------------------
@@ -2009,7 +1945,7 @@ def check_FTP_config() :
 		except :
 			ftp_OK = False
 			log_and_message( "ERROR: Unexpected ERROR in FTP quit: {}".format( sys.exc_info()[0] ) )
-	return ftp_OK 
+	return ftp_OK
 
 
 # ----------------------------------------------------------------------------------------
@@ -2145,9 +2081,7 @@ def camera_down():
 	age = "0"
 
 	# --------------------------------------------------------------------------------
-	# --------------------------------------------------------------------------------
-	# --------------------------------------------------------------------------------
-	# --------------------------------------------------------------------------------
+	#
 	# --------------------------------------------------------------------------------
 	try :
 #>>>		response = urlopen( realtime_URL )
@@ -2189,6 +2123,11 @@ def camera_down():
 		# ------------------------------------------------------------------------
 		content = "-1\n-1"
 		logger( "DEBUG: content = \"" + content + "\" in camera_down()" )
+#
+	except :
+		log_and_message( "ERROR: in camera_down: NOT URLError" )
+		log_and_message( "DEBUG: Calling traceback.print_tb(tb, limit=None, file=None)" )
+		traceback.print_tb(file=sys.stdout)
 
 ######	logger( "DEBUG: content = \"" + content + "\" in camera_down()" )
 
@@ -2200,44 +2139,6 @@ def camera_down():
 	seconds = int( lines[1] )
 
 	# --------------------------------------------------------------------------------
-	# --------------------------------------------------------------------------------
-	# --------------------------------------------------------------------------------
-	# --------------------------------------------------------------------------------
-	# --------------------------------------------------------------------------------
-	# --------------------------------------------------------------------------------
-#>>	try:
-
-#DEBUG#		logger("DEBUG: reading: \"{}\"".format( image_age_URL ) )
-#>>		response = urlopen( image_age_URL )
-#>>		age = response.read()
-#DEBUG#		logger("DEBUG: image age read from web: \"{}\"".format( age ) )
-		# ------------------------------------------------------------------
-		# The file contains at least a trailing newline ... I've not looked
-		#   "545   1504095902   12:25:02_UTC "
-		#
-		# systemd seems to complain about urlopen failing in restart...
-		#     Maybe content = "0 0 00:00:00_UTC" if urlopen fails??
-		# ------------------------------------------------------------------
-#>>	except:
-#		age = "0"
-#>>		logger("WARNING: Could not access {}.  Assume image age: {}".format( image_age_URL, age ) )
-
-	# --------------------------------------------------------------------------------
-	# Avoid ... "ValueError: invalid literal for int() with base 10: ''"
-	# --------------------------------------------------------------------------------
-#>>	if len( age ) < 1 :
-#		age = "0"
-#>>		logger("WARNING: Zero-length value from {}.  Assume image age: {}".format( image_age_URL, age ) )
-
-#>>	age = int( age.rstrip() )
-#	##DEBUG## ___print words[0], words[2]
-#
-#	# Periodically put a record into the log for reference.
-#	if 0 == (check_counter % log_stride) :
-#		logger("INFO: image age: {}".format( age ) )
-#
-#	check_counter += 1
-
 	# ================================================================================
 	# ================================================================================
 	# ================================================================================
@@ -2264,56 +2165,6 @@ def camera_down():
 		return 1
 	else:
 		return 0
-
-
-
-
-
-
-# ----------------------------------------------------------------------------------------
-# TEST Support
-#
-#    NOTE:  For transition to Namecheap hosting.  Post copies to GoDaddy...
-# ----------------------------------------------------------------------------------------
-def push_to_test(local_file, remote_path) :
-#      local_file = work_dir + '/' + file_list[line]
-
-	return
-	return
-	return
-
-	server = "45.40.166.137"
-	login = "login"
-	password = "password"
-
-	if re.search('/', local_file) :
-		local_file_bare = re.sub(r'.*/', r'', local_file)
-
-	# --------------------------------------------------------------------------------
-	#
-	# See https://stackoverflow.com/questions/567622/is-there-a-pythonic-way-to-try-something-up-to-a-maximum-number-of-times
-	# --------------------------------------------------------------------------------
-	for iii in range(8) :
-		try :
-			ftp = FTP( server )
-			ftp.login( login, password )
-			ftp.cwd( remote_path )
-			ftp.storbinary('STOR ' +  local_file_bare, open(local_file, 'rb'))
-			ftp.quit()
-			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-			# Yes, that's a return that's not at the funtion end
-			# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-			return
-		except socket.error as e :
-			iii += 1
-			log_and_message( "FTP Socket Error %d: %s" % (e.args[0], e.args[1]) )
-			for jjj in range(0, len(e.args) - 1) :
-				log_and_message( "    {}".format( e.args[jjj] ) )
-			# Increase the sleep time with each iteration
-			sleep(iii)
-	return
-
-
 
 
 
@@ -2385,7 +2236,7 @@ if __name__ == '__main__':
 #	return                 <<<<<<<<--------------------  INSERT
 #	timestamp = datetime.datetime.now().strftime(strftime_FMT)
 #
-# Modify 
+# Modify
 # def midnight_process(date_string) :
 #	return                 <<<<<<<<--------------------  INSERT
 #	logger( "DEBUG: sleep( 15 )" )
