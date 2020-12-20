@@ -21,8 +21,8 @@ After=multi-user.target
 Type=simple
 User=pi
 Group=pi
-WorkingDirectory=/home/pi/S
-ExecStart=/usr/bin/python3 -u /home/pi/S/webcamimager.py /home/pi/S/south.cfg
+WorkingDirectory=/mnt/ssd/S
+ExecStart=/usr/bin/python3 -u /mnt/ssd/S/webcamimager.py /mnt/ssd/S/south.cfg
 # ExecStart=/usr/bin/python -u ./webcamimager.py /home/pi/S/South S.jpg S_thumb.jpg South
 
 Restart=always
