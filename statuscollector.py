@@ -575,7 +575,7 @@ def push_to_server_via_scp(local_file, remote_path, server) :
 
 	try :
 		########## output = subprocess.check_output(["scp", "-q", "-P", "21098", local_file, destination])
-		output = subprocess.check_output( cmd )
+		output = subprocess.check_output( cmd, stderr=subprocess.STDOUT, text=True )
 		lines = re.split('\n', output)
 	except :
 		lines = {}
