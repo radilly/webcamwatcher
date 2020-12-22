@@ -10,13 +10,13 @@ Modifications to Raspberry Pi Imager created SD card using raspberrypi_03
 
 ls -al /dev/sd*
 lsblk
-sudo mount /dev/sda1 /mnt/pi/boot
+sudo mount /dev/sda1 /mnt/pi/BOOT
 sudo mount /dev/sda2 /mnt/pi/root
 
 NOTE: >>> If you want to edit the mount point, in vi ... :/pi\/.oot
 NOTE: >>> Most of the work is in the ROOT filesystem
 
-sudo touch /mnt/pi/boot/ssh
+sudo touch /mnt/pi/BOOT/ssh
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 # This should work for our network
@@ -47,8 +47,8 @@ ifconfig
 #>>> Change the hostname
 #   https://www.raspberrypi-spy.co.uk/2012/11/how-to-rename-your-raspberry-pi/
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-ls -al /mnt/pi/root/etc/host*
-sudo sed -i'.BAK' 's/raspberrypi/raspberrypi_03/' /mnt/pi/root/etc/host*[es]
+ls -al /mnt/pi/root/etc/host*[es]
+sudo sed -i'.BAK' 's/raspberrypi/____x_x_x_____/' /mnt/pi/root/etc/host*[es]
 ls -al /mnt/pi/root/etc/host*
 cat -n /mnt/pi/root/etc/hosts
 cat -n /mnt/pi/root/etc/hostname
@@ -56,7 +56,7 @@ cat -n /mnt/pi/root/etc/hostname
  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #>>> After updating
 pi@raspb_01_Cams:~ $ cat /mnt/pi/root/etc/hostname
-raspberrypi_03
+____x_x_x_____
 
 pi@raspb_01_Cams:~ $ cat /mnt/pi/root/etc/hosts
 127.0.0.1       localhost
@@ -64,7 +64,7 @@ pi@raspb_01_Cams:~ $ cat /mnt/pi/root/etc/hosts
 ff02::1         ip6-allnodes
 ff02::2         ip6-allrouters
 
-127.0.1.1       raspberrypi_03
+127.0.1.1       ____x_x_x_____
  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
