@@ -570,8 +570,18 @@ def main():
 # wx_worker.sh on the web server which gives the ages of some files of interest.
 # These files are listed in public_html/wx/files2mon.txt.
 #
-#
-#
+#	[dillwjfq@premium29 wx]$ cat fileages.txt
+#	    2030     7200  images/moon.png
+#	      60      240  thisyear.htm
+#	      60      240  monthlyrecord.htm
+#	      59      240  graphconfig.json
+#	       . . . . . . . .
+#	       2      240  record.htm
+#	       1      240  thismonth.htm
+#	       1      240  gauges.htm
+#        -------      ---  -------------------
+#        current      max      file
+#        -------      ---  -------------------
 #
 # @@@  @@@@@@
 # ----------------------------------------------------------------------------------------
@@ -621,8 +631,8 @@ def check_file_ages():
 		#
 		#  https://stackoverflow.com/questions/8238360/how-to-save-traceback-sys-exc-info-values-in-a-variable
 		# ------------------------------------------------------------------------
-		content = [ "0 foo", "1 bar", "2 slam", "3 dunk" ]
-		content = "0 foo\n1 bar\n2 slam\n3 dunk"
+		content = [ "0 0 foo", "1 1 bar", "2 2 slam", "3 3 dunk" ]
+		content = "0 99 foo\n1 99 bar\n2 99 slam\n3 99 dunk"
 		logger( "DEBUG: content = \"{}\" in last_upload()".format( content ) )
 
 
@@ -635,6 +645,8 @@ def check_file_ages():
 	# --------------------------------------------------------------------------------
 	for line in lines :
 		logger( "DEBUG: line = \"{}\"".format( line ) )
+
+
 
 
 		if "Page updated" in line :
