@@ -13,7 +13,6 @@
 Description=Status Collection and Publishing Service
 After=multi-user.target
 
-
 # ----------------------------------------------------------------------------
 # https://www.freedesktop.org/software/systemd/man/systemd.service.html
 # ----------------------------------------------------------------------------
@@ -21,8 +20,8 @@ After=multi-user.target
 Type=simple
 User=pi
 Group=pi
-WorkingDirectory=/home/pi/status
-ExecStart=/usr/bin/python3 -u /home/pi/status/statuscollector.py /home/pi/status
+WorkingDirectory=/mnt/ssd/status
+ExecStart=/usr/bin/python3 -u /mnt/ssd/status/statuscollector.py /mnt/ssd/status
 
 Restart=always
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -45,7 +44,7 @@ RequiredBy=multi-user.target
 # ----------------------------------------------------------------------------
 # Other references:
 #  http://sandaysoft.com/forum/viewtopic.php?f=27&t=16087
-# ----------------------------------------------------------------------------
+#
 ##############################################################################
 # Outline of commands...
 #

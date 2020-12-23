@@ -47,6 +47,7 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20201223 Moved CMX to an ssd.
 # 20201220 Added check_file_ages after disabling CMX realtime file generation since it
 #          isn't required for the site. Not surrently called. Started prepping to move
 #          the working dir back to an SSD.
@@ -261,15 +262,13 @@ ws_data_last_secs = 0       # Number of epoch secs at outage start
 ws_data_last_count = 0
 saved_contact_lost = -1     # Number of epoch secs when RF contact lost
 
-BASE_DIR =              "/mnt/wx"  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-BASE_DIR =              "/home/pi"  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+BASE_DIR =              "/mnt/ssd"
 
-data_stop_file =        BASE_DIR + "/CumulusMX/web/DataStoppedT.txttmp"
-ambient_temp_file =     BASE_DIR + "/CumulusMX/web/ambient_tempT.txttmp"
-status_page =           BASE_DIR + "/CumulusMX/web/status.html"
-events_page =           BASE_DIR + "/CumulusMX/web/event_status.html"
-mxdiags_dir =           BASE_DIR + "/CumulusMX/MXdiags"
-
+data_stop_file =        BASE_DIR + "/Cumulus_MX/web/DataStoppedT.txttmp"
+ambient_temp_file =     BASE_DIR + "/Cumulus_MX/web/ambient_tempT.txttmp"
+status_page =           BASE_DIR + "/Cumulus_MX/web/status.html"
+events_page =           BASE_DIR + "/Cumulus_MX/web/event_status.html"
+mxdiags_dir =           BASE_DIR + "/Cumulus_MX/MXdiags"
 
 status_dir =            BASE_DIR + "/status"
 
