@@ -20,8 +20,9 @@ After=network-online.target
 # Environment=MONO_GC_PARAMS=nursery-size=16m		# from my version
 User=root
 Group=root
-WorkingDirectory=/home/pi/CumulusMX
-ExecStart=/usr/bin/mono-service /home/pi/CumulusMX/CumulusMX.exe -service
+WorkingDirectory=/mnt/ssd/Cumulus_MX
+# ExecStart=/usr/bin/mono /mnt/ssd/Cumulus_MX/CumulusMX.exe
+ExecStart=/usr/bin/mono-service /mnt/ssd/Cumulus_MX/CumulusMX.exe -service
 Type=forking
 Restart=always
 
@@ -34,7 +35,6 @@ ExecStopPost=/bin/rm /tmp/CumulusMX.exe.lock
 [Install]
 WantedBy=multi-user.target
 # RequiredBy=multi-user.target				# from my version
-
 
 #========================================================================================================================================================================
 # NOTE:  "Guts" of my rendition, vesus what shipped with CumulusMX
@@ -58,7 +58,6 @@ WantedBy=multi-user.target
 # [Install]										[Install]
 # RequiredBy=multi-user.target							      |	WantedBy=multi-user.target
 #========================================================================================================================================================================
-
 
 # https://fedoramagazine.org/what-is-an-init-system/
 # ==============================================================================
@@ -148,7 +147,6 @@ WantedBy=multi-user.target
 #---  #   /dev/mmcblk0p6     67434    21530     45904  32% /boot
 #---  #   tmpfs              94776        0     94776   0% /run/user/1000
 #---  #   /dev/sda1      244196348 38457960 205738388  16% /media/pi/Marie
-
 
 ##############################################################################
 # Outline of commands...

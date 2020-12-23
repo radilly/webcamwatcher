@@ -17,8 +17,6 @@
 # https://fedoraproject.org/wiki/How_to_debug_Systemd_problems
 # https://www.certdepot.net/systemd-service-debugging-tips/
 # 
-#
-#
 # https://www.freedesktop.org/software/systemd/man/journalctl.html
 # -------------------------------------------------------
 # https://www.freedesktop.org/software/systemd/man/systemd.unit.html
@@ -35,9 +33,9 @@ Description=WX Station Watchdog Service
 Type=simple
 User=pi
 Group=pi
-WorkingDirectory=/home/pi/wxaux
+WorkingDirectory=/mnt/ssd/wxaux
 
-ExecStart=/usr/bin/python3 -u /home/pi/wxaux/watchdog.py
+ExecStart=/usr/bin/python3 -u /mnt/ssd/wxaux/watchdog.py
 
 ###  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ###  https://unix.stackexchange.com/questions/316114/service-start-request-repeated-too-quickly-refusing-to-start
@@ -49,7 +47,6 @@ Restart=always
 RestartSec=60
 StartLimitInterval=700
 StartLimitBurst=10
-
 
 # -------------------------------------------------------
 # https://www.freedesktop.org/software/systemd/man/systemd.unit.html#id-1.9
@@ -63,9 +60,13 @@ RequiredBy=multi-user.target
 # Without the above, this service wasn't starting on boot up.  Enabling displayed...
 # Created symlink /etc/systemd/system/multi-user.target.requires/webcam_north.service → /lib/systemd/system/webcam_north.service.
 
-# -------------------------------------------------------
-# http://sandaysoft.com/forum/viewtopic.php?f=27&t=16087
-# I have done 'sudo systemctl enable cumulusmx' [worked fine]
-# and then 'sudo systemctl start cumulusmx' but this does not
-# quite work.
-# -------------------------------------------------------
+##############################################################################
+# Outline of commands...
+#
+#  sudo cp -p wxwatchdog.service /lib/systemd/system
+#  sudo systemctl daemon-reload
+#  sudo systemctl enable wxwatchdog
+#  sudo systemctl start wxwatchdog
+#  systemctl status wxwatchdog
+#  sudo systemctl stop wxwatchdog
+##############################################################################
