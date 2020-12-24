@@ -492,6 +492,7 @@ def main():
 	logger("DEBUG: BASE_DIR = \"{}\"".format( BASE_DIR ) )
 	logger("DEBUG: status_dir = \"{}\"".format( status_dir ) )
 
+	log_event("", "INFO: Starting watchdog.py.", 901 )
 	iii = 0
 	while True:
 		if 0 == iii % log_header_stride:
@@ -2047,10 +2048,13 @@ def cmx_svc_runtime():
 		lines = re.split('\n', output)
 		#@@@# print( "@@@" )
 		#@@@# print( lines )
-	except :
+	except Exception as problem :
 		log_and_message( "ERROR: From systemctl status: {}".format( sys.exc_info()[0] ) )
+		log_and_message( "ERROR: From systemctl problem: {}".format( problem ) )
 ####		lines[0] = "   Active: active (running) since DOWN; DOWN"
 ####		lines[1] = " Main PID: DOWN (mono)"
+	except :
+		log_and_message( "ERROR: systemctl alternate exception: {}".format( sys.exc_info()[0] ) )
 
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	#   Active: active (running) since Sat 2018-06-23 10:10:30 EDT; 4s ago
