@@ -47,6 +47,7 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20201223 Moved CMX to an ssd.
 # 20201220 Added check_file_ages after disabling CMX realtime file generation since it
 #          isn't required for the site. Not surrently called. Started prepping to move
 #          the working dir back to an SSD.
@@ -261,15 +262,13 @@ ws_data_last_secs = 0       # Number of epoch secs at outage start
 ws_data_last_count = 0
 saved_contact_lost = -1     # Number of epoch secs when RF contact lost
 
-BASE_DIR =              "/mnt/wx"  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-BASE_DIR =              "/home/pi"  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+BASE_DIR =              "/mnt/ssd"
 
-data_stop_file =        BASE_DIR + "/CumulusMX/web/DataStoppedT.txttmp"
-ambient_temp_file =     BASE_DIR + "/CumulusMX/web/ambient_tempT.txttmp"
-status_page =           BASE_DIR + "/CumulusMX/web/status.html"
-events_page =           BASE_DIR + "/CumulusMX/web/event_status.html"
-mxdiags_dir =           BASE_DIR + "/CumulusMX/MXdiags"
-
+data_stop_file =        BASE_DIR + "/Cumulus_MX/web/DataStoppedT.txttmp"
+ambient_temp_file =     BASE_DIR + "/Cumulus_MX/web/ambient_tempT.txttmp"
+status_page =           BASE_DIR + "/Cumulus_MX/web/status.html"
+events_page =           BASE_DIR + "/Cumulus_MX/web/event_status.html"
+mxdiags_dir =           BASE_DIR + "/Cumulus_MX/MXdiags"
 
 status_dir =            BASE_DIR + "/status"
 
@@ -493,6 +492,7 @@ def main():
 	logger("DEBUG: BASE_DIR = \"{}\"".format( BASE_DIR ) )
 	logger("DEBUG: status_dir = \"{}\"".format( status_dir ) )
 
+	log_event("", "INFO: Starting watchdog.py.", 901 )
 	iii = 0
 	while True:
 		if 0 == iii % log_header_stride:
@@ -570,8 +570,18 @@ def main():
 # wx_worker.sh on the web server which gives the ages of some files of interest.
 # These files are listed in public_html/wx/files2mon.txt.
 #
-#
-#
+#	[dillwjfq@premium29 wx]$ cat fileages.txt
+#	    2030     7200  images/moon.png
+#	      60      240  thisyear.htm
+#	      60      240  monthlyrecord.htm
+#	      59      240  graphconfig.json
+#	       . . . . . . . .
+#	       2      240  record.htm
+#	       1      240  thismonth.htm
+#	       1      240  gauges.htm
+#        -------      ---  -------------------
+#        current      max      file
+#        -------      ---  -------------------
 #
 # @@@  @@@@@@
 # ----------------------------------------------------------------------------------------
@@ -621,8 +631,8 @@ def check_file_ages():
 		#
 		#  https://stackoverflow.com/questions/8238360/how-to-save-traceback-sys-exc-info-values-in-a-variable
 		# ------------------------------------------------------------------------
-		content = [ "0 foo", "1 bar", "2 slam", "3 dunk" ]
-		content = "0 foo\n1 bar\n2 slam\n3 dunk"
+		content = [ "0 0 foo", "1 1 bar", "2 2 slam", "3 3 dunk" ]
+		content = "0 99 foo\n1 99 bar\n2 99 slam\n3 99 dunk"
 		logger( "DEBUG: content = \"{}\" in last_upload()".format( content ) )
 
 
@@ -635,6 +645,8 @@ def check_file_ages():
 	# --------------------------------------------------------------------------------
 	for line in lines :
 		logger( "DEBUG: line = \"{}\"".format( line ) )
+
+
 
 
 		if "Page updated" in line :
@@ -2036,10 +2048,13 @@ def cmx_svc_runtime():
 		lines = re.split('\n', output)
 		#@@@# print( "@@@" )
 		#@@@# print( lines )
-	except :
+	except Exception as problem :
 		log_and_message( "ERROR: From systemctl status: {}".format( sys.exc_info()[0] ) )
+		log_and_message( "ERROR: From systemctl problem: {}".format( problem ) )
 ####		lines[0] = "   Active: active (running) since DOWN; DOWN"
 ####		lines[1] = " Main PID: DOWN (mono)"
+	except :
+		log_and_message( "ERROR: systemctl alternate exception: {}".format( sys.exc_info()[0] ) )
 
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	#   Active: active (running) since Sat 2018-06-23 10:10:30 EDT; 4s ago
