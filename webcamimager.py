@@ -1,18 +1,18 @@
 #!/usr/bin/python3 -u
 # @@@ ...
+# ----------------------------------------------------------------------------------------
+#    NOTE:
+#    NOTE: The monitoring / watchdogging should be moved to a separate process.
+#    NOTE:     For example ... see other_systemctl
 #    NOTE:
 #    NOTE:
 #    NOTE:
-#    NOTE: At some point, remove push_to_server()
+#    NOTE:
+#    NOTE: At some point, remove push_to_server() and go with SCP.
 #    NOTE:
 #    NOTE: This assumes you can
 #    NOTE:     ssh -p 21098 dillwjfq@server162.web-hosting.com
-#    NOTE:
-#    NOTE:
-#    NOTE:
-#    NOTE:
-#    NOTE:
-#    NOTE:
+#    NOTE:              (without a password)
 #    NOTE:
 #    NOTE:
 #    NOTE:
@@ -30,6 +30,7 @@
 #    NOTE:
 #    NOTE:
 #    NOTE:
+# ----------------------------------------------------------------------------------------
 #
 # This script is started by 2 services - for for north- and south-facing cameras:
 #	webcam_north.service
@@ -187,11 +188,16 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20201226 In using Pi Zero-based webcams, and pushing images through ssh and dd, we were
+#          seeing a lot of issues around next_image_file() and check_stable_size(). A
+#          number of changes were made to make it more tolerant and improve the logging a
+#          bit. It to was hard to see what was going on and I don't see that there is
+#          a definitive algoritm - e.g. there a bit of trial, error, and twiddling
+#          required.
 # 20201220 RAD Rewrote check_stable_size(). Either scp_dest has to be configure or
 #              ftp_login does,  If ftp_login is "" SCP is used instead of FTP.
 #              If mon_log is empty, log monitoring is bypassed. Similarly, if relay_GPIO
 #              is a negative value, power-cycling is disabled.
-#
 # 20200207 RAD Looks like the video generation process takes on the order of 1 minute.
 #              We could drive it from a date change on the snapshot being processed.
 #						if last_day_code != day_code :
@@ -423,8 +429,6 @@ import traceback
 
 mon_log = ""
 mon_max_age = 300
-same_count_min = 5
-
 
 relay_GPIO = -1
 relay2_GPIO = -1
@@ -468,6 +472,7 @@ sleep_for = 5
 # strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
 # Could not get %Z to work. "empty string if the the object is naive" ... which now() is...
 strftime_FMT = "%Y/%m/%d %H:%M:%S"
+time_only_FMT = "%H:%M:%S"
 WEB_URL = "http://dilly.family/wx"
 cam_host = "127.0.0.1"
 
@@ -565,14 +570,17 @@ def main():
 # ----------------------------------------------------------------------------------------
 def process_new_image( source, target) :
 
-	jpg_size = stat( source ).st_size
+	source_file = "{}/{}".format( work_dir, source )
+	jpg_size = stat( source_file ).st_size
+	jpg_ts = stat( source_file ).st_mtime
 
-	logger( "INFO: Process {} - {:7.1f} KB".format(source,jpg_size/1024) )
-#DEBUG#	logger( "DEBUG: Called process_new_image(\n\t {},\n\t {} )".format(source, target) )
+	logger( "INFO: Process {} {:8d} B  {:10.1f}".format(source, jpg_size, jpg_ts) )
+#	logger( "INFO: Process {} - {:7.1f} KB".format(source_file,jpg_size/1024) )
+#DEBUG#	logger( "DEBUG: Called process_new_image(\n\t {},\n\t {} )".format(source_file, target) )
 
 	camera_down()     # TESTING
 
-	shutil.copy2( source, target )
+	shutil.copy2( source_file, target )
 	push_to_server( target, remote_dir )
 
 	thumbnail_file = work_dir + '/' + thumbnail_image
@@ -703,15 +711,21 @@ def next_image_file() :
 ###	print "DEBUG: last processed day code = " + last_day_code
 
 	# --------------------------------------------------------------------------------
-	#  We look through all files and remove any not starting with "snapshot-".
+	#  Find the oldest 'unprocessed' file(s) in the work directory- the directory 
+	#  which the remote system is writing (image) files into.  The file names came
+	#  from the original cameras which incorporated a timestamp.  For example:
+	#	snapshot-2020-12-26-14-30-01.jpg
+	#	snapshot-yyyy-mm-dd-hh-hh-ss.jpg
+	#  So the names will sort into the order in which they were written, and the
+	#  order in which we want to process them.
 	#
-	#  Look for the most recent *unprocessed* snapshot image file.
-	#  We look through all remaining files and examine the name-embedded timestamp
-	#  by converting it to an integer to see if it is greater than the one saved
-	#  from the last image processed.
+	#  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
+	#  First pass: look through all files and remove any not starting with "snapshot-".
+	#     This should run pretty quickly...
 	# --------------------------------------------------------------------------------
 	file_list = listdir( work_dir )
 	file_list.sort()
+
 	line = 0
 	while line < len( file_list ) :
 		if "snapshot-" not in file_list[line] :
@@ -719,29 +733,60 @@ def next_image_file() :
 		else :
 			line += 1
 
-	file_list_len = len( file_list )
+#DEBUG#			if line == 1 :
+#DEBUG#				logger( "DEBUG: ts for {} = {:10.1f}".format( file_list[line-1], stat( work_dir + '/' + file_list[line-1] ).st_mtime ) )
+
+
+
 
 	# --------------------------------------------------------------------------------
-	#  Run through the list of snapshot files.
+	#  Now file_list should contain all the "snapshot" files in this folder, which
+	#  could easily be 700 files or more.
+	#  .
+	#  .
+	#  .
 	#
 	# --------------------------------------------------------------------------------
+	file_list_len = len( file_list )
+#DEBUG#	logger( "DEBUG: file_list_len = {}".format( file_list_len ) )
 	line = 0
+
 	while line < file_list_len :
 #DEBUG#		logger( "DEBUG: file {} of {} - - -  {}".format( line+1, file_list_len, file_list[line] ) )
 
-		date_string = re.sub(r'snapshot-(....-..-..).*', r'\1', file_list[line] )
-		source_file = work_dir + '/' + file_list[line]
-		target_file = work_dir + '/' + main_image
-		current_mtime = stat( source_file ).st_mtime
+		this_file = file_list[line]
+		# file names are 'bare" - no path, which we may need.
+		source_file = "{}/{}".format( work_dir, this_file )
+		source_mtime = stat( source_file ).st_mtime
 
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# Skip already processed files.
-		#	Technically files older than the one last processed.
+		#   Technically files older than (or as old as) the one last processed.
+		# If that's the case, got to the next one.
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-#DEBUG#		logger( "DEBUG: current {}  last {} - - -  {}".format( current_mtime, last_mtime, current_mtime <= last_mtime ) )
-		if current_mtime <= last_mtime :
-#DEBUG#			logger( "DEBUG: file {} of {}, {} should have already been processed.".format( line+1, file_list_len, file_list[line] ) )
+#DEBUG#		logger( "DEBUG: current {}  last {} - - -  {}".format( source_mtime, last_mtime, source_mtime <= last_mtime ) )
+		if source_mtime <= last_mtime :
+#DEBUG#			logger( "DEBUG: file {} of {}, {} should have already been processed.".format( line+1, file_list_len, this_file ) )
 			line += 1
+			continue
+
+		target_file = "{}/{}".format( work_dir, main_image )
+		date_string = re.sub(r'snapshot-(....-..-..).*', r'\1', this_file )
+
+
+# @@@		log_string( "\n DEBUG:" )
+# @@@		logger( "DEBUG: {:8.1f} - {:8.1f} = {:4.1f} for file {}".format( source_mtime, last_mtime, source_mtime-last_mtime, this_file ) )
+
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# Don't process the same file - This should be rare as source_mtime is
+		# now re-read after check_stable_size() which can allow the file to
+		# "age" a little more than when we read the st_mtime above.
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		if last_filename == this_file :
+			delta = source_mtime - last_mtime  # DEBUG:
+			log_string( "\n" )
+			logger( "DEBUG-WARNING: Reprocessing {} last?????   dot_counter  = {} delta = {}".format( last_filename, dot_counter, delta ) )
+			logger( "DEBUG-WARNING: Reprocessing {} this?????   dot_counter  = {} ds = \"{}\"".format( this_file, dot_counter, date_string ) )
 			continue
 
 
@@ -758,7 +803,7 @@ def next_image_file() :
 			logger( "INFO: Catch-up mode off" )
 
 		# snapshot-2018-05-23-16-57-04.jpg
-		tok = re.split('-', re.sub('\.jpg', '', file_list[line]) )
+		tok = re.split('-', re.sub('\.jpg', '', this_file ) )
 		day_code = int(tok[3])
 		if last_day_code != day_code :
 			date_rollover = True
@@ -771,15 +816,16 @@ def next_image_file() :
 		# Because of the timezone, this is before the start of the Unix epoch!!!
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		if int(tok[1]) < 2000 :
-			log_string( "||  ({})\n".format( dot_counter ) )
+			log_string( "||  ({})  {}\n".format( dot_counter, timestamp() ) )
 			dot_counter = 0
-			old_file = file_list[line]
+			old_file = this_file
 			logger( "WARNING: Probably webcam recently rebooted: old file! {}".format( old_file ) )
 			unlink( "{}/{}".format(work_dir, old_file ) )
 
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		# If not in catching up mode wait for size to stablize, if not it was
-		# written a while ago - an no waiting is needed.
+		# If not in catching up mode wait for size to "stablize", if not it was
+		# written a while ago and no waiting is needed.  Because the file is
+		# being written by a remote process, network load can affect timing.
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		if not catching_up :
 			# this takes 4 seconds.
@@ -798,13 +844,14 @@ def next_image_file() :
 			if 0 == ( small_counter % 4 ) :
 				power_cycle( 5 )
 
-			try:
-				subprocess.check_output("rm {}/{}".format( work_dir, file_list[line] ), shell=True)
-			except :
-				logger( "ERROR: Unexpected ERROR in rm: {}".format( sys.exc_info()[0] ) )
+			unlink( "{}/{}".format(work_dir, this_file ) )
+#DELETE - DELETE - DELETE#			try:
+#DELETE - DELETE - DELETE#				subprocess.check_output("rm {}/{}".format( work_dir, this_file ), shell=True)
+#DELETE - DELETE - DELETE#			except :
+#DELETE - DELETE - DELETE#				logger( "ERROR: Unexpected ERROR in rm: {}".format( sys.exc_info()[0] ) )
 
-			store_file_data ( current_mtime, file_list[line] )
-			last_mtime = current_mtime
+			store_file_data ( source_mtime, this_file )
+			last_mtime = source_mtime
 
 			line += 1
 			continue
@@ -819,13 +866,14 @@ def next_image_file() :
 		#
 		# ------------------------------------------------------------------------
 		if catching_up :
-			logger( "DEBUG: file {} of {} !!!!!! Skip processing {} (in Catch-up)".format( line+1, file_list_len, file_list[line] ) )
+			logger( "DEBUG: file {} of {} !!!!!! Skip processing {} (in Catch-up)".format( line+1, file_list_len, this_file ) )
 		else :
-			log_string( "||  ({})\n".format( dot_counter ) )
+			log_string( "||  ({})  {}\n".format( dot_counter, timestamp() ) )
 
-			process_new_image( source_file, target_file )
+			process_new_image( this_file, target_file )
 			# First '.' right after processing is done...
 			if not date_rollover :
+				logger( "waiting" )
 				log_string( '.' )
 				dot_counter = 1
 
@@ -846,11 +894,11 @@ def next_image_file() :
 			dot_counter = 1
 
 
-
-		store_file_data ( current_mtime, file_list[line] )
+		source_mtime = stat( source_file ).st_mtime
+		store_file_data ( source_mtime, this_file )
 		last_day_code = day_code
-		last_mtime = current_mtime
-		last_filename = file_list[line]
+		last_mtime = source_mtime
+		last_filename = this_file
 
 #DEBUG#		logger( "DEBUG: NEXT!" )
 
@@ -1390,48 +1438,77 @@ def tar_dailies(date_string) :
 
 
 # ----------------------------------------------------------------------------------------
-#  A single stat() may not be enough.  It is possible that the files is in the
-#  process of being written.  In the message below we had determined that the file
-#  was at least 500 bytes.  The final size was 118090. When I ran the cobert by hand...
-#   /usr/bin/convert South/snapshot-2018-06-14-12-37-03.jpg -resize 30% South/SSS_thumb.jpg
-#  it worked fine, so it seems convert tried to read an incomplete file.
+# Wait for a file to be completely written.
 #
-#  So let's make sure the size in the same on 2 checks in a row...
+# We can notice a new file, or a directory m-time changing before a file is completely
+# written.  This routine this attempts to insure that writing has been finished by
+# checking that it's size has stopped growing.  There are 2 parameters involving in
+# getting to *size stability*, set at the start of this routine:
+#  * same_count_min - The minimum number of times (counts) seeing the same file size.
+#  * sleep_for - The sleep time between reading the size in each iteration.
 #
+# We're just waiting for the file size to setle down, so we check it periodically
+# looking to get the same size so many times in a row. We're trying to balance finding
+# this condition fairly quickly after the (remote) writing completes (incurring a small
+# delay) and making this a busy resource-consuming loop.
 #
-#   2018/06/14 16:37:09 DEBUG: convert returned data: "convert: Premature end of JPEG file
+# This routine should rarely generate messages. If it does, these 2 parameters can
+# be adjusted.  Largely trial and error, and is affected by network loading.
+#
+# The minimum time to return with a stable file size in seconds is
+#       ( same_count_min - 1 ) * sleep_for
+#
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+#   20180614 16:37:09 DEBUG: convert returned data: "convert: Premature end of JPEG file
 #	`South/S.jpg' @ warning/jpeg.c/JPEGWarningHandler/352.
-#
 # ----------------------------------------------------------------------------------------
 def check_stable_size( filename ) :
+	same_count_min = 5
+	sleep_for = 0.5
+
 #DEBUG#	log_string( "DEBUG: \n" )
 
 	# Need to get same_count_min sizes the same in a row to decide that we're stable
 	same_count = 0
 	last_size = -1
-	for iii in range(30) :
+	newline = False
+	for attempt in range(30) :
 		file_size = stat( filename ).st_size
 ###		logger( "DEBUG: {} file_size = {} last_size = {}.".format(filename, file_size, last_size) )
 
 		if file_size == last_size :
 			same_count += 1
-			if same_count > 5 :
-				logger( "DEBUG-WARNING: {} == {}   same_count = {}  iii = {}".format(file_size, last_size, same_count, iii ) )
+			if same_count > same_count_min :
+				if not newline :
+					log_string( "\n" )
+					newline = True
+				logger( "WARNING: {} == {} bytes,  same_count = {},  attempt # = {}".format( \
+					file_size, last_size, same_count, attempt ) )
 #DEBUG#			else :
-#DEBUG#				logger( "DEBUG: {} == {}   same_count = {}  iii = {}".format(file_size, last_size, same_count, iii ) )
+#DEBUG#				logger( "DEBUG: {} == {}   same_count = {}  attempt = {}".format(file_size, last_size, same_count, attempt ) )
 			if same_count >= same_count_min :
 				break
 		else :
 			same_count = 0
 
 		last_size = file_size
-		if iii >= same_count_min :
-			log_string( "\n" )
-			logger( "DEBUG: check_stable_size wait #{}.  {} bytes  same_count = {}.".format(iii+1, file_size, same_count) )
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		# We should see this message fairly infrequently. `Seeing this frequently
+		# in the log file may suggest that same_count_min needs to be nudged up.
+		# At the moment ingaes are dropped here every 2 minutes so a few extra
+		# seconds to process are of no significance.
+		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		if attempt >= same_count_min + 1 :
+			if not newline :
+				log_string( "\n" )
+				newline = True
+			logger( "WARNING: check_stable_size wait #{:2d}.  {} bytes  same_count ={:2d}.".format( \
+				attempt+1, file_size, same_count) )
 
-		sleep( 0.3 )
+		sleep( sleep_for )
 
 	return last_size
+
 
 
 # ----------------------------------------------------------------------------------------
@@ -1639,7 +1716,7 @@ def get_stored_ts() :
 		filename = "snapshot-2000-01-01-01-01-01.jpg"
 		store_file_data(ts, filename)
 
-	logger( "DEBUG: Stored ts = {}".format( ts ) )
+	logger( "DEBUG: Stored ts = {:8.1f}".format( float(ts) ) )
 
 	return ts
 
@@ -1946,6 +2023,15 @@ def check_FTP_config() :
 			ftp_OK = False
 			log_and_message( "ERROR: Unexpected ERROR in FTP quit: {}".format( sys.exc_info()[0] ) )
 	return ftp_OK
+
+
+# ----------------------------------------------------------------------------------------
+# Return a timestamp - time only
+# ----------------------------------------------------------------------------------------
+def timestamp() :
+	time = datetime.datetime.now().strftime(time_only_FMT)
+#	logger( "DEBUG: {}".format( time ) )
+	return time
 
 
 # ----------------------------------------------------------------------------------------

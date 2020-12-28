@@ -1,2 +1,3 @@
-webcamimager\.py .*/north.cfg
-webcamimager\.py .*/south.cfg
+webcamimager\.py .*north.cfg
+webcamimager\.py .*south.cfg
+webcamimager\.py .*test.cfg
