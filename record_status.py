@@ -13,8 +13,8 @@ import datetime
 import time
 import sys
 
-BASE_DIR =              "/mnt/ssd"
 BASE_DIR =              "/home/pi"
+BASE_DIR =              "/mnt/ssd"
 status_dir =            BASE_DIR + "/status"
 
 # strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
