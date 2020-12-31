@@ -605,7 +605,7 @@ def check_file_ages():
 		content = content.rstrip()
 
 	except ( URLError, Exception ) as err :
-		log_and_message( "ERROR: in last_upload: {}".format( sys.exc_info()[0] ) )
+		log_and_message( "ERROR: in check_file_ages: {}".format( sys.exc_info()[0] ) )
 		# ------------------------------------------------------------------------
 		#  See https://docs.python.org/2/tutorial/errors.html (~ middle)
 		# ------------------------------------------------------------------------
@@ -633,7 +633,7 @@ def check_file_ages():
 		# ------------------------------------------------------------------------
 		content = [ "0 0 foo", "1 1 bar", "2 2 slam", "3 3 dunk" ]
 		content = "0 99 foo\n1 99 bar\n2 99 slam\n3 99 dunk"
-		logger( "DEBUG: content = \"{}\" in last_upload()".format( content ) )
+		logger( "DEBUG: content = \"{}\" in check_file_ages()".format( content ) )
 
 
 	#---# logger( "DEBUG: len(content) = {}".format( len(content) ) )
@@ -723,7 +723,7 @@ def check_file_ages():
 
 	#########################  print( "DEBUG: . . . .  {}    {}    {}   {}".format(timestamp,seconds,diff_secs,status) )
 	last_secs = seconds
-	data['last_upload'] = diff_secs
+#	data['last_upload'] = diff_secs
 	return diff_secs       # For now we track this number. Later should return status.
 
 
@@ -838,7 +838,7 @@ def log_event(ID, description, code):
 	bgcolor = "TD"
 	# Supply timestamp if no ID was given
 	if len(ID) < 1 :
-		ID = datetime.datetime.now().strftime(strftime_FMT + " (local)")
+		ID = datetime.datetime.now().strftime(strftime_FMT)
 
 	# http://htmlcolorcodes.com/
 	if code == 101 :
@@ -1267,6 +1267,15 @@ def last_upload():
 		content = "00/00/00 00:00:00 45.5 80 NEEDS TO BE FIXED   0 0.05 30.14 N 0 mph ..."
 		content = "Page updated 00/00/0000 00:00:00<br />"
 		logger( "DEBUG: content = \"" + content + "\" in last_upload()" )
+
+		# ------------------------------------------------------------------------
+		# Examples of errors
+		#   2020/12/30 16:36:51
+		#   ERROR: in last_upload: <class 'http.client.RemoteDisconnected'>
+		#   ERROR: type: <class 'http.client.RemoteDisconnected'>
+		#   ERROR: args: ('Remote end closed connection without response',)
+		#      Caused a restart
+		# ------------------------------------------------------------------------
 
 
 	#---# logger( "DEBUG: len(content) = {}".format( len(content) ) )
@@ -1974,6 +1983,15 @@ def camera_down():
 		# ------------------------------------------------------------------------
 		content = "-1\n-1"
 		logger( "DEBUG: content = \"" + content + "\" in camera_down()" )
+
+		# ------------------------------------------------------------------------
+		# Examples of errors
+		#   2020/12/30 16:24:51
+		#   ERROR: in camera_down: <class 'ConnectionResetError'>
+		#   ERROR: type: <class 'ConnectionResetError'>
+		#   ERROR: args: (104, 'Connection reset by peer')
+		#      Caused a restart
+		# ------------------------------------------------------------------------
 
 #>>>	logger( "DEBUG: content = \"" + content + "\" in camera_down()" )
 
