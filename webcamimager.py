@@ -492,6 +492,7 @@ cfg_parameters = [
 	]
 
 
+next_image_count = 999
 
 # ========================================================================================
 # ----------------------------------------------------------------------------------------
@@ -648,6 +649,7 @@ def next_image_file() :
 	global work_dir, last_mtime, last_filename, last_image_dir_mtime
 	global catching_up, current_filename, dot_counter, small_counter
 	global last_day_code
+	global next_image_count
 
 	date_rollover = False
 
@@ -817,6 +819,10 @@ def next_image_file() :
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		if int(tok[1]) < 2000 :
 			log_string( "||  ({})  {}\n".format( dot_counter, timestamp() ) )
+			next_image_count += 1
+			if next_image_count >= 12 :
+				logger( "INFO: Monitoring \"{}\"".format(work_dir) )
+				next_image_count = 0
 			dot_counter = 0
 			old_file = this_file
 			logger( "WARNING: Probably webcam recently rebooted: old file! {}".format( old_file ) )
@@ -869,6 +875,10 @@ def next_image_file() :
 			logger( "DEBUG: file {} of {} !!!!!! Skip processing {} (in Catch-up)".format( line+1, file_list_len, this_file ) )
 		else :
 			log_string( "||  ({})  {}\n".format( dot_counter, timestamp() ) )
+			next_image_count += 1
+			if next_image_count >= 12 :
+				logger( "INFO: Monitoring \"{}\"".format(work_dir) )
+				next_image_count = 0
 
 			process_new_image( this_file, target_file )
 			# First '.' right after processing is done...
