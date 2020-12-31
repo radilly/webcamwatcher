@@ -1,14 +1,5 @@
 #!/usr/bin/python3
-# NOTE: @@@  @@@@@@
-#
-# Restart using...
-#   kill -9 `cat /mnt/root/home/pi/watchdog.PID` ; nohup /usr/bin/python -u /mnt/root/home/pi/watchdog.py >> /mnt/root/home/pi/watchdog.log 2>&1 &
-#
-# Stop with ...
-#   kill -9 `cat watchdog.PID`
-#
-# Start with ...
-#   nohup /usr/bin/python -u /mnt/root/home/pi/watchdog.py >> /mnt/root/home/pi/watchdog.log 2>&1 &
+# NOTE: @@@
 #
 #   NOTE: check_file_ages needs to be finished.
 #
@@ -23,29 +14,12 @@
 #         discovered a 'Temporary failure in name resolution', perhaps we
 #         should just take a break rather than hammering away.
 #
-#
-# This is a first hack to see if I can prove the concept of, basically a
-# watchdog running on a Pi that will detect when images stopped uploading
-# from my webcam, and then power-cycle the sucker.
-#
-# Posted on this to http://sandaysoft.com/forum/viewtopic.php?f=27&t=16448
-#
-# Invoke with ...  python -u ./webcamwatch.py 2>&1 | tee -a webcamwatch.txt
-#       The -u should bypass any I/O caching
-#
 # https://stackoverflow.com/questions/22676/how-do-i-download-a-file-over-http-using-python
-# Inverted signals to use the NC side of the relay...
-#
 # https://stackoverflow.com/questions/21662783/linux-tee-is-not-working-with-python
 # The -u option works fine.  However, sys.stdout.flush() wouldn't depend on
 # the command line.  My concern though, on a Pi, is that without buffering
 # you're going to hammer the SD Card over time.  Buffering might help, or
 # reducing the output.
-# ========================================================================================
-#      See MXdiags sample at the end of this file
-# ========================================================================================
-# ========================================================================================
-# ========================================================================================
 # ========================================================================================
 # 20201223 Moved CMX to an ssd.
 # 20201220 Added check_file_ages after disabling CMX realtime file generation since it
@@ -61,146 +35,13 @@
 #              in that directory. Turns out the same timestamp we consider in
 #              last_realtime as of the same format, although it starts at the third
 #              token.  In multiple places "last_realtime" was renamed to "last_upload".
-# 20201006 RAD Found in several places I had a pair of parens rather the curlies. You can
-#              see that following "Reason:" below. I noticed a cycle in the logging when
-#              there was a problem with the network or host being down. Search on
-#              "ERROR: in" to see it. There are 3 blocks of repeated code.  Not clear
-#              that would be reasonable to put in a routine, but once we've discovered
-#              a 'Temporary failure in name resolution', perhaps we should just take a
-#              break rather than hammering away.  Add to the wish list...
-#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-#     2020/10/05 02:06:35 2020/10/05 02:06:35, 0, 0, 0,  30,    0.06, 0,    23, 109584, 11%,      0,  0%, 41.3c, 106.4f,  51.3f,   3.3%,    1.2815, X, ,
 #
-#     2020/10/05 02:06:59 ERROR: in server_stalled: <class 'urllib.error.URLError'>
-#     2020/10/05 02:06:59 ERROR: We failed to reach a server.
-#     2020/10/05 02:06:59 ERROR: Reason: ()
-#     2020/10/05 02:06:59 WARNING:  unique_count =1; expected 12.  realtime.txt data was not updated recently (last 45 mins).
-#     2020/10/05 02:06:59 ERROR: in last_realtime: <class 'urllib.error.URLError'>
-#     2020/10/05 02:06:59 ERROR: type: <class 'urllib.error.URLError'>
-#     2020/10/05 02:06:59 ERROR: args: (gaierror(-3, 'Temporary failure in name resolution'),)
-#     2020/10/05 02:06:59 ERROR: We failed to reach a server.
-#     2020/10/05 02:06:59 ERROR: Reason: ()
-#     2020/10/05 02:06:59 DEBUG: content = "00/00/00 00:00:00 45.5 80 39.7 0.0 0.7 360 0.00 0.05 30.14 N 0 mph ..." in last_realtime()
-#     2020/10/05 02:06:59 DEBUG: Got large negative value from record:
-#     	00/00/00 00:00:00 45.5 80 39.7 0.0 0.7 360 0.00 0.05 30.14 N 0 mph ...
-#     2020/10/05 02:06:59 ERROR: in camera_down: <class 'urllib.error.URLError'>
-#     2020/10/05 02:06:59 ERROR: We failed to reach a server.
-#     2020/10/05 02:06:59 ERROR: Reason: ()
-#     2020/10/05 02:06:59 WARNING: Read URL failed.  Assumed image age: 0
-#     2020/10/05 02:06:59 2020/10/05 02:06:59, 1, 0, 0, -7593,    0.04, 0,    23, 109092, 11%,      0,  0%, 40.8c, 105.4f,  51.3f,   2.2%,    1.2818, X, <<<<<,
+#           .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
 #
-#     2020/10/05 02:07:23 ERROR: in server_stalled: <class 'urllib.error.URLError'>
-#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-
-
-# 20201004 RAD First pass rewritting for Python 3 and toward use as a service.
-#              Revision: 7604a3bb8a2097f4668a0aa136fa8cd6a7aaf00f was the version before
-#              I started this slash and burn.  This does work from the command line,
-#              though several columns are not working.
-#              Used https://docs.python.org/3.0/library/2to3.html to get started.
-# 20190722 RAD Added system_uptime.  Already issuing the command- just had to parse
-#              out that portion.
-# 20190529 RAD In server_stalled() initialized content = "1" to avoid the following.
-#              Frankly not super-well tought out at 10:30 PM, but I wanted to take
-#              a quick stab at a fix rather tha ignote it.
-#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-#		Traceback (most recent call last):
-#		  File "/mnt/root/home/pi/watchdog.py", line 1970, in <module>
-#		    main()
-#		  File "/mnt/root/home/pi/watchdog.py", line 417, in main
-#		    server_stalled()
-#		  File "/mnt/root/home/pi/watchdog.py", line 936, in server_stalled
-#		    content = content.rstrip()
-#		UnboundLocalError: local variable 'content' referenced before assignment
-#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# 20181229 RAD Got the following (untrapped) error:
-#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-#                Traceback (most recent call last):
-#                  File "/mnt/root/home/pi/watchdog.py", line 1924, in <module>
-#
-#                  File "/mnt/root/home/pi/watchdog.py", line 393, in main
-#                    camera_down()
-#                  File "/mnt/root/home/pi/watchdog.py", line 1711, in camera_down
-#                    response = urlopen( image_age_URL )
-#                  File "/usr/lib/python2.7/urllib2.py", line 154, in urlopen
-#                    return opener.open(url, data, timeout)
-#                  File "/usr/lib/python2.7/urllib2.py", line 431, in open
-#                    response = self._open(req, data)
-#                  File "/usr/lib/python2.7/urllib2.py", line 449, in _open
-#                    '_open', req)
-#                    . . . . . . . . . .
-#                  File "/usr/lib/python2.7/httplib.py", line 400, in _read_status
-#                    line = self.fp.readline(_MAXLINE + 1)
-#                  File "/usr/lib/python2.7/socket.py", line 476, in readline
-#                    data = self._sock.recv(self._rbufsize)
-#                socket.error: [Errno 110] Connection timed out
-#                - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-#              Changed several occurances of "except URLError as err :" to
-#              "except ( URLError, Exception ) as err :".
-# 20181116 RAD WU_Cancels added to count when CMX cancels the WU update. When
-#              this is found in the log, it is now treated as a special case.
-#              We don't yet do anything special, but we count these with the
-#              idea that after do many occurances we could, perhaps, reboot?
-# 20180918 RAD Got some confusing log messages tied to a urlopen() failure. See
-#                  NOTE: This doesn't seem like it was handled well.  Messaging ...
-#              near the bottom - a log frament.  Wrapped the same exception
-#              handling around each of 3 calls to urlopen() plus added a leading
-#              WARNING message to indicate which routine we are in.
-#              Perhaps we should be trying this call several times?????
-# 20180707 RAD Cleaned up the webcam checking code, here and on the virtual web
-#              server.  camera_down() is somewhat cleaned up, though at present
-#              it is pretty hard-wired for the North cam.
-# 20180606 RAD Weather Underground uploads continue to throw errors.
-#              It's gotten really bad, so bad that my log can be hard to read
-#              as the stuff that results from the WU exceptions dominates during
-#              some periods.  I suppose it possible to see and exception other
-#              than what become an extremely common, and thus meaningless) one
-#              likely results from many WU issues.  For the moment, I just
-#              commented out a few key lines, starting with '#WU#' to silence
-#              all the noise in the log.  It might be useful to split out any
-#              WU Excpetion processing (first) from a generic Exception case.
-#
-#              NOTE: Making the current if into an elif, and inserting a new if
-#              specifically looking for "WU update:    at System.Net.Web..."
-#              would allows us to minimally process that special case of
-#              Exception and still catch any other CMX Exceptions.
-# 20180606 RAD It appears the Pi Network connection went down in the wee hours
-#              this morning.  I don't think the exception process was helpful.
-#              I switched to urllib2, and imported just a few methods.
-#              NOTE: Compare exception handling for each urlopen call...
-# 20180224 RAD Had a case when the readline() in ws_data_stopped() returned ''
-#              which could not be converted to an integer. Somewhat kludgy fix.
-# 20180108 RAD When I restarted the cumulusmx service the change of PID caused a
-#              failure.  cmx_svc_runtime() moved up in the do forever loop to
-#              handle this case.
-# 20171209 RAD Added cmx_svc_runtime().  Changed the method or writing the CSV-style
-#              output lines to leverage the data[] array.
-# 20171012 RAD Started writing status.html, which CMX copies up to the web-server.
-#              It's pretty simple yet, but now I can at least check the current
-#              status remoted via web-browser.
-# 20170920 RAD Noticed rf_dropped() was returning "None" in some cases.
-#              Cumulus MX is catching an exception tied to Weather Underground.
-#              See http://sandaysoft.com/forum/viewtopic.php?f=27&t=16510
-#              Added return_value to make sure there is a value returned.
-#              Increased the number of records checked too.
-#              not to hammer the SD card.
-# 20170822 RAD Posted to http://sandaysoft.com/forum/viewtopic.php?f=27&t=16448
-#              about this project because I'm not sure I yet have a handle on what
-#              to track.  Others may have ideas and be interested...
 # 20170712 RAD Want this to run silently (eventually), but log periodically soas
 #              not to hammer the SD card.
-# ========================================================================================
-#
-#
-#
-#  https://stackoverflow.com/questions/21535467/querying-process-load-in-python
-#
-#  I noticed 10-12 active processes at one point when Cumulus was sluggish...
-#
 #
 # ========================================================================================
-#
 #
 #  EXTERNALIZING LOCAL SETTINGS:
 #
@@ -214,8 +55,6 @@
 #  https://stackoverflow.com/questions/8525765/load-parameters-from-a-file-in-python
 #  https://docs.python.org/2/library/json.html#module-json
 #  https://docs.python.org/2/library/configparser.html
-#
-#
 #
 # ========================================================================================
 
@@ -473,8 +312,6 @@ Prob_Track = [
 # Main loop
 #
 # ----------------------------------------------------------------------------------------
-#
-#
 #  To Do:
 #		last_upload() return value should be leveraged <<<  OBSOLETE???????????????
 # ----------------------------------------------------------------------------------------
@@ -549,22 +386,9 @@ def main():
 
 
 # ----------------------------------------------------------------------------------------
-#
 #   NOTE:   Hacked from last_upload()
-#   NOTE:   Hacked from last_upload()
-#   NOTE:   Hacked from last_upload()
-#   NOTE:   Hacked from last_upload()
-#   NOTE:   Hacked from last_upload()
-#   NOTE:   Hacked from last_upload()
-#   NOTE:   Hacked from last_upload()
-#   NOTE:   Hacked from last_upload()
-#   NOTE:   Hacked from last_upload()
-#   NOTE:   Hacked from last_upload()
-#   NOTE:   Hacked from last_upload()
-#
-# Detemines if the expected files from Cumulus MX are getting uploaded tothe server.
-# Detemines if the expected files from Cumulus MX are getting uploaded tothe server.
-# Detemines if the expected files from Cumulus MX are getting uploaded tothe server.
+# ----------------------------------------------------------------------------------------
+# Detemines if the expected files from Cumulus MX are getting uploaded to the server.
 #
 # Reads fileages_URL (https://dilly.family/wx/fileages.txt) which is generated by
 # wx_worker.sh on the web server which gives the ages of some files of interest.
@@ -583,7 +407,7 @@ def main():
 #        current      max      file
 #        -------      ---  -------------------
 #
-# @@@  @@@@@@
+#
 # ----------------------------------------------------------------------------------------
 def check_file_ages():
 	global data
@@ -727,18 +551,12 @@ def check_file_ages():
 	return diff_secs       # For now we track this number. Later should return status.
 
 
-
-
-
-
-
 # ----------------------------------------------------------------------------------------
 #  Read and parse the first line of "/proc/stat", the cpu line, and calulate the
 #  average cpu utilization as a percentage.
 #
 #  First call is the initialization - usage since boot-up.
 #  Subsequent calls find the avergae utilization since the previous call.
-#
 # ----------------------------------------------------------------------------------------
 def proc_pct() :
 	global proc_stat_busy
@@ -796,22 +614,10 @@ def mono_threads():
 	global data
 
 	PID = str( data['mono_pid'] )
-# @@@ #
 	if "DOWN" in PID :
 		return -1
 
 	# --------------------------------------------------------------------------------
-	#  This failed 01/08/18 when I restarted the "cumulusmx" service.  I reordered
-	#  the calls in the do forever loop which should avoid this...
-	#        Traceback (most recent call last):
-	#          File "/mnt/root/home/pi/watchdog.py", line 1362, in <module>
-	#            main()
-	#          File "/mnt/root/home/pi/watchdog.py", line 296, in main
-	#            mono_threads()
-	#          File "/mnt/root/home/pi/watchdog.py", line 413, in mono_threads
-	#            fileHandle = open ( "/proc/" + str(PID) + "/stat","r" )
-	#        IOError: [Errno 2] No such file or directory: '/proc/540/stat'
-	#
 	#  We could check that we have the right process via cmdline...
 	#    $ cat /proc/13899/cmdline
 	#    /usr/bin/mono/mnt/root/home/pi/Cumulus_MX/CumulusMX.exe
@@ -979,8 +785,6 @@ def read_cpu_temp():
 
 
 # ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
 #
 # Had the idea to list the calling routine, and maybe the line number.
 #
@@ -989,9 +793,6 @@ def read_cpu_temp():
 #
 #   https://stackoverflow.com/questions/45621045/python-print-debugging-show-file-and-line-number
 #
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # Write message to the log file with a leading timestamp.
 #
@@ -1313,8 +1114,6 @@ def last_upload():
 		diff_secs = -1
 	else:
 		date_str = words[0]
-		# Not used...
-		# ddd = re.split('/', date_str)
 
 		timestamp = words[1]
 		########## ___print timestamp
@@ -1365,7 +1164,6 @@ def last_upload():
 
 
 
-
 # ----------------------------------------------------------------------------------------
 # uptime  gives  a one line display of the following information.  The current time,
 # how long the system has been running, how many users are currently logged on,  and
@@ -1411,7 +1209,6 @@ def proc_load():
 		return 1
 	else:
 		return 0
-
 
 
 # ----------------------------------------------------------------------------------------
@@ -1464,7 +1261,6 @@ def mem_usage():
 #%%	print( free )
 	lines = re.split( '\n', free )
 
-# @@@
 	for token in lines :
 #%%		if "total" in token :
 #%%			print( "HEADER -----------------" )
@@ -1509,7 +1305,6 @@ def mem_usage():
 # ----------------------------------------------------------------------------------------
 #
 # NOTE: This is sort of a hack.  WU has been behaving badly so I'm not tracking it...
-#
 #
 # ----------------------------------------------------------------------------------------
 def WX_RF_Restored(cur_line, lineList):
@@ -1577,11 +1372,6 @@ def rf_dropped() :
 			log_file = file_list[iii]
 			break
 
-
-
-	### logger( "DEBUG:  log_file = " + log_file )
-	# ___print log_file
-
 	# --------------------------------------------------------------------------------
 	# Work backwards from the end of the most recent file looking for
 	# one of the lines above.
@@ -1593,8 +1383,6 @@ def rf_dropped() :
 
 	for iii in range(-1, (-1 * check_lines), -1):
 		lineList[iii] = re.sub('\n', ' ', lineList[iii])        # Remove any newline which might be left
-		### logger( "DEBUG:  lineList[" + str(iii) + "] = \"" + lineList[iii] + "\"" )
-		# ___print str(iii) + " \t" + lineList[iii]
 		# ------------------------------------------------------------------------
 		# We may print the same exception multiple times.  It could be identified
 		# by the timestamp...
@@ -1602,11 +1390,6 @@ def rf_dropped() :
 		#     2017-09-22 22:24:00.485
 		#     -----------------------
 		# ------------------------------------------------------------------------
-		#      WARNING:  exception_tstamp = 2017-10-0210:57:00.626:.....
-		#
-		#   2017/11/09 18:28:07 GMT WARNING:  Cumulus MX Exception thrown:    exception_tstamp =
-		#   2017-11-0913:28:00.388:.....
-		#   2017-11-09 13:28:00.388 WU update:    at System.Net.WebConnection.HandleError(WebExceptionStatus st, System.Exception e, System.String where)
 
 		if "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.Exception" in lineList[iii] :
 #WU#		if "Exception" in lineList[iii] :
@@ -1634,7 +1417,7 @@ def rf_dropped() :
 #WU# This whole if block is never executed if saved_exception_tstamp never changes
 #WU#					logger_code =110
 #WU#					saved_exception_tstamp = exception_tstamp
-#@@@#					pass
+#					pass
 					pass
 				else :
 					logger_code =111
@@ -1665,8 +1448,6 @@ def rf_dropped() :
 ###				check_lines = 12
 ###					exception_tstamp )
 			break
-
-
 
 		# ------------------------------------------------------------------------
 		#   2017-09-15 20:26:45.616 Sensor contact lost; ignoring outdoor data
@@ -1699,57 +1480,6 @@ def rf_dropped() :
 			return_value = 1
 			break
 
-
-
-		# ------------------------------------------------------------------------
-		# 01/22/18 - This type of message caused a problem for Weather Underground
-		#            which required a restart/reboot to clear.
-		#
-		# NOTE: Find unexpected messages really needs some analysis and thought.
-		#
-		# This is a grep of the diags logs for "WU" when CMX got stuck...
-		#   2018-01-22 05:54:01.173 WU Response: OK: success
-		#   2018-01-22 05:55:01.213 WU Response: OK: success
-		#   2018-01-22 05:57:40.987 WU update: The Task was canceled
-		#   2018-01-22 05:59:40.996 WU update: The Task was canceled
-		#   2018-01-22 06:01:41.021 WU update: The Task was canceled
-		#   2018-01-22 06:03:41.006 WU update: The Task was canceled
-		#
-		# I also looked for unique WeatherCloud messages
-		#   WeatherCloud Response: InternalServerError: <h1>CException</h1>
-		#   WeatherCloud Response: OK: 200
-		#   WeatherCloud Response: OK: 429
-		#   WeatherCloud update: The Task was canceled
-		#
-		# ------------------------------------------------------------------------
-		# ------------------------------------------------------------------------
-		# ------------------------------------------------------------------------
-		# 20181116 RAD WU_Cancels added
-		# ------------------------------------------------------------------------
-		# ------------------------------------------------------------------------
-		# ------------------------------------------------------------------------
-		#
-		# NOTE:  This caused a 24 hour outage with Weather Underground
-		#
-		# 2018/11/15 13:32:56, 0, 0, 0,  24,    0.00, 0,    16, 138936, 14%,   2356,  2%, 38.1c, 100.6f,  63.7f,   0.4%,   17.6674, 0, ,
-		# 2018/11/15 13:33:21, 0, 0, 0,  24,    0.00, 0,    16, 138860, 14%,   2356,  2%, 37.6c,  99.6f,  63.7f,   0.4%,   17.6677, 0, ,
-		# 77265	2018-11-15 13:30:03.554 WeatherCloud Response: OK: 200
-		# 77266	2018-11-15 13:31:00.994 WU Response: OK: success
-		# 77267	
-		# 77268	2018-11-15 13:33:40.825 WU update: The Task was canceled
-		# 2018/11/15 13:33:45 WARNING:   "The Task was canceled"  from  /mnt/root/home/pi/Cumulus_MX/MXdiags/20181028-223154.txt
-		#
-		#   * * * * *  almost 700 of this in MXdiags  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-		#
-		# 79363	2018-11-16 12:30:02.904 WeatherCloud Response: OK: 200
-		# 79364	2018-11-16 12:31:40.696 WU update: The Task was canceled
-		# 79365	2018-11-16 12:33:40.659 WU update: The Task was canceled
-		# 2018/11/16 12:33:45 WARNING:   "The Task was canceled"  from  /mnt/root/home/pi/Cumulus_MX/MXdiags/20181028-223154.txt
-		#
-		# 2018/11/16 12:33:46, 0, 0, 0,  23,    0.00, 0,    17, 129992, 13%,   2852,  2%, 37.6c,  99.6f,  63.7f,   0.9%,   18.6263, 0, ,
-		# 2018/11/16 12:34:10, 0, 0, 0,   0,    0.30, 0,    12, 146404, 15%,   2780,  2%, 38.6c, 101.5f,  63.7f,  15.5%,    0.0002, 0, ,
-		# 2018/11/16 12:34:35, 0, 0, 0,  45,    0.22, 0,    13, 147356, 15%,   2780,  2%, 38.6c, 101.5f,  63.7f,   1.3%,    0.0005, 0, ,
-		#
 		# ------------------------------------------------------------------------
 		#   The WU handling is a mess.  Some of it is WU and some of it is
 		#   CMX.  The above, almost 24 hour outage was fixed by restarting
@@ -1812,17 +1542,10 @@ def rf_dropped() :
 		#
 		# ------------------------------------------------------------------------
 		elif "Data input appears to have stopped" in lineList[iii] :
-			# ----------------------------------------------------------------
 			log_event("", "Data input appears to have stopped, USB likely disconnected.", 120 )
 			logger( "INFO: \"Data input appears to have stopped\", USB likely disconnected.   (code 120)" )
 			return_value = 1
 			break
-
-
-
-
-
-
 
 		# ------------------------------------------------------------------------
 		# See the block below for a "Sensor contact lost" example.
@@ -1863,43 +1586,10 @@ def rf_dropped() :
 
 
 	# --------------------------------------------------------------------------------
-	#   Not sure what to do with "None", or where exactly this comes from.
-	#   Added return_value to make sure there is a value returned.
-	#   Increased the number of records checked too.
-	#
-	#  2017/09/20 12:50:21 GMT,  0,  0,  None,  24,  0.16,  0,  122740,  12%,  0,  0%,
-	#  free|945512|664316|281196|6764|392848|148728|122740|822772|102396|0|102396
-	#  2017/09/20 12:50:46 GMT,  0,  0,  None,  24,  0.1,  0,  122608,  12%,  0,  0%,
-	#  free|945512|664200|281312|6764|392860|148732|122608|822904|102396|0|102396
-	#  2017/09/20 12:51:11 GMT,  0,  0,  0,  24,  0.07,  0,  122696,  12%,  0,  0%,
-	# --------------------------------------------------------------------------------
 	data['rf_dropped'] = return_value
 	return return_value
 
 	# --------------------------------------------------------------------------------
-	#
-	#
-	#                  NOTE:   Tons of comments removed here
-	#
-	#
-	# --------------------------------------------------------------------------------
-	# Pulling these Latest reading records out, I notice a pattern when the RF seems
-	# to be down of "FF FF FF" as shown, but it isn't quite right because we didn't
-	# have around 20 minutes of changing data from looking at the graphs.
-	#
-	#  2018-02-26 05:25:00.424 Latest reading: 75A0: 18 35 B1 00 FF FF FF 6A 26 FF FF FF 80 45 0E C0
-	#  2018-02-26 05:30:00.439 Latest reading: 75A0: 1D 35 B2 00 FF FF FF 6C 26 FF FF FF 80 45 0E C0
-	#  2018-02-26 05:35:00.453 Latest reading: 75B0: 04 35 B2 00 47 28 00 6C 26 00 00 00 00 45 0E 80
-	#  2018-02-26 05:40:00.469 Latest reading: 75B0: 09 35 B2 00 47 28 00 6B 26 00 00 00 00 45 0E 80
-	#  2018-02-26 05:45:00.483 Latest reading: 75B0: 0E 35 B3 00 47 28 00 6B 26 00 00 00 00 45 0E 80
-	#  2018-02-26 05:50:00.498 Latest reading: 75B0: 11 36 B5 00 47 28 00 6F 26 00 00 00 00 45 0E 80
-	#  2018-02-26 05:55:00.513 Latest reading: 75B0: 18 36 B6 00 FF FF FF 6D 26 FF FF FF 80 45 0E C0
-	#  2018-02-26 06:00:00.539 Latest reading: 75B0: 1D 36 B7 00 FF FF FF 6D 26 FF FF FF 80 45 0E C0
-	#                                                            ^^^^^^^^
-	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-	#  2018-02-26 05:51:00.979 WU Response: OK: success
-	# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-	#
 	# Maybe we can't conclude the RF has restarted unless we see a minimum
 	# of two "WU Response: OK: success" records in a row.  Or, if we do see
 	# such a record, the one before cannot be "Sensor contact lost." But there
@@ -1907,7 +1597,6 @@ def rf_dropped() :
 	# record, we still might have dropped RF.  Its also possible a
 	# "WeatherCloud Response" record could be in there depending on the
 	# response time from the server.
-	#
 	# --------------------------------------------------------------------------------
 
 
@@ -1937,11 +1626,6 @@ def camera_down():
 	is_down = 1
 
 
-	# --------------------------------------------------------------------------------
-	# --------------------------------------------------------------------------------
-	# --------------------------------------------------------------------------------
-# -----------------------------------------  @@@@@@  --------------------------------------------
-	# --------------------------------------------------------------------------------
 	# --------------------------------------------------------------------------------
 	try :
 #>>>		response = urlopen( realtime_URL )
@@ -2003,14 +1687,6 @@ def camera_down():
 	age_secs = int( lines[1] )
 
 	# --------------------------------------------------------------------------------
-	# --------------------------------------------------------------------------------
-	# --------------------------------------------------------------------------------
-	# --------------------------------------------------------------------------------
-	# --------------------------------------------------------------------------------
-	# --------------------------------------------------------------------------------
-
-
-	# --------------------------------------------------------------------------------
 	# Keep as string up until this point, because of...
 	#      TypeError: object of type 'int' has no len()
 	# --------------------------------------------------------------------------------
@@ -2064,8 +1740,6 @@ def cmx_svc_runtime():
 	try :
 		output = subprocess.check_output(["/bin/systemctl", "status", "cumulusmx"], text=True)
 		lines = re.split('\n', output)
-		#@@@# print( "@@@" )
-		#@@@# print( lines )
 	except Exception as problem :
 		log_and_message( "ERROR: From systemctl status: {}".format( sys.exc_info()[0] ) )
 		log_and_message( "ERROR: From systemctl problem: {}".format( problem ) )
@@ -2077,25 +1751,6 @@ def cmx_svc_runtime():
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	#   Active: active (running) since Sat 2018-06-23 10:10:30 EDT; 4s ago
 	# Main PID: 3364 (mono)
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	#   Active: activating (auto-restart) (Result: signal) since Tue 2018-12-25 09:04:04 EST; 4s ago
-	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-	#
-	#   $ sudo systemctl status cumulusmx
-	#   ● cumulusmx.service - CumulusMX service
-	#      Loaded: loaded (/etc/systemd/system/cumulusmx.service; enabled; vendor preset: enabled)
-	#      Active: active (running) since Sat 2020-10-03 19:21:11 EDT; 2h 47min ago
-	#        Docs: https://cumuluswiki.org/a/Main_Page
-	#     Process: 571 ExecStart=/usr/bin/mono-service /home/pi/CumulusMX/CumulusMX.exe -service (code=exited, status=0/SUCC
-	#    Main PID: 576 (mono)
-	#       Tasks: 26 (limit: 2065)
-	#      CGroup: /system.slice/cumulusmx.service
-	#              └─576 /usr/bin/mono /usr/lib/mono/4.5/mono-service.exe /home/pi/CumulusMX/CumulusMX.exe -service
-	#
-	#   Oct 03 19:21:11 raspi-005 systemd[1]: Starting CumulusMX service...
-	#   Oct 03 19:21:11 raspi-005 systemd[1]: Started CumulusMX service.
-	#   Oct 03 19:21:18 raspi-005 mono[576]: /home/pi/CumulusMX/CumulusMX.exe: Service CumulusService started
-	#
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	for iii in range(0, len(lines)):
 		if re.search('Main PID:', lines[iii]) :
