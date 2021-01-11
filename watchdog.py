@@ -21,6 +21,9 @@
 # you're going to hammer the SD Card over time.  Buffering might help, or
 # reducing the output.
 # ========================================================================================
+# 20210111 Disabled, but didn't remove camera_down() yet.  There are 3 cameras at this
+#          point and this might make more sense to create a separate watcher (that
+#          could run as 3 instances ... as needed).
 # 20201223 Moved CMX to an ssd.
 # 20201220 Added check_file_ages after disabling CMX realtime file generation since it
 #          isn't required for the site. Not surrently called. Started prepping to move
@@ -330,6 +333,12 @@ def main():
 	logger("DEBUG: status_dir = \"{}\"".format( status_dir ) )
 
 	log_event("", "INFO: Starting watchdog.py.", 901 )
+
+	# --------------------------------------------------------------------------------
+	# Should remove this at some point
+	# --------------------------------------------------------------------------------
+	data['camera_down'] = 0
+
 	iii = 0
 	while True:
 		if 0 == iii % log_header_stride:
@@ -348,7 +357,7 @@ def main():
 		last_upload()
 		proc_load()
 		proc_pct()
-		camera_down()
+# DELETE #		camera_down()
 		cmx_svc_runtime()
 		mono_threads()
 		mem_usage()
@@ -1602,103 +1611,92 @@ def rf_dropped() :
 
 
 
-# ----------------------------------------------------------------------------------------
-#  Check webcam status by fetching a control file from the hosted web-server.
-#  The file just contains a number - the number of seconds between the time of
-#  last writing the generically-named full-size image file, e.g. N.jpg by FTP,
-#  an the current time.  Since cron_10_min.sh runs every 5 minutes
-#
-#   Can verify with: curl http://dillys.org/wx/North/N_age.txt
-#
-#    Copied from "webcamwatch.py" and modified for here...
-#
-#  NOTE: Should make the camera a parameter.  2 things affected:
-#           * The URL to check
-#           * The index to store in data[]
-#
-#  NOTE: Question:  Is pcyc_holdoff_time really required?  It adds complexity...
-#
-# ----------------------------------------------------------------------------------------
-def camera_down():
-	global data
-	global pcyc_holdoff_time
-	age = ""
-	is_down = 1
+
+
+
+#	# ----------------------------------------------------------------------------------------
+#	#  Check webcam status by fetching a control file from the hosted web-server.
+#	#  The file just contains a number - the number of seconds between the time of
+#	#  last writing the generically-named full-size image file, e.g. N.jpg by FTP,
+#	#  an the current time.  Since cron_10_min.sh runs every 5 minutes
+#	#
+#	#   Can verify with: curl http://dillys.org/wx/North/N_age.txt
+#	#
+#	#    Copied from "webcamwatch.py" and modified for here...
+#	#
+#	#  NOTE: Should make the camera a parameter.  2 things affected:
+#	#           * The URL to check
+#	#           * The index to store in data[]
+#	#
+#	#  NOTE: Question:  Is pcyc_holdoff_time really required?  It adds complexity...
+#	#
+#	# ----------------------------------------------------------------------------------------
+#	# def camera_down():
+#	#	global data
+#	#	global pcyc_holdoff_time
+#	#	age = ""
+#	#	is_down = 1
 
 
 	# --------------------------------------------------------------------------------
-	try :
-#>>>		response = urlopen( realtime_URL )
-		response = urlopen( image_age_URL )
+#	#	try :
+#	#		response = urlopen( realtime_URL )
+#	#		response = urlopen( image_age_URL )
 
 		# NOTE: The decode() methed seemed required for Python 3.  See
 		#       https://stackoverflow.com/questions/31019854/typeerror-cant-use-a-string-pattern-on-a-bytes-like-object-in-re-findall
 		#       https://stackoverflow.com/questions/37722051/re-search-typeerror-cannot-use-a-string-pattern-on-a-bytes-like-object
 		content = response.read().decode('utf-8')
-# NOTE: I think unneeded
-#>>>		content = content.rstrip()
+#	# NOTE: I think unneeded
+#	#		content = content.rstrip()
 
-	except ( URLError, Exception ) as err :
-		log_and_message( "ERROR: in camera_down: {}".format( sys.exc_info()[0] ) )
-		# ------------------------------------------------------------------------
-		#  See https://docs.python.org/2/tutorial/errors.html (~ middle)
-		# ------------------------------------------------------------------------
-		log_and_message( "ERROR: type: {}".format( type(err) ) )
-		log_and_message( "ERROR: args: {}".format( err.args ) )
-		if hasattr(err, 'reason'):
-			log_and_message( 'ERROR: We failed to reach a server.' )
-			log_and_message( 'ERROR: Reason: {}'.format( err.reason ) )
+#	#	except ( URLError, Exception ) as err :
+#	#		log_and_message( "ERROR: in camera_down: {}".format( sys.exc_info()[0] ) )
+#	#		# ------------------------------------------------------------------------
+#	#		#  See https://docs.python.org/2/tutorial/errors.html (~ middle)
+#	#		# ------------------------------------------------------------------------
+#	#		log_and_message( "ERROR: type: {}".format( type(err) ) )
+#	#		log_and_message( "ERROR: args: {}".format( err.args ) )
+#	#		if hasattr(err, 'reason'):
+#	#			log_and_message( 'ERROR: We failed to reach a server.' )
+#	#			log_and_message( 'ERROR: Reason: {}'.format( err.reason ) )
 
-		elif hasattr(err, 'code'):
-			log_and_message( 'ERROR: The server couldn\'t fulfill the request.' )
-			log_and_message( 'ERROR: code: {}'.format( err.code ) )
+#	#		elif hasattr(err, 'code'):
+#	#			log_and_message( 'ERROR: The server couldn\'t fulfill the request.' )
+#	#			log_and_message( 'ERROR: code: {}'.format( err.code ) )
 
-		else:
-			log_and_message( 'ERROR: Reason: {}'.format( err.reason ) )
-			log_and_message( 'ERROR: code: {}'.format( err.code ) )
-
-		# ------------------------------------------------------------------------
-		#  https://docs.python.org/2/tutorial/errors.html
-		#  https://docs.python.org/2/library/sys.html
-		#  https://docs.python.org/3/library/traceback.html
-		#  https://docs.python.org/2/library/traceback.html
-		#
-		#  https://stackoverflow.com/questions/8238360/how-to-save-traceback-sys-exc-info-values-in-a-variable
-		# ------------------------------------------------------------------------
-		content = "-1\n-1"
-		logger( "DEBUG: content = \"" + content + "\" in camera_down()" )
+#	#		else:
+#	#			log_and_message( 'ERROR: Reason: {}'.format( err.reason ) )
+#	#			log_and_message( 'ERROR: code: {}'.format( err.code ) )
 
 		# ------------------------------------------------------------------------
-		# Examples of errors
-		#   2020/12/30 16:24:51
-		#   ERROR: in camera_down: <class 'ConnectionResetError'>
-		#   ERROR: type: <class 'ConnectionResetError'>
-		#   ERROR: args: (104, 'Connection reset by peer')
-		#      Caused a restart
+#	#		content = "-1\n-1"
+#	#		logger( "DEBUG: content = \"" + content + "\" in camera_down()" )
+
 		# ------------------------------------------------------------------------
 
-#>>>	logger( "DEBUG: content = \"" + content + "\" in camera_down()" )
+#	#	logger( "DEBUG: content = \"" + content + "\" in camera_down()" )
 
 	#---# logger( "DEBUG: len(content) = {}".format( len(content) ) )
-	lines = re.split( '\n', content )
+#	#	lines = re.split( '\n', content )
 	#---# logger( "DEBUG: len(lines) = {}".format( len(lines) ) )
 
-	age = int( lines[0] )
-	age_secs = int( lines[1] )
+#	#	age = int( lines[0] )
+#	#	age_secs = int( lines[1] )
 
 	# --------------------------------------------------------------------------------
 	# Keep as string up until this point, because of...
 	#      TypeError: object of type 'int' has no len()
 	# --------------------------------------------------------------------------------
-#>>>	if len( age ) < 1 :
-#>>>		age = "0"
-#>>>		logger("WARNING: Read null.  Assumed image age: {}".format( age ) )
+#	#	if len( age ) < 1 :
+#	#		age = "0"
+#	#		logger("WARNING: Read null.  Assumed image age: {}".format( age ) )
 
 	# --------------------------------------------------------------------------------
 	#
 	# --------------------------------------------------------------------------------
-	if int(age) > 600 :
-		logger("WARNING: Old image age: {}".format( age ) )
+#	#	if int(age) > 600 :
+#	#		logger("WARNING: Old image age: {}".format( age ) )
 		## power_cycle()
 
 		# ------------------------------------------------------------------------
@@ -1706,26 +1704,29 @@ def camera_down():
 		#  Seems to me we only want to avoid power-cycling the webcam repeatedly
 		#  We are not doing that from here at the moment...
 		# ------------------------------------------------------------------------
-		if pcyc_holdoff_time > 0 :
-			if int(time.strftime("%s")) > pcyc_holdoff_time :
-				# holdoff has expired
-				logger("WARNING: Waiting on webcam image update at web server.")
-				###### if data['camera_down'] == 0 :
-				######	log_event("", " waiting on webcam image update.", 104 )
-		else:
-			pcyc_holdoff_time = int(time.strftime("%s")) + 600
-			logger("DEBUG: power cycle needed.")
-			log_event("", " Webcam image update stalled.", 103 )
+#	#		if pcyc_holdoff_time > 0 :
+#	#			if int(time.strftime("%s")) > pcyc_holdoff_time :
+#	#				# holdoff has expired
+#	#				logger("WARNING: Waiting on webcam image update at web server.")
+#	#				###### if data['camera_down'] == 0 :
+#	#				######	log_event("", " waiting on webcam image update.", 104 )
+#	#		else:
+#	#			pcyc_holdoff_time = int(time.strftime("%s")) + 600
+#	#			logger("DEBUG: power cycle needed.")
+#	#			log_event("", " Webcam image update stalled.", 103 )
 
-	else:
-		is_down = 0
-		if data['camera_down'] == 1 :
-			log_event("", " Webcam image updating!.", 105 )
-		pcyc_holdoff_time = 0
+#	#	else:
+#	#		is_down = 0
+#	#		if data['camera_down'] == 1 :
+#	#			log_event("", " Webcam image updating!.", 105 )
+#	#		pcyc_holdoff_time = 0
 
 
-	data['camera_down'] = is_down
-	return is_down
+#	#	data['camera_down'] = is_down
+#	#	return is_down
+
+
+
 
 
 # ----------------------------------------------------------------------------------------
