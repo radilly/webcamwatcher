@@ -568,7 +568,7 @@ def push_to_server_via_scp(local_file, remote_path, server) :
 	for iii in cmd :
 		temp = "{} {}".format( temp, iii )
 
-	print( temp )
+	logger( temp )
 	### DEBUG
 	### DEBUG
 
@@ -579,11 +579,11 @@ def push_to_server_via_scp(local_file, remote_path, server) :
 		lines = re.split('\n', output)
 	except :
 		lines = {}
-		messager( "ERROR: scp: {}".format( sys.exc_info()[0] ) )
+		logger( "ERROR: scp: {}".format( sys.exc_info()[0] ) )
 
 	if len(lines) > 1 :
 		for jjj in range( len(lines) ) :
-			print( "DEBUG: #{} \"{}\"".format( jjj, lines[jjj] ) )
+			logger( "DEBUG: #{} \"{}\"".format( jjj, lines[jjj] ) )
 	
 	return
 
