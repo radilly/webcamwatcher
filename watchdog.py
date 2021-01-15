@@ -1,6 +1,13 @@
 #!/usr/bin/python3
 # NOTE: @@@
 #
+#   NOTE: ==================================================================
+#   NOTE: fetch_URL() written, but not called or tested.
+#   NOTE: fetch_URL() written, but not called or tested.
+#   NOTE: fetch_URL() written, but not called or tested.
+#   NOTE: fetch_URL() written, but not called or tested.
+#   NOTE: ==================================================================
+#
 #   NOTE: check_file_ages needs to be finished.
 #
 #   NOTE: It would be interesting to see if we could log any "significant"
@@ -21,6 +28,7 @@
 # you're going to hammer the SD Card over time.  Buffering might help, or
 # reducing the output.
 # ========================================================================================
+# 20210113 Removed camera_down().  fetch_URL() written, but not called or tested.
 # 20210111 Disabled, but didn't remove camera_down() yet.  There are 3 cameras at this
 #          point and this might make more sense to create a separate watcher (that
 #          could run as 3 instances ... as needed).
@@ -153,7 +161,6 @@ WU_Cancels = 0
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 data = []
 data = { 'watcher_pid' : getpid() }
-data['camera_down'] = 0
 
 data_keys = [
 	"mono_pid",
@@ -164,7 +171,7 @@ data_keys = [
 	"server_stalled",
 	"ws_data_stopped",
 	"rf_dropped",
-	"camera_down",
+
 	"last_upload",
 	"proc_pct",
 	"proc_load",
@@ -196,7 +203,7 @@ data_format = [
 	"{}",
 	"{}",
 	"{}",
-	"{}",
+
 	"{} sec",
 	"{:5.1f}%",
 	"{:7.2f}",
@@ -223,7 +230,7 @@ thresholds = [
 	0,
 	0,
 	0,
-	0,
+
 	120,
 	10.0,
 	4.0,
@@ -245,6 +252,7 @@ thresholds = [
 
 # ----------------------------------------------------------------------------------------
 # For CSV-style output line
+#
 # ----------------------------------------------------------------------------------------
 #       "date-time",
 CSV_keys = [
@@ -253,7 +261,7 @@ CSV_keys = [
 	"rf_dropped",
 	"last_upload",
 	"proc_load",
-	"camera_down",
+
 	"mono_threads",
 	"effective_used",
 	"mem_pct",
@@ -274,7 +282,7 @@ CSV_format = [
 	"{}",
 	"{:3d}",
 	"{:7.2f}",
-	"{}",
+
 	"{:5d}",
 	"{:6d}",
 	"{:2d}%",
@@ -295,7 +303,7 @@ Prob_Track = [
 	1,
 	0,
 	0,
-	1,
+
 	0,
 	0,
 	0,
@@ -326,18 +334,17 @@ def main():
 	python_version = re.sub(' *\n *', '<BR>', python_version )
 	python_version = re.sub(' *\(', '<BR>(', python_version )
 
-	logger("INFO: Python version: ".format(sys.version) )
+	logger("INFO: Python version: {}".format(sys.version) )
 	data['python_version'] = python_version
 
-	logger("DEBUG: BASE_DIR = \"{}\"".format( BASE_DIR ) )
-	logger("DEBUG: status_dir = \"{}\"".format( status_dir ) )
+	# logger("DEBUG: BASE_DIR = \"{}\"".format( BASE_DIR ) )
+	# logger("DEBUG: status_dir = \"{}\"".format( status_dir ) )
 
 	log_event("", "INFO: Starting watchdog.py.", 901 )
 
 	# --------------------------------------------------------------------------------
 	# Should remove this at some point
 	# --------------------------------------------------------------------------------
-	data['camera_down'] = 0
 
 	iii = 0
 	while True:
@@ -357,7 +364,6 @@ def main():
 		last_upload()
 		proc_load()
 		proc_pct()
-# DELETE #		camera_down()
 		cmx_svc_runtime()
 		mono_threads()
 		mem_usage()
@@ -371,7 +377,7 @@ def main():
 			CSV_rec = CSV_rec + format_str.format( data[CSV_keys[jjj]] )
 			if Prob_Track[jjj] > 0 :
 				if data[CSV_keys[jjj]] > 0 :
-					Prob_Flag = " <<<<<,"
+					Prob_Flag += " <<<<<," + CSV_keys[jjj]
 
 		logger_no_ts(CSV_rec + Prob_Flag)
 
@@ -391,6 +397,58 @@ def main():
 		iii += 1
 		sleep(sleep_for)
 
+
+# ----------------------------------------------------------------------------------------
+#  Call urlopen and handle possible errors
+#  Returns data read, or "ERROR"
+#
+# NOTE: @@@
+# ----------------------------------------------------------------------------------------
+def fetch_URL( remote_url, caller_string ) :
+	# --------------------------------------------------------------------------------
+	#  09/10/17 12:02:47 73.0 92 70.6 3.1 4.5 270 ...
+	#  09/10/17 12:03:11 73.0 92 70.6 3.1 4.5 270 ...
+	#  Search for "20181015" to see an odd error I've gotten several times...
+	#         BadStatusLine
+	# --------------------------------------------------------------------------------
+	try :
+		response = urlopen( fileages_URL )
+
+		# NOTE: The decode() methed seemed required for Python 3.  See
+		content = response.read().decode('utf-8')
+#######################################################		content = content.rstrip()
+
+	except ( URLError, Exception ) as err :
+		log_and_message( "ERROR: in {}: {}".format( caller_string, sys.exc_info()[0] ) )
+		# ------------------------------------------------------------------------
+		#  See https://docs.python.org/2/tutorial/errors.html (~ middle)
+		# ------------------------------------------------------------------------
+		log_and_message( "ERROR: type: {}".format( type(err) ) )
+		log_and_message( "ERROR: args: {}".format( err.args ) )
+		if hasattr(err, 'reason'):
+			log_and_message( 'ERROR: We failed to reach a server.' )
+			log_and_message( 'ERROR: Reason: {}'.format( err.reason ) )
+
+		elif hasattr(err, 'code'):
+			log_and_message( 'ERROR: The server couldn\'t fulfill the request.' )
+			log_and_message( 'ERROR: code: {}'.format( err.code ) )
+
+		else:
+			log_and_message( 'ERROR: Reason: {}'.format( err.reason ) )
+			log_and_message( 'ERROR: code: {}'.format( err.code ) )
+
+		# ------------------------------------------------------------------------
+		#  https://docs.python.org/2/tutorial/errors.html
+		#  https://docs.python.org/2/library/sys.html
+		#  https://docs.python.org/3/library/traceback.html
+		#  https://docs.python.org/2/library/traceback.html
+		#
+		#  https://stackoverflow.com/questions/8238360/how-to-save-traceback-sys-exc-info-values-in-a-variable
+		# ------------------------------------------------------------------------
+		content = "ERROR"
+		logger( "DEBUG: content = \"{}\" in check_file_ages()".format( content ) )
+
+	return content
 
 
 
@@ -416,9 +474,8 @@ def main():
 #        current      max      file
 #        -------      ---  -------------------
 #
-#
 # ----------------------------------------------------------------------------------------
-def check_file_ages():
+def check_file_ages() :
 	global data
 	global last_secs
 	global last_date
@@ -428,6 +485,7 @@ def check_file_ages():
 	#  Search for "20181015" to see an odd error I've gotten several times...
 	#         BadStatusLine
 	# --------------------------------------------------------------------------------
+# NOTE: @@@
 	try :
 		response = urlopen( fileages_URL )
 
@@ -869,7 +927,7 @@ def write_pid_file():
 	pid_file = sys.argv[0]
 	pid_file = re.sub('\.py', '.PID', pid_file)
 
-	logger( "DEBUG: Writing {}".format( pid_file ) )
+	# logger( "DEBUG: Writing {}".format( pid_file ) )
 
 	FH = open(pid_file, "w")
 	FH.write(PID)
@@ -970,6 +1028,7 @@ def server_stalled():
 	#   2017/10/11 13:01:56 GMT,  0,  0,  0,  24,   0.01,  0,  89248,  9%,  0,  0%,  46.2,  46.160,   115.1,
 	#   free|945512|271656|673856|6796|55352|127056|89248|856264|102396|0|102396
 	# --------------------------------------------------------------------------------
+# NOTE: @@@
 	try:
 		response = urlopen( WS_Updates_URL )
 		content = response.read()
@@ -1038,6 +1097,7 @@ def last_upload():
 	#  Search for "20181015" to see an odd error I've gotten several times...
 	#         BadStatusLine
 	# --------------------------------------------------------------------------------
+# NOTE: @@@
 	try :
 		response = urlopen( realtime_URL )
 
@@ -1611,124 +1671,6 @@ def rf_dropped() :
 
 
 
-
-
-
-#	# ----------------------------------------------------------------------------------------
-#	#  Check webcam status by fetching a control file from the hosted web-server.
-#	#  The file just contains a number - the number of seconds between the time of
-#	#  last writing the generically-named full-size image file, e.g. N.jpg by FTP,
-#	#  an the current time.  Since cron_10_min.sh runs every 5 minutes
-#	#
-#	#   Can verify with: curl http://dillys.org/wx/North/N_age.txt
-#	#
-#	#    Copied from "webcamwatch.py" and modified for here...
-#	#
-#	#  NOTE: Should make the camera a parameter.  2 things affected:
-#	#           * The URL to check
-#	#           * The index to store in data[]
-#	#
-#	#  NOTE: Question:  Is pcyc_holdoff_time really required?  It adds complexity...
-#	#
-#	# ----------------------------------------------------------------------------------------
-#	# def camera_down():
-#	#	global data
-#	#	global pcyc_holdoff_time
-#	#	age = ""
-#	#	is_down = 1
-
-
-	# --------------------------------------------------------------------------------
-#	#	try :
-#	#		response = urlopen( realtime_URL )
-#	#		response = urlopen( image_age_URL )
-
-		# NOTE: The decode() methed seemed required for Python 3.  See
-		#       https://stackoverflow.com/questions/31019854/typeerror-cant-use-a-string-pattern-on-a-bytes-like-object-in-re-findall
-		#       https://stackoverflow.com/questions/37722051/re-search-typeerror-cannot-use-a-string-pattern-on-a-bytes-like-object
-		content = response.read().decode('utf-8')
-#	# NOTE: I think unneeded
-#	#		content = content.rstrip()
-
-#	#	except ( URLError, Exception ) as err :
-#	#		log_and_message( "ERROR: in camera_down: {}".format( sys.exc_info()[0] ) )
-#	#		# ------------------------------------------------------------------------
-#	#		#  See https://docs.python.org/2/tutorial/errors.html (~ middle)
-#	#		# ------------------------------------------------------------------------
-#	#		log_and_message( "ERROR: type: {}".format( type(err) ) )
-#	#		log_and_message( "ERROR: args: {}".format( err.args ) )
-#	#		if hasattr(err, 'reason'):
-#	#			log_and_message( 'ERROR: We failed to reach a server.' )
-#	#			log_and_message( 'ERROR: Reason: {}'.format( err.reason ) )
-
-#	#		elif hasattr(err, 'code'):
-#	#			log_and_message( 'ERROR: The server couldn\'t fulfill the request.' )
-#	#			log_and_message( 'ERROR: code: {}'.format( err.code ) )
-
-#	#		else:
-#	#			log_and_message( 'ERROR: Reason: {}'.format( err.reason ) )
-#	#			log_and_message( 'ERROR: code: {}'.format( err.code ) )
-
-		# ------------------------------------------------------------------------
-#	#		content = "-1\n-1"
-#	#		logger( "DEBUG: content = \"" + content + "\" in camera_down()" )
-
-		# ------------------------------------------------------------------------
-
-#	#	logger( "DEBUG: content = \"" + content + "\" in camera_down()" )
-
-	#---# logger( "DEBUG: len(content) = {}".format( len(content) ) )
-#	#	lines = re.split( '\n', content )
-	#---# logger( "DEBUG: len(lines) = {}".format( len(lines) ) )
-
-#	#	age = int( lines[0] )
-#	#	age_secs = int( lines[1] )
-
-	# --------------------------------------------------------------------------------
-	# Keep as string up until this point, because of...
-	#      TypeError: object of type 'int' has no len()
-	# --------------------------------------------------------------------------------
-#	#	if len( age ) < 1 :
-#	#		age = "0"
-#	#		logger("WARNING: Read null.  Assumed image age: {}".format( age ) )
-
-	# --------------------------------------------------------------------------------
-	#
-	# --------------------------------------------------------------------------------
-#	#	if int(age) > 600 :
-#	#		logger("WARNING: Old image age: {}".format( age ) )
-		## power_cycle()
-
-		# ------------------------------------------------------------------------
-		#  NOTE: This pcyc_holdoff_time business may not be needed.
-		#  Seems to me we only want to avoid power-cycling the webcam repeatedly
-		#  We are not doing that from here at the moment...
-		# ------------------------------------------------------------------------
-#	#		if pcyc_holdoff_time > 0 :
-#	#			if int(time.strftime("%s")) > pcyc_holdoff_time :
-#	#				# holdoff has expired
-#	#				logger("WARNING: Waiting on webcam image update at web server.")
-#	#				###### if data['camera_down'] == 0 :
-#	#				######	log_event("", " waiting on webcam image update.", 104 )
-#	#		else:
-#	#			pcyc_holdoff_time = int(time.strftime("%s")) + 600
-#	#			logger("DEBUG: power cycle needed.")
-#	#			log_event("", " Webcam image update stalled.", 103 )
-
-#	#	else:
-#	#		is_down = 0
-#	#		if data['camera_down'] == 1 :
-#	#			log_event("", " Webcam image updating!.", 105 )
-#	#		pcyc_holdoff_time = 0
-
-
-#	#	data['camera_down'] = is_down
-#	#	return is_down
-
-
-
-
-
 # ----------------------------------------------------------------------------------------
 # Return run-time of cumulusmx service as fractional days - Excel-style date.
 #
@@ -1898,7 +1840,7 @@ if __name__ == '__main__':
 
 	log_and_message("INFO: Mono version: {}" .format( mono_version() ) )
 
-	log_and_message("DEBUG: Logging to {}" .format( logger_file ) )
+	# log_and_message("DEBUG: Logging to {}" .format( logger_file ) )
 
 	try:
 		main()
