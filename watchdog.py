@@ -28,6 +28,7 @@
 # you're going to hammer the SD Card over time.  Buffering might help, or
 # reducing the output.
 # ========================================================================================
+# 20210116 Missing the decode - now "response.read().decode('utf-8')" in server_stalled().
 # 20210113 Removed camera_down().  fetch_URL() written, but not called or tested.
 # 20210111 Disabled, but didn't remove camera_down() yet.  There are 3 cameras at this
 #          point and this might make more sense to create a separate watcher (that
@@ -1031,7 +1032,7 @@ def server_stalled():
 # NOTE: @@@
 	try:
 		response = urlopen( WS_Updates_URL )
-		content = response.read()
+		content = response.read().decode('utf-8')
 
 	except ( URLError, Exception ) as err :
 	### >>>> except URLError as err :
@@ -1058,7 +1059,7 @@ def server_stalled():
 	# .................................................................
 	content = content.rstrip()
 	if len(content) < 1:
-		logger( "DEBUG: WS_Updates.txt looks short = \"" + content.rstrip() + "\"" )
+		logger( "DEBUG: WS_Updates.txt looks short = \"{}\"".format( content ) )
 
 	try:
 		unique_count = int(content)
