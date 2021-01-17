@@ -188,6 +188,8 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20210114 Added def log_event() to work with statuscollector.py to consolodate a view
+#          of what is happening across multiple scripts.
 # 20201226 In using Pi Zero-based webcams, and pushing images through ssh and dd, we were
 #          seeing a lot of issues around next_image_file() and check_stable_size(). A
 #          number of changes were made to make it more tolerant and improve the logging a
@@ -440,6 +442,7 @@ remote_dir = ""
 image_age_URL = ""
 
 other_systemctl = ""
+status_HOST = ""
 
 this_script = sys.argv[0]
 if re.match('^\./', this_script) :
@@ -477,6 +480,7 @@ WEB_URL = "http://dilly.family/wx"
 cam_host = "127.0.0.1"
 
 cfg_parameters = [
+	"status_HOST",
 	"work_dir",
 	"main_image",
 	"thumbnail_image",
@@ -538,10 +542,11 @@ def main():
 	log_and_message( "INFO: mon_log = \"{}\"".format( mon_log ) )
 	log_and_message( "INFO: mon_max_age = \"{}\"".format( mon_max_age ) )
 	log_and_message( "INFO: other_systemctl = \"{}\"".format( other_systemctl ) )
+	log_and_message( "INFO: status_HOST = \"{}\"".format( status_HOST ) )
 	log_and_message( "" )
 
-	nvers = mono_version()
-	log_and_message("INFO: Mono version: {}" .format( nvers ) )
+###	nvers = mono_version()
+###	log_and_message("INFO: Mono version: {}" .format( nvers ) )
 
 	python_version = "v " + str(sys.version)
 	python_version = re.sub(r'\n', r', ', python_version )
@@ -578,6 +583,8 @@ def process_new_image( source, target) :
 	logger( "INFO: Process {} {:8d} B  {:10.1f}".format(source, jpg_size, jpg_ts) )
 #	logger( "INFO: Process {} - {:7.1f} KB".format(source_file,jpg_size/1024) )
 #DEBUG#	logger( "DEBUG: Called process_new_image(\n\t {},\n\t {} )".format(source_file, target) )
+	msg = "INFO: Process {} {:8d} B  {:10.1f}".format(source, jpg_size, jpg_ts)
+#	log_event(msg, 999)
 
 	camera_down()     # TESTING
 
@@ -1159,6 +1166,35 @@ def read_config( config_file ) :
 	mon_max_age = int( mon_max_age )
 
 
+	ssh_cmd = [ "ssh", status_HOST, "pwd" ]
+
+	try :
+		output = subprocess.check_output(ssh_cmd, stderr=subprocess.STDOUT ).decode('utf-8')
+	except subprocess.CalledProcessError as e :
+		output = ""
+		logger( "ERROR: ssh: \"{}\" (from read_config), CalledProcessError)".format( sys.exc_info()[0] ) )
+		logger( "DEBUG: ssh cmd = {}".format( e.cmd ) )
+		logger( "DEBUG: ssh returncode = {}".format( e.returncode ) )
+		logger( "DEBUG: ssh error output:\n{}".format( e.output ) )
+		logger( "DEBUG: ssh command::\n{}".format( ssh_cmd ) )
+		# https://stackoverflow.com/questions/7575284/check-output-from-calledprocesserror
+	except :
+		output = ""
+		logger( "ERROR: ssh: {} (from read_config(), general case)".format( sys.exc_info()[0] ) )
+
+
+
+
+	ssh_cmd = [ "ssh", status_HOST, "pwd" ]
+	try :
+		output = subprocess.check_output(ssh_cmd, stderr=subprocess.STDOUT ).decode('utf-8')
+	except :
+		logger( "ERROR: status_HOST not accessible: {}".format( status_HOST ) )
+		logger( "ERROR: ssh: {} (from read_config(), general case)".format( sys.exc_info()[0] ) )
+
+
+
+
 
 
 # ----------------------------------------------------------------------------------------
@@ -1195,6 +1231,61 @@ def power_cycle( interval ):
 	# --------------------------------------------------------------------------------
 
 	return
+
+
+
+# ----------------------------------------------------------------------------------------
+#  This pushes the specified file to the (hosted) web server via SCP.
+#
+#  References:
+#   https://stackoverflow.com/questions/68335/how-to-copy-a-file-to-a-remote-server-in-python-using-scp-or-ssh
+#   https://stackoverflow.com/questions/250283/how-to-scp-in-python
+#
+#   https://stackoverflow.com/questions/68335/how-to-copy-a-file-to-a-remote-server-in-python-using-scp-or-ssh
+#   https://stackoverflow.com/questions/68335/how-to-copy-a-file-to-a-remote-server-in-python-using-scp-or-ssh
+# ----------------------------------------------------------------------------------------
+def log_event(description, code) :
+	global status_HOST
+
+	ssh_cmd = [
+		"ssh",
+		status_HOST,
+		"bin/record_status.py",
+		"\"{}\"".format(description),
+		str(code),
+		]
+
+	logger( "DEBUG: log_event ssh command: \"{}\"".format( ssh_cmd ) )
+
+# @@@
+	try :
+		output = subprocess.check_output(ssh_cmd, stderr=subprocess.STDOUT ).decode('utf-8')
+	except subprocess.CalledProcessError as e :
+		output = ""
+		logger( "ERROR: ssh: \"{}\" (from log_event), CalledProcessError)".format( sys.exc_info()[0] ) )
+		logger( "DEBUG: ssh cmd = {}".format( e.cmd ) )
+		logger( "DEBUG: ssh returncode = {}".format( e.returncode ) )
+		logger( "DEBUG: ssh error output:\n{}".format( e.output ) )
+		logger( "DEBUG: ssh command::\n{}".format( ssh_cmd ) )
+		# https://stackoverflow.com/questions/7575284/check-output-from-calledprocesserror
+	except Exception as e :
+		output = ""
+		logger( "ERROR: ssh: {} (from log_event(), general case sys.exc_info)".format( sys.exc_info()[0] ) )
+		logger( "ERROR: ssh: {} (from log_event(), general case sys.exc_info)".format( sys.exc_info() ) )
+		logger( "ERROR: ssh: {} (from log_event(), general case e)".format( e ) )
+		logger( "DEBUG: ssh command::\n{}".format( ssh_cmd ) )
+
+
+
+#####	lines = re.split('\n', output)
+	# if len(lines[0]) > 0 or len(lines) > 1 :
+#####	if scp_failed and len(lines) > 1 :
+#####		logger( "DEBUG: ssh stdout output:\n".format( output ) )
+#####		for jjj in range( len(lines) ) :
+#####			logger( "DEBUG: #{} \"{}\"".format( jjj, lines[jjj] ) )
+
+	return
+
 
 
 # ----------------------------------------------------------------------------------------
@@ -1283,6 +1374,11 @@ def midnight_process(date_string) :
 	else :
 		logger( "WARNING: ffmpeg or tar failed; skip deleting jpg files for {}.".format( date_string ) )
 
+# @@@
+	if not ffmpeg_failed and not tar_failed :
+		log_event("INFO: Video generated, images archived for {}".format( mp4_file_daylight ), 205)
+	else :
+		log_event("ERROR: Video not generated, or images not archived for {}".format( mp4_file_daylight ), 215)
 
 
 #DEBUG#	logger( "DEBUG: sleep( 15 )" )
@@ -2121,9 +2217,8 @@ def mono_version():
 
 # ----------------------------------------------------------------------------------------
 #  Wait for ffmpeg (to complete).
+#
 #  Running two instances of ffmpeg on a Pi concurrently seems to be a problem.
-#
-#
 # ----------------------------------------------------------------------------------------
 def wait_ffmpeg() :
 	delay_secs = 10
@@ -2142,7 +2237,7 @@ def wait_ffmpeg() :
 
 		for jjj in range( len(line) ) :
 			if "ffmpeg" in line[jjj] :
-				logger( "DEBUG: #{} delay {} sec: '{}'".format( iii, iii * delay_secs, line[jjj] ) )
+				logger( "DEBUG: #{} total delay {} sec: '{}'".format( iii, iii * delay_secs, line[jjj] ) )
 				sleep( delay_secs )
 				break
 
