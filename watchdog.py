@@ -28,6 +28,8 @@
 # you're going to hammer the SD Card over time.  Buffering might help, or
 # reducing the output.
 # ========================================================================================
+# 20210119 Added a plain exception for urlopen() calls that were not getting caught.
+#          All have a message like "ERROR: alternate exception in..."
 # 20210116 Missing the decode - now "response.read().decode('utf-8')" in server_stalled().
 # 20210113 Removed camera_down().  fetch_URL() written, but not called or tested.
 # 20210111 Disabled, but didn't remove camera_down() yet.  There are 3 cameras at this
@@ -449,6 +451,11 @@ def fetch_URL( remote_url, caller_string ) :
 		content = "ERROR"
 		logger( "DEBUG: content = \"{}\" in check_file_ages()".format( content ) )
 
+	except :
+		log_and_message( "ERROR: alternate exception in {}: {}".format(
+			caller_string, sys.exc_info()[0] ) )
+		content = "ERROR"
+
 	return content
 
 
@@ -524,6 +531,12 @@ def check_file_ages() :
 		#  https://stackoverflow.com/questions/8238360/how-to-save-traceback-sys-exc-info-values-in-a-variable
 		# ------------------------------------------------------------------------
 		content = [ "0 0 foo", "1 1 bar", "2 2 slam", "3 3 dunk" ]
+		content = "0 99 foo\n1 99 bar\n2 99 slam\n3 99 dunk"
+		logger( "DEBUG: content = \"{}\" in check_file_ages()".format( content ) )
+
+	except :
+		log_and_message( "ERROR: alternate exception in check_file_ages: {}".format(
+			sys.exc_info()[0] ) )
 		content = "0 99 foo\n1 99 bar\n2 99 slam\n3 99 dunk"
 		logger( "DEBUG: content = \"{}\" in check_file_ages()".format( content ) )
 
@@ -1053,6 +1066,11 @@ def server_stalled():
 #	except :
 #		print "Unexpected ERROR in server_stalled:", sys.exc_info()[0]
 #		content = "1"      # Assume a bad answer...
+	except :
+		log_and_message( "ERROR: alternate exception in server_stalled: {}".format(
+			sys.exc_info()[0] ) )
+		content = "1"
+
 	# .................................................................
 	# Strip off the trailing newline which is helpful when catting on the other
 	# side. This should have a value be 1 and 10 - when 10 is realy expected.
@@ -1136,6 +1154,13 @@ def last_upload():
 		#  https://stackoverflow.com/questions/8238360/how-to-save-traceback-sys-exc-info-values-in-a-variable
 		# ------------------------------------------------------------------------
 		content = "00/00/00 00:00:00 45.5 80 NEEDS TO BE FIXED   0 0.05 30.14 N 0 mph ..."
+		content = "Page updated 00/00/0000 00:00:00<br />"
+		logger( "DEBUG: content = \"" + content + "\" in last_upload()" )
+
+	except :
+		log_and_message( "ERROR: alternate exception in last_upload: {}".format(
+			sys.exc_info()[0] ) )
+
 		content = "Page updated 00/00/0000 00:00:00<br />"
 		logger( "DEBUG: content = \"" + content + "\" in last_upload()" )
 
