@@ -1154,7 +1154,7 @@ def last_upload():
 		#  https://stackoverflow.com/questions/8238360/how-to-save-traceback-sys-exc-info-values-in-a-variable
 		# ------------------------------------------------------------------------
 		content = "00/00/00 00:00:00 45.5 80 NEEDS TO BE FIXED   0 0.05 30.14 N 0 mph ..."
-		content = "Page updated 00/00/0000 00:00:00<br />"
+		content = "Page updated 00/00/0000 00:00:11<br />"
 		logger( "DEBUG: content = \"" + content + "\" in last_upload()" )
 
 	except :
@@ -1236,7 +1236,7 @@ def last_upload():
 		logger( "DEBUG: Got large negative value from record:{}\n\t".format( line ) )
 #		for item in content :
 #			___print "    " + item
-		if last_date != date_str :
+		if last_date != date_str  and  date_str != "00/00/0000" :
 			#  -----------------------------------------------------
 			#  Timestamp in realtime.txt is in "local" time.
 			#  -----------------------------------------------------

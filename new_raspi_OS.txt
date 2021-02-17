@@ -10,13 +10,13 @@ Modifications to Raspberry Pi Imager created SD card using raspberrypi_03
 
 ls -al /dev/sd*
 lsblk
-sudo mount /dev/sda1 /mnt/pi/BOOT
-sudo mount /dev/sda2 /mnt/pi/root
+sudo mount /dev/sda1 /mnt/tmp/boot
+sudo mount /dev/sda2 /mnt/tmp/root
 
 NOTE: >>> If you want to edit the mount point, in vi ... :/pi\/.oot
 NOTE: >>> Most of the work is in the ROOT filesystem
 
-sudo touch /mnt/pi/BOOT/ssh
+sudo touch /mnt/tmp/boot/ssh
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 # This should work for our network
@@ -25,7 +25,7 @@ sudo touch /mnt/pi/BOOT/ssh
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Before copying over ...
-pi@raspb_01_Cams:~ $ sudo diff /etc/wpa_supplicant/wpa_supplicant.conf /mnt/pi/root/etc/wpa_supplicant/wpa_supplicant.conf
+pi@raspb_01_Cams:~ $ sudo diff /etc/wpa_supplicant/wpa_supplicant.conf /mnt/tmp/root/etc/wpa_supplicant/wpa_supplicant.conf
 3,8d2
 < country=US
 <
@@ -34,7 +34,7 @@ pi@raspb_01_Cams:~ $ sudo diff /etc/wpa_supplicant/wpa_supplicant.conf /mnt/pi/r
 <         psk=d5f141e9b8f948a7cd37a452d38baaaac014e3582b2d78331296e2b18d2d716d
 < }
  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-sudo cp -p /etc/wpa_supplicant/wpa_supplicant.conf /mnt/pi/root/etc/wpa_supplicant/
+sudo cp -p /etc/wpa_supplicant/wpa_supplicant.conf /mnt/tmp/root/etc/wpa_supplicant/
 # NOTE: You might still have to force this after boot.  raspi-config probably handles it.
 sudo rfkill list all
 ifconfig
@@ -47,18 +47,18 @@ ifconfig
 #>>> Change the hostname
 #   https://www.raspberrypi-spy.co.uk/2012/11/how-to-rename-your-raspberry-pi/
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-ls -al /mnt/pi/root/etc/host*[es]
-sudo sed -i'.BAK' 's/raspberrypi/____x_x_x_____/' /mnt/pi/root/etc/host*[es]
-ls -al /mnt/pi/root/etc/host*
-cat -n /mnt/pi/root/etc/hosts
-cat -n /mnt/pi/root/etc/hostname
+ls -al /mnt/tmp/root/etc/host*[es]
+sudo sed -i'.BAK' 's/raspberrypi/____x_x_x_____/' /mnt/tmp/root/etc/host*[es]
+ls -al /mnt/tmp/root/etc/host*
+cat -n /mnt/tmp/root/etc/hosts
+cat -n /mnt/tmp/root/etc/hostname
 
  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #>>> After updating
-pi@raspb_01_Cams:~ $ cat /mnt/pi/root/etc/hostname
+pi@raspb_01_Cams:~ $ cat /mnt/tmp/root/etc/hostname
 ____x_x_x_____
 
-pi@raspb_01_Cams:~ $ cat /mnt/pi/root/etc/hosts
+pi@raspb_01_Cams:~ $ cat /mnt/tmp/root/etc/hosts
 127.0.0.1       localhost
 ::1             localhost ip6-localhost ip6-loopback
 ff02::1         ip6-allnodes
@@ -70,34 +70,34 @@ ff02::2         ip6-allrouters
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 #>>> These may be helpful
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-cp -p ~/.bash_aliases ~/.vimrc /mnt/pi/root/home/pi/
+cp -p ~/.bash_aliases ~/.vimrc /mnt/tmp/root/home/pi/
 
-If desired, a this to /mnt/pi/root/home/pi/.bashrc
+If desired, a this to /mnt/tmp/root/home/pi/.bashrc
 	export VISUAL='/usr/bin/vi'
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 #>>> To enable camera
 #    If you don't find this, run the sed command...
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-$ egrep '(start_x|gpu_mem)' /boot/config.txt
+$ egrep '(start_x|gpu_mem)' /mnt/tmp/boot/config.txt
 start_x=1
 gpu_mem=128
 
 # Append 2 lines
-sudo sed -i.BAK -e '$astart_x=1' -e '$agpu_mem=128' /boot/config.txt
+sudo sed -i.BAK -e '$astart_x=1' -e '$agpu_mem=128' /mnt/tmp/boot/config.txt
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 #>>> Needed only for the pond box Pi
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-cp -p ~/*grep /mnt/pi/root/home/pi/
+cp -p ~/*grep /mnt/tmp/root/home/pi/
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 #>>> Set up .ssh directory and copy in authorized_keys
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-mkdir /mnt/pi/root/home/pi/.ssh
-chmod 700 /mnt/pi/root/home/pi/.ssh
-cp -p ~/.ssh/authorized_keys /mnt/pi/root/home/pi/.ssh
-ls -al /mnt/pi/root/home/pi/.ssh
+mkdir /mnt/tmp/root/home/pi/.ssh
+chmod 700 /mnt/tmp/root/home/pi/.ssh
+cp -p ~/.ssh/authorized_keys /mnt/tmp/root/home/pi/.ssh
+ls -al /mnt/tmp/root/home/pi/.ssh
 
 
 
@@ -111,6 +111,7 @@ ls -al /mnt/pi/root/home/pi/.ssh
 # Consider whether you want to disable the partition resize
 #   https://www.raspberrypi.org/forums/viewtopic.php?t=148133
 #
+#          See section #>>> resize
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 sudo dd if=/dev/sda of=~/SDCardBackup.img
 
@@ -194,14 +195,14 @@ sudo update-locale LANG=en_US.UTF-8
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 !!!! >>>>  Some of this looks like before the first boot...
     -------------------------------------------------------
-cat /mnt/pi/root/etc/timezone
-ls -al /mnt/pi/root/etc/localtime
-ls -al /mnt/pi/root/usr/share/zoneinfo/America/New_York
+cat /mnt/tmp/root/etc/timezone
+ls -al /mnt/tmp/root/etc/localtime
+ls -al /mnt/tmp/root/usr/share/zoneinfo/America/New_York
 
 ls -al /usr/share/zoneinfo/US/Eastern
 sudo dpkg-reconfigure tzdata
-cat /mnt/pi/root/etc/timezone
-ls -al /mnt/pi/root/etc/localtime
+cat /mnt/tmp/root/etc/timezone
+ls -al /mnt/tmp/root/etc/localtime
 
  $ sudo dpkg-reconfigure tzdata
 
@@ -310,6 +311,16 @@ total 16
 
 $ cat id_rsa.pub | tr "ABCDQTPKYNEFRUI" "_"
 ssh-rsa _____3_za_1yc2_________________hyrG0p6Jy_4_S6_g_v___x5nx1_gy40mnnd_j_zgxx_bgJ___29MZ6y_W+79r_aHzWOJWu_dGxkM_HW_S_6l__ZwxJi3_u0+__8rqXr_h/aZ+c2_bXcjV_1y_3k_q7edJteh_dsl_fS_z_quf_e__a_h88en9tncn_tisc4/5_le/_t_0/_cb_xW_+6_Oc1V___9_hs4Gt__7jm9MchVx_2_zXm39oaV_W+j_ul4rWW+0w_nr4p8dHa7/4npg_84u__H3_Sepv39ZOcO+_o80JJm_wL3_1bsrHh_/_h_lMr__cqby_hppi9u/Lw_hwkO2+Xz__Jq+hHL_p88eeZ2j pi@rasp95
+ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Static IP address??
+
+https://www.caretech.io/2017/11/07/raspberry-pi-setup-part-2-change-default-raspberry-pi-password-and-set-static-ip-address/
+
+Edit /etc/dhcpcd.conf
+
  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
@@ -561,6 +572,14 @@ SshFtpPskFile=
 -----------------------------------------------------------------------------------------
 -----------------------------------------------------------------------------------------
 -----------------------------------------------------------------------------------------
+#>>> Image Processing
+#       sudo apt-get install ffmpeg       - - - - This is a fairly big package....
+#                                         - Used in webcamimager.py
+
+#  https://www.raspberrypi-spy.co.uk/2014/09/how-to-get-media-info-from-raspberry-pi-command-line/
+#   Have never used.   I use identify from graphicsmagick-imagemagick-compat which is much bigger
+#       sudo apt-get install -y mediainfo
+
 -----------------------------------------------------------------------------------------
 
 
@@ -602,5 +621,29 @@ This failed with a message about .
   104  sed 's/907af7d0-02/907af7d0-02/' /mnt/tmp/boot/cmdline.txt.MODS 
 
 -----------------------------------------------------------------------------------------
+
+#>>> resize
+
+sudo cp -p /mnt/tmp/root/usr/lib/raspi-config/init_resize.sh /mnt/tmp/root/usr/lib/raspi-config/init_resize.sh.BAK
+sudo cp -p /mnt/tmp/root/etc/init.d/resize2fs_once /mnt/tmp/root/etc/init.d/resize2fs_once.BAK
+sudo cp -p /mnt/tmp/boot/cmdline.txt /mnt/tmp/boot/cmdline.txt.BAK
+
+
+diff /mnt/tmp/root/usr/lib/raspi-config/init_resize.sh /mnt/tmp/root/usr/lib/raspi-config/init_resize.sh.BAK
+179,180d178
+< # @@@
+<  
+
+diff /mnt/tmp/root/etc/init.d/resize2fs_once /mnt/tmp/root/etc/init.d/resize2fs_once.BAK
+11,12d10
+< # Per https://www.raspberrypi.org/forums/viewtopic.php?t=148133
+< exit 0
+
+
+diff /mnt/tmp/boot/cmdline.txt /mnt/tmp/boot/cmdline.txt.BAK
+1c1
+< console=serial0,115200 console=tty1 root=PARTUUID=e8af6eb2-02 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait quiet
+---
+> console=serial0,115200 console=tty1 root=PARTUUID=e8af6eb2-02 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait quiet init=/usr/lib/raspi-config/init_resize.sh
 
 
