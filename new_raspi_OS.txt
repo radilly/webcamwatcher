@@ -646,4 +646,50 @@ diff /mnt/tmp/boot/cmdline.txt /mnt/tmp/boot/cmdline.txt.BAK
 ---
 > console=serial0,115200 console=tty1 root=PARTUUID=e8af6eb2-02 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait quiet init=/usr/lib/raspi-config/init_resize.sh
 
+-----------------------------------------------------------------------------------------
+
+$ cat /mnt/tmp/root/home/pi/prevent_resize.script
+cat prevent_resize.script
+Script started on 2020-10-17 10:03:45-04:00 [TERM="xterm" TTY="/dev/pts/0" COLUMNS="152" LINES="44"]
+===>  pi@pi-005-zero-b:~ $ sudo mount /dev/sda1 /mnt/boot
+mount: /mnt/boot: /dev/sda1 already mounted on /mnt/boot.
+===>  pi@pi-005-zero-b:~ $ sudo mount /dev/sda2 /mnt/ROOT/
+mount: /mnt/ROOT: /dev/sda2 already mounted on /mnt/ROOT.
+===>  pi@pi-005-zero-b:~ $ df
+Filesystem     1K-blocks    Used Available Use% Mounted on
+/dev/root       29977572 1475964  27252236   6% /
+devtmpfs          188256       0    188256   0% /dev
+tmpfs             221272       0    221272   0% /dev/shm
+tmpfs             221272    3216    218056   2% /run
+tmpfs               5120       4      5116   1% /run/lock
+tmpfs             221272       0    221272   0% /sys/fs/cgroup
+/dev/mmcblk0p1    258095   54604    203492  22% /boot
+tmpfs              44252       0     44252   0% /run/user/1000
+/dev/sda2        1479088 1105016    280888  80% /mnt/ROOT
+/dev/sda1         258095   54604    203492  22% /mnt/boot
+===>  pi@pi-005-zero-b:~ $ diff /mnt/ROOT/usr/lib/raspi-config/init_resize.sh /mnt/ROOT/usr/lib/raspi-config/init_resize.sh.ORIG
+179,183d178
+< # Sat 17 Oct 09:54:45 EDT 2020
+< # Bypass resize for now ...
+< whiptail --infobox "Bypass resizing of root filesystem. Modified .../raspi-config/init_resize.sh..." 20 60
+< exit 0
+<
+===>  pi@pi-005-zero-b:~ $ ls -l /mnt/boot/cmdline.txt*
+-rwxr-xr-x 1 root root 127 Oct 17 09:49 /mnt/boot/cmdline.txt
+-rwxr-xr-x 1 root root 169 Aug 20 06:47 /mnt/boot/cmdline.txt.ORIG
+===>  pi@pi-005-zero-b:~ $ diff /mnt/boot/cmdline.txt*
+1c1
+< console=serial0,115200 console=tty1 root=PARTUUID=907af7d0-02 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait quiet
+---
+> console=serial0,115200 console=tty1 root=PARTUUID=907af7d0-02 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait quiet init=/usr/lib/raspi-config/init_resize.sh
+===>  pi@pi-005-zero-b:~ $ exit
+
+Script done on 2020-10-17 10:04:44-04:00 [COMMAND_EXIT_CODE="1"]
+
+
+
+
+
+-----------------------------------------------------------------------------------------
+
 
