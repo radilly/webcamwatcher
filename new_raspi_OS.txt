@@ -34,6 +34,7 @@ pi@raspb_01_Cams:~ $ sudo diff /etc/wpa_supplicant/wpa_supplicant.conf /mnt/tmp/
 <         psk=d5f141e9b8f948a7cd37a452d38baaaac014e3582b2d78331296e2b18d2d716d
 < }
  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+sudo cp -p /mnt/tmp/root/etc/wpa_supplicant/wpa_supplicant.conf /mnt/tmp/root/etc/wpa_supplicant/wpa_supplicant.conf.BAK
 sudo cp -p /etc/wpa_supplicant/wpa_supplicant.conf /mnt/tmp/root/etc/wpa_supplicant/
 # NOTE: You might still have to force this after boot.  raspi-config probably handles it.
 sudo rfkill list all
