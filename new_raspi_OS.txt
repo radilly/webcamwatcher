@@ -155,7 +155,7 @@ sudo raspi-config
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 #  >>>>>>>>>> NOT TRIED YET <<<<<<<<<<
 # Set locale to en_US.UTF-8
-sudo cp /etc/locale.gen /etc/locale.gen.dist
+sudo cp /etc/locale.gen /etc/locale.gen.BACKUP
 sudo sed -i'.BAK' -e "/^[^#]/s/^/#/" -e "/en_US.UTF-8/s/^#//" /etc/locale.gen
 #  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
 Mine:
@@ -170,7 +170,7 @@ sudo sed -i'.BAK' -e "/^[^#]/s/^/# /" -e "/en_US.UTF-8/s/^# *//" /etc/locale.gen
 
 #  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -
 
-sudo cp /var/cache/debconf/config.dat /var/cache/debconf/config.dat.dist
+sudo cp /var/cache/debconf/config.dat /var/cache/debconf/config.dat.BAK
 sudo sed -i'.BAK' -e "/^Value: en_GB.UTF-8/s/en_GB/en_US/" \
        -e "/^ locales = en_GB.UTF-8/s/en_GB/en_US/" /var/cache/debconf/config.dat
 sudo locale-gen
