@@ -188,6 +188,15 @@
 # ========================================================================================
 # ========================================================================================
 # ========================================================================================
+# 20210223 Getting periodic seg faults from ffmpeg. Added globals:
+#			vid_gen_attempt = -1
+#			vid_date_string = ""
+#          Added dot_interval to the cfg file as an option.  Default is 5 (sec).
+# 20210220 Deprecated config variable cam_host.  relay_HOST is used instead which includes
+#          the user, i.e. "pi@127.0.0.1"
+# 20210202 Changed record_status.py so that if --bgcolor is used with a hex code, the
+#          leading '#' should not be included.  I could not find a work-around for that
+#          being treated like a comment by the shell.
 # 20210114 Added def log_event() to work with statuscollector.py to consolodate a view
 #          of what is happening across multiple scripts.
 # 20201226 In using Pi Zero-based webcams, and pushing images through ssh and dd, we were
@@ -422,6 +431,9 @@ import os
 from ftplib import FTP
 from urllib.request import urlopen
 # from urllib.error import URLError, HTTPError
+# https://docs.python.org/3/library/urllib.error.html
+# https://docs.python.org/3/library/exceptions.html#OSError
+from urllib.error import URLError, HTTPError
 import shutil
 import re
 
@@ -434,6 +446,8 @@ mon_max_age = 300
 
 relay_GPIO = -1
 relay2_GPIO = -1
+cam_timeout = 99999
+vid_gen_minute = 0
 
 work_dir = ""
 main_image = ""
@@ -445,6 +459,7 @@ other_systemctl = ""
 status_HOST = ""
 
 this_script = sys.argv[0]
+script_ts = stat( this_script ).st_mtime
 if re.match('^\./', this_script) :
 	this_script = "{}/{}".format( os.getcwd(), re.sub('^\./', '', this_script) )
 
@@ -468,16 +483,18 @@ last_mtime = 0.0
 last_filename = ""
 last_day_code = -1
 catching_up = False
+vid_gen_attempt = -1
+vid_date_string = ""
 dot_counter = 0
 small_counter = 0
-sleep_for = 5
+dot_interval = 5
 
 # strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
 # Could not get %Z to work. "empty string if the the object is naive" ... which now() is...
 strftime_FMT = "%Y/%m/%d %H:%M:%S"
 time_only_FMT = "%H:%M:%S"
 WEB_URL = "http://dilly.family/wx"
-cam_host = "127.0.0.1"
+# cam_host = "127.0.0.1" # @@@ Deprecated
 
 cfg_parameters = [
 	"status_HOST",
@@ -486,9 +503,11 @@ cfg_parameters = [
 	"thumbnail_image",
 	"remote_dir",
 	"image_age_URL",
-	"cam_host",
+	"dot_interval",
 	"relay_GPIO",
 	"relay2_GPIO",
+	"cam_timeout",
+	"vid_gen_minute",
 	"relay_HOST",
 	"mon_log",
 	"mon_max_age",
@@ -513,6 +532,7 @@ def main():
 		log_and_message( "ERROR: cfg file is a required first argument." )
 		exit()
 
+	log_and_message( "INFO: script_ts = \"{}\"".format(script_ts) )
 	if not os.path.isfile( config_file ) :
 		log_and_message( "ERROR: cfg file \"{}\" not found.".format( config_file ) )
 		exit()
@@ -535,10 +555,13 @@ def main():
 	log_and_message( "INFO: thumbnail_image = \"{}\"".format(thumbnail_image) )
 	log_and_message( "INFO: remote_dir = \"{}\"".format(remote_dir) )
 	log_and_message( "INFO: image_age_URL = \"{}\"".format( image_age_URL ) )
-	log_and_message( "INFO: cam_host = \"{}\"".format( cam_host ) )
+	log_and_message( "INFO: dot_interval= \"{}\"".format( dot_interval ) )
+# @@@ Deprecated	log_and_message( "INFO: cam_host = \"{}\"".format( cam_host ) )
 	log_and_message( "INFO: relay_HOST = \"{}\"".format( relay_HOST ) )
 	log_and_message( "INFO: relay_GPIO = \"{}\"".format( relay_GPIO ) )
 	log_and_message( "INFO: relay2_GPIO = \"{}\"".format( relay2_GPIO ) )
+	log_and_message( "INFO: cam_timeout = \"{}\"".format( cam_timeout ) )
+	log_and_message( "INFO: vid_gen_minute = \"{}\"".format( vid_gen_minute ) )
 	log_and_message( "INFO: mon_log = \"{}\"".format( mon_log ) )
 	log_and_message( "INFO: mon_max_age = \"{}\"".format( mon_max_age ) )
 	log_and_message( "INFO: other_systemctl = \"{}\"".format( other_systemctl ) )
@@ -556,7 +579,7 @@ def main():
 	while True:
 		next_image_file()
 		check_log_age( )
-		sleep(sleep_for)
+		sleep(dot_interval)
 
 	exit()
 
@@ -584,9 +607,13 @@ def process_new_image( source, target) :
 #	logger( "INFO: Process {} - {:7.1f} KB".format(source_file,jpg_size/1024) )
 #DEBUG#	logger( "DEBUG: Called process_new_image(\n\t {},\n\t {} )".format(source_file, target) )
 	msg = "INFO: Process {} {:8d} B  {:10.1f}".format(source, jpg_size, jpg_ts)
-#	log_event(msg, 999)
+#	log_event(msg, 999, "")
 
-	camera_down()     # TESTING
+	try :
+		camera_down()     # TESTING
+	except :
+		logger( "ERROR: In process_new_image() camera_down() failed." )
+
 
 	shutil.copy2( source_file, target )
 	push_to_server( target, remote_dir )
@@ -657,6 +684,7 @@ def next_image_file() :
 	global catching_up, current_filename, dot_counter, small_counter
 	global last_day_code
 	global next_image_count
+	global vid_gen_attempt, vid_date_string
 
 	date_rollover = False
 
@@ -682,13 +710,13 @@ def next_image_file() :
 	#  image updates, this should be around 120 secs, but here allow for a missing
 	#  image.  (Most often we count 22 dots per image upload.)
 	# --------------------------------------------------------------------------------
-	elapsed = ( dot_counter * sleep_for )
-	if elapsed > 300 :
+	elapsed = ( dot_counter * dot_interval )
+	if elapsed > cam_timeout :
 		if 0 == ( dot_counter % 22 ) :
 			log_string( "  ({})\n".format( dot_counter ) )
 			logger( "WARNING: Webcam might be down. More than {} secs since last update".format( elapsed ) )
 			log_and_message( "WARNING: power-cycling webcam" )
-			power_cycle( 5 )
+			power_cycle( )
 
 
 	# --------------------------------------------------------------------------------
@@ -814,8 +842,11 @@ def next_image_file() :
 		# snapshot-2018-05-23-16-57-04.jpg
 		tok = re.split('-', re.sub('\.jpg', '', this_file ) )
 		day_code = int(tok[3])
+		mm_code = int(tok[4])
 		if last_day_code != day_code :
 			date_rollover = True
+			vid_gen_attempt = 0
+			vid_date_string = re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename)
 		else :
 			date_rollover = False
 
@@ -855,14 +886,9 @@ def next_image_file() :
 			small_counter += 1
 			# Don't power-cycle unless we've seen a few of these in a row...
 			if 0 == ( small_counter % 4 ) :
-				power_cycle( 5 )
+				power_cycle( )
 
 			unlink( "{}/{}".format(work_dir, this_file ) )
-#DELETE - DELETE - DELETE#			try:
-#DELETE - DELETE - DELETE#				subprocess.check_output("rm {}/{}".format( work_dir, this_file ), shell=True)
-#DELETE - DELETE - DELETE#			except :
-#DELETE - DELETE - DELETE#				logger( "ERROR: Unexpected ERROR in rm: {}".format( sys.exc_info()[0] ) )
-
 			store_file_data ( source_mtime, this_file )
 			last_mtime = source_mtime
 
@@ -879,7 +905,8 @@ def next_image_file() :
 		#
 		# ------------------------------------------------------------------------
 		if catching_up :
-			logger( "DEBUG: file {} of {} !!!!!! Skip processing {} (in Catch-up)".format( line+1, file_list_len, this_file ) )
+			logger( "DEBUG: file {:5d} of {:5d} !!!!!! Skip processing {} (in Catch-up)".format( line+1, file_list_len, this_file ) )
+
 		else :
 			log_string( "||  ({})  {}\n".format( dot_counter, timestamp() ) )
 			next_image_count += 1
@@ -889,6 +916,7 @@ def next_image_file() :
 
 			process_new_image( this_file, target_file )
 			# First '.' right after processing is done...
+
 			if not date_rollover :
 				logger( "waiting" )
 				log_string( '.' )
@@ -901,11 +929,18 @@ def next_image_file() :
 		# first image of a new day - i.e. that date number has changed.  The
 		# last (previous) image filename contains yesterday's date string.
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+		if mm_code > vid_gen_minute  and  vid_gen_attempt > -1 :
+			logger( "DEBUG: past (mm_code) image-minute {})".format( mm_code ) )
+			vid_gen_attempt = -1
+			vid_date_string = ""
+
 #DEBUG#		logger( "DEBUG: last_day_code = {}   day_code = {}".format( day_code, last_day_code ) )
 		if date_rollover :
 			log_string( "\n" )
 			logger( "INFO: MIDNIGHT ROLLOVER!\n" )
 			midnight_process(re.sub(r'snapshot-(....-..-..).*', r'\1', last_filename))
+
+			vid_date_string = ""
 
 			log_string( '.' )
 			dot_counter = 1
@@ -1012,10 +1047,12 @@ def check_log_age( ) :
 # ----------------------------------------------------------------------------------------
 def read_config( config_file ) :
 	global work_dir, main_image, thumbnail_image, remote_dir
-	global cam_host, relay_HOST
+# @@@ Deprecated	global cam_host
+	global relay_HOST, cam_timeout, vid_gen_minute
 	global relay_GPIO, relay2_GPIO, webcam_ON, webcam_OFF
 	global mon_log, mon_max_age
 	global other_systemctl
+	global dot_interval
 
 # 	# https://docs.python.org/2/library/configparser.html
 	config = configparser.RawConfigParser()
@@ -1158,13 +1195,20 @@ def read_config( config_file ) :
 
 	relay2_GPIO = int( relay2_GPIO )
 
+	cam_timeout = int( cam_timeout )
+
+	vid_gen_minute = int( vid_gen_minute )
+
 	if len(mon_log) > 0  and  not os.path.exists(mon_log) :
 		log_and_message( "ERROR: mon_log \"{}\" not found.".format( mon_log ) )
 		if len(mon_log) > 1 :
 			exit()
 
+	dot_interval = int( dot_interval )
+
 	mon_max_age = int( mon_max_age )
 
+	cam_timeout = int( cam_timeout )
 
 	ssh_cmd = [ "ssh", status_HOST, "pwd" ]
 
@@ -1181,9 +1225,6 @@ def read_config( config_file ) :
 	except :
 		output = ""
 		logger( "ERROR: ssh: {} (from read_config(), general case)".format( sys.exc_info()[0] ) )
-
-
-
 
 	ssh_cmd = [ "ssh", status_HOST, "pwd" ]
 	try :
@@ -1204,7 +1245,7 @@ def read_config( config_file ) :
 #
 # From a quick test, the (South) RSX-3211 webam seems to take around 32 secs to reboot.
 # ----------------------------------------------------------------------------------------
-def power_cycle( interval ):
+def power_cycle( ):
 
 	if relay_GPIO < 0 :
 		return
@@ -1235,25 +1276,37 @@ def power_cycle( interval ):
 
 
 # ----------------------------------------------------------------------------------------
-#  This pushes the specified file to the (hosted) web server via SCP.
+#  This runs a script on the "status host", the Cumulus Pi at this point, which creates
+#  a status record, which the statuscollector.py process appends to a status event log.
 #
-#  References:
-#   https://stackoverflow.com/questions/68335/how-to-copy-a-file-to-a-remote-server-in-python-using-scp-or-ssh
-#   https://stackoverflow.com/questions/250283/how-to-scp-in-python
+#  NOTE: If you want to pass a hex code for "background" do NOT include the leading '#'.
+#  NOTE: If you want to pass a hex code for "background" do NOT include the leading '#'.
+#  NOTE: If you want to pass a hex code for "background" do NOT include the leading '#'.
 #
-#   https://stackoverflow.com/questions/68335/how-to-copy-a-file-to-a-remote-server-in-python-using-scp-or-ssh
-#   https://stackoverflow.com/questions/68335/how-to-copy-a-file-to-a-remote-server-in-python-using-scp-or-ssh
+#
 # ----------------------------------------------------------------------------------------
-def log_event(description, code) :
+def log_event(description, code, background) :
 	global status_HOST
 
-	ssh_cmd = [
-		"ssh",
-		status_HOST,
-		"bin/record_status.py",
-		"\"{}\"".format(description),
-		str(code),
-		]
+#	logger( "DEBUG: background = \"{}\"".format( background ) )
+	if len(background) > 0 :
+		ssh_cmd = [
+			"ssh",
+			status_HOST,
+			"bin/record_status.py",
+			"--bgcolor",
+			background,
+			"\"{}\"".format(description),
+			str(code),
+			]
+	else :
+		ssh_cmd = [
+			"ssh",
+			status_HOST,
+			"bin/record_status.py",
+			"\"{}\"".format(description),
+			str(code),
+			]
 
 	logger( "DEBUG: log_event ssh command: \"{}\"".format( ssh_cmd ) )
 
@@ -1355,7 +1408,8 @@ def midnight_process(date_string) :
 
 	if not ffmpeg_failed :
 		push_to_server( mp4_file_daylight, remote_dir )
-
+	else :
+		log_and_message( "ERROR: in midnight_process() ffmpeg failed." )
 
 
 	# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -1376,9 +1430,9 @@ def midnight_process(date_string) :
 
 # @@@
 	if not ffmpeg_failed and not tar_failed :
-		log_event("INFO: Video generated, images archived for {}".format( mp4_file_daylight ), 205)
+		log_event("INFO: Video generated, images archived for {}".format( mp4_file_daylight ), 205, "0E7135")
 	else :
-		log_event("ERROR: Video not generated, or images not archived for {}".format( mp4_file_daylight ), 215)
+		log_event("ERROR: Video not generated, or images not archived for {}".format( mp4_file_daylight ), 215, "red")
 
 
 #DEBUG#	logger( "DEBUG: sleep( 15 )" )
@@ -1399,6 +1453,7 @@ def generate_video(date_string, mp4_out) :
 
 	logger( "DEBUG: generate_video( \"{}\", \"{}\" ) called".format( date_string, mp4_out ) )
 
+	RC = -1
 	ffmpeg_failed = True
 
 	date_stamp = re.sub(r'(\d*)-(\d*)-(\d*)', r'\1\2\3', date_string)
@@ -1412,7 +1467,13 @@ def generate_video(date_string, mp4_out) :
 	cat_cmd = r"cat {}/snapshot-{}*.jpg".format( work_dir, date_string )
 	logger( "DEBUG: cat_cmd = \"{}\"".format( cat_cmd ) )
 
-	ffmpeg_opts = "-f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 "
+	# NOTE: Trailing blank
+	# ffmpeg_opts = "-f image2pipe -r 8 -vcodec mjpeg -i - -vcodec libx264 "
+	# Per https://superuser.com/questions/326629/how-can-i-make-ffmpeg-be-quieter-less-verbose
+	#    "-nostats -loglevel 0"   seems to cut the stderr output to almost nothing.
+	#    "-nostats"    seems to eliminate the changing status which really blows up logs.
+	# NOTE: Trailing blank
+	ffmpeg_opts = "-f image2pipe -nostats -r 8 -vcodec mjpeg -i - -vcodec libx264 "
 	logger( "DEBUG: ffmpeg_opts = \"{}\"".format( ffmpeg_opts ) )
 
 	ffmpeg_cmd = cat_cmd + r" | ffmpeg " + ffmpeg_opts + mp4_out
@@ -1421,24 +1482,81 @@ def generate_video(date_string, mp4_out) :
 	logger( "DEBUG: calling = wait_ffmpeg()" )
 	wait_ffmpeg()
 
-	log_and_message( "DEBUG: Creating mp4 using cmd: " + ffmpeg_cmd )
+	log_and_message( "DEBUG: Creating mp4 using cmd:\n\n\n{}".format( ffmpeg_cmd ) )
 	ffmpeg = ""
-	try:
+
+	# --------------------------------------------------------------------------------
+	# Ran into this once on 01/20/2021
+	#
+	#    Stream mapping:
+	#      Stream #0:0 -> #0:0 (mjpeg (native) -> h264 (libx264))
+	#    frame=   47 fps=0.0 q=0.0 size=       0kB time=00:00:00.00 bitrate=N/A speed=   0x
+	#    frame=   69 fps= 60 q=24.0 size=      13kB time=00:00:02.00 bitrate=  52.8kbits/s speed=1.73x
+	#    #frame=   94 fps= 57 q=24.0 size=      24kB time=00:00:05.12 bitrate=  39.1kbits/s speed=3.09x
+	#    frame=  719 fps= 11 q=24.0 size=   22492kB time=00:01:23.25 bitrate=2213.3kbits/s speed=1.32x
+	#    *** stack smashing detected ***: ffmpeg terminated
+	#    Aborted
+	#    2021/01/21 00:03:06 ERROR: Unexpected ERROR in ffmpeg:
+	#    .
+	#    Get an occaisional seg fault from ffmpeg - but we don't see it... logged in nohup at the moment
+	#    See https://stackoverflow.com/questions/22250893/capture-segmentation-fault-message-for-a-crashed-subprocess-no-out-and-err-af
+	#        Popen(shell_command, shell=True, stdout=PIPE, stderr=PIPE)
+	#    .
+	#    .
+	# --------------------------------------------------------------------------------
+	start = time.time()
+	try :
 		ffmpeg = subprocess.check_output(ffmpeg_cmd , shell=True).decode('utf-8')
-		ffmpeg_failed = False
+		### ffmpeg_failed = False
+	except subprocess.CalledProcessError as e :
+		logger( "ERROR: ffmpeg: \"{}\" (from generate_video), CalledProcessError)".format( sys.exc_info()[0] ) )
+		logger( "DEBUG: ffmpeg cmd = {}".format( e.cmd ) )
+		logger( "DEBUG: ffmpeg returncode = {}".format( e.returncode ) )
+		RC = e.returncode
+		if e.returncode == 139 :
+			logger( "DEBUG: Likely ffmpeg Segmentation fault" )
+		logger( "DEBUG: ffmpeg output:\n{}".format( e.output ) )
+		logger( "DEBUG: ffmpeg command::\n{}".format( ffmpeg_cmd ) )
+		# https://docs.python.org/3/library/subprocess.html
+		# https://stackoverflow.com/questions/7575284/check-output-from-calledprocesserror
 	except Exception as problem :
-		log_and_message( "ERROR: Unexpected ERROR in ffmpeg: {}".format( problem ) )
+		log_and_message( "ERROR: Unexpected ERROR in ffmpeg: \"{}\"".format( problem ) )
 		ffmpeg_failed = True
+		iii = 0
+		for p in problem:
+			iii += 1
+			log_and_message( "DEBUG: {} ::: \"{}\"".format( iii, p ) )
 ###	except CalledProcessError, EHandle:
 ###	except :
 ###		log_and_message( "ERROR: Unexpected ERROR in ffmpeg: {}".format( sys.exc_info()[0] ) )
 ###		ffmpeg_failed = True
+	else :
+		ffmpeg_failed = False
+	# finally :
+		# See  https://docs.python.org/3/tutorial/errors.html
+
+	elapsed = - time.time() - start
+	log_and_message( "DEBUG: ffmpeg runtime = {}".format( elapsed ) )
+	# -*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*-
+	# -*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*-
+	# NOTE: ffmpeg -v info -nostats -i /mnt/ssd/TEST/Test/arc_2021/20210223_daylight.mp4 -f null -
+	# Could be used to verify mp4 is good
+	# See https://superuser.com/questions/100288/how-can-i-check-the-integrity-of-a-video-file-avi-mpeg-mp4
+	#
+	# or ffprobe 20210222_daylight.mp4 ; echo $?
+	# NOTE: https://stackoverflow.com/questions/59627740/how-to-validate-mp4-file-or-audio-files-in-general-with-python
+	# -*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*-
+	# -*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*-
 
 	if len(ffmpeg) > 0 :
-		log_and_message( "DEBUG: ffmpeg returned data: \"" + ffmpeg + "\"" )
+		log_and_message( "DEBUG: ffmpeg returned data: \"{}\"".format( ffmpeg ) )
+	else :
+		log_and_message( "DEBUG: ffmpeg returned nothing. ffmpeg_failed = {}, RC = {}".format( ffmpeg_failed, RC ) )
 
 	if ffmpeg_failed :
-		logger( "WARNING: ffmpeg failed." )
+		log_and_message( "WARNING: ffmpeg failed." )
+	else :
+		log_and_message( "DEBUG: ffmpeg success." )
 
 	return ffmpeg_failed
 
@@ -1570,7 +1688,7 @@ def tar_dailies(date_string) :
 # ----------------------------------------------------------------------------------------
 def check_stable_size( filename ) :
 	same_count_min = 5
-	sleep_for = 0.5
+	pause_for = 0.5
 
 #DEBUG#	log_string( "DEBUG: \n" )
 
@@ -1611,7 +1729,7 @@ def check_stable_size( filename ) :
 			logger( "WARNING: check_stable_size wait #{:2d}.  {} bytes  same_count ={:2d}.".format( \
 				attempt+1, file_size, same_count) )
 
-		sleep( sleep_for )
+		sleep( pause_for )
 
 	return last_size
 
@@ -2269,7 +2387,10 @@ def wait_ffmpeg() :
 def camera_down():
 #	global check_counter
 
+	log_string( "[@1]" )  # On entry - NOTE: Added because of apparent hang, maybe in urlopen()
+
 	age = "0"
+	content = "-1\n-1"
 
 	# --------------------------------------------------------------------------------
 	#
@@ -2281,9 +2402,8 @@ def camera_down():
 		# NOTE: The decode() methed seemed required for Python 3.  See
 		#       https://stackoverflow.com/questions/31019854/typeerror-cant-use-a-string-pattern-on-a-bytes-like-object-in-re-findall
 		#       https://stackoverflow.com/questions/37722051/re-search-typeerror-cannot-use-a-string-pattern-on-a-bytes-like-object
-		content = response.read().decode('utf-8')
-# NOTE: I think unneeded
-#>>>		content = content.rstrip()
+		# NOTE: This was moved to an else clause after the exceptions.
+		# content = response.read().decode('utf-8')
 
 	except ( URLError, Exception ) as err :
 		log_and_message( "ERROR: in camera_down: {}".format( sys.exc_info()[0] ) )
@@ -2301,8 +2421,15 @@ def camera_down():
 			log_and_message( 'ERROR: code: {}'.format( err.code ) )
 
 		else:
-			log_and_message( 'ERROR: Reason: {}'.format( err.reason ) )
-			log_and_message( 'ERROR: code: {}'.format( err.code ) )
+			# ----------------------------------------------------------------
+			# https://docs.python.org/3.5/library/sys.html   exc_info()
+			# https://docs.python.org/3.5/library/traceback.html?highlight=format_exception
+			# https://www.programcreek.com/python/example/246/traceback.format_exception
+			# ----------------------------------------------------------------
+			err_type, err_value, err_tb = err
+			log_and_message( "ERROR: in camera_down: type: {}".format( err_type ) )
+			log_and_message( "ERROR: in camera_down: value: {}".format( err_value ) )
+			log_and_message( "ERROR: in camera_down: {}".format( traceback.format_exception( err_type, err_value, err_tb ) ) )
 
 		# ------------------------------------------------------------------------
 		#  https://docs.python.org/2/tutorial/errors.html
@@ -2312,15 +2439,21 @@ def camera_down():
 		#
 		#  https://stackoverflow.com/questions/8238360/how-to-save-traceback-sys-exc-info-values-in-a-variable
 		# ------------------------------------------------------------------------
-		content = "-1\n-1"
 		logger( "DEBUG: content = \"" + content + "\" in camera_down()" )
+		log_and_message( "DEBUG: content = \"" + content + "\" in camera_down()" )
+
+
 #
 	except :
 		log_and_message( "ERROR: in camera_down: NOT URLError" )
 		log_and_message( "DEBUG: Calling traceback.print_tb(tb, limit=None, file=None)" )
 		traceback.print_tb(file=sys.stdout)
 
+	else :
+		content = response.read().decode('utf-8')
 ######	logger( "DEBUG: content = \"" + content + "\" in camera_down()" )
+
+	log_string( "[@5]" )  # End of urlopen() try block - NOTE: Added because of apparent hang, maybe in urlopen()
 
 	#---# logger( "DEBUG: len(content) = {}".format( len(content) ) )
 	lines = re.split( '\n', content )
@@ -2338,14 +2471,15 @@ def camera_down():
 	# ================================================================================
 	# ================================================================================
 	# logger( "DEBUG: Server image age = {}".format(age) )
+	log_string( "[@6]\n" )  # On camera_down() return - NOTE: Added because of apparent hang, maybe in urlopen()
 	return
 
 	# ================================================================================
 	#
 	# ================================================================================
-	if age > 420 :
+	if age > cam_timeout :
 		logger("WARNING: image age: {}".format( age ) )
-		power_cycle( 5 )
+		power_cycle( )
 #		log_restart( "webcam power-cycled, interval: {}".format( age ) )
 		# Give the cam time to reset, and the webserver crontab to fire.
 		# The camera comes up pretty quickly, but it seems to resynch to
@@ -2369,6 +2503,7 @@ if __name__ == '__main__':
 	#### This might be useful...
 	#### if sys.argv[1] = "stop"
 	log_string( "\n\n\n\n" )
+	print( "\n\n\n\n" )
 	log_and_message("INFO: Starting {}   PID={}".format( this_script, getpid() ) )
 
 ###		For testing @@@
@@ -2629,4 +2764,69 @@ def do_midnight() :
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 
+# 03/01/2021 This process just seemed to freeze.
 
+#   $ procs
+#   UID        PID  PPID  C STIME TTY          TIME CMD
+#   pi        1757     1  0 Feb24 ?        00:07:10 /usr/bin/python3 -u /mnt/ssd/S/webcamimager.py /mnt/ssd/S/south.cfg
+#   pi        1811     1  0 Feb24 ?        00:10:06 /usr/bin/python3 -u /mnt/ssd/N/webcamimager.py /mnt/ssd/N/north.cfg
+#   pi        1928     1  0 Feb24 ?        00:19:18 /usr/bin/python3 -u /mnt/ssd/TEST/webcamimager.py /mnt/ssd/TEST/test.cfg
+#   found 3 of the expected 3 processes
+
+#   $ logs
+#   DEBUG: checking 3 log files...
+#   DEBUG: age =    57.12  max =   500.00  /home/pi/webcamwatcher/pinger.log
+#   DEBUG: age =     1.66  max =    20.00  /mnt/ssd/S/webcamimager.log
+#   DEBUG: age = 51232.01  max =    20.00  /mnt/ssd/N/webcamimager.log
+#   ERROR: log file /mnt/ssd/N/webcamimager.log is age = 51232.01 seconds old (beyond    20.00 )
+
+
+# "webcamimager.log"
+#   2021/02/28 18:33:26 ERROR: args: (OSError(0, 'Error'),)
+#   2021/02/28 18:33:26 ERROR: We failed to reach a server.
+#   2021/02/28 18:33:26 ERROR: Reason: [Errno 0] Error
+#   2021/02/28 18:33:26 DEBUG: content = "-1
+#   -1" in camera_down()
+#   2021/02/28 18:33:32 waiting
+#   .||  (1)  18:33:39
+#   2021/02/28 18:33:39 INFO: Process snapshot-2021-02-28-18-33-01.jpg    13857 B  1614555182.3
+#   2021/02/28 18:34:09 waiting
+#   .||  (1)  18:34:17
+#   2021/02/28 18:34:17 INFO: Process snapshot-2021-02-28-18-34-01.jpg    15121 B  1614555243.0
+#   2021/02/28 18:34:31 waiting
+#   .......||  (7)  18:35:09
+#   2021/02/28 18:35:09 INFO: Process snapshot-2021-02-28-18-35-01.jpg    13185 B  1614555302.7
+#   2021/02/28 18:35:37 waiting
+#   .....||  (5)  18:36:05
+#   2021/02/28 18:36:05 INFO: Monitoring "/mnt/ssd/N/North"
+#   2021/02/28 18:36:05 INFO: Process snapshot-2021-02-28-18-36-01.jpg    12453 B  1614555362.5
+#   2021/02/28 18:36:39 waiting
+#   .....||  (5)  18:37:07
+#   2021/02/28 18:37:07 INFO: Process snapshot-2021-02-28-18-37-01.jpg    11854 B  1614555422.2
+# NOTE: given "sleep_for = 5", the time for each 'dot', it is taking a long time to process...
+#
+#       S T U C K
+#       S T U C K
+#       S T U C K
+#
+#
+
+# "sudo journalctl -u webcam_north"
+#   Feb 28 00:03:57 raspb_01_Cams python3[1811]: 2021/02/28 00:03:57 DEBUG: ffmpeg returned nothing.
+#   Feb 28 00:03:57 raspb_01_Cams python3[1811]: 2021/02/28 00:03:57 DEBUG: ffmpeg success.
+#   Feb 28 18:33:26 raspb_01_Cams python3[1811]: 2021/02/28 18:33:26 ERROR: in camera_down: <class 'urllib.error.URLError'>
+#   Feb 28 18:33:26 raspb_01_Cams python3[1811]: 2021/02/28 18:33:26 ERROR: type: <class 'urllib.error.URLError'>
+#   Feb 28 18:33:26 raspb_01_Cams python3[1811]: 2021/02/28 18:33:26 ERROR: args: (OSError(0, 'Error'),)
+#   Feb 28 18:33:26 raspb_01_Cams python3[1811]: 2021/02/28 18:33:26 ERROR: We failed to reach a server.
+#   Feb 28 18:33:26 raspb_01_Cams python3[1811]: 2021/02/28 18:33:26 ERROR: Reason: [Errno 0] Error
+#
+# Restarted  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+#   Mar 01 08:51:39 raspb_01_Cams systemd[1]: Stopping Webcam Image Processing North...
+#   Mar 01 08:51:39 raspb_01_Cams systemd[1]: Stopped Webcam Image Processing North.
+#   Mar 01 08:51:39 raspb_01_Cams systemd[1]: Started Webcam Image Processing North.
+
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
