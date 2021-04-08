@@ -24,7 +24,7 @@ while [[ ${ITER} -gt 0  &&  ${RC} -ne 0 ]] ; do
 		/home/pi/webcamwatcher/gpio_driver.py 16 hi > /dev/null
 		echo "$PING_OUT" | egrep '(rtt min/avg/max/mdev|packets transmitted)'
 		III=$( expr ${TRIES} - ${ITER} )
-		date +"%T %F Retry #{III} host = ${host}"
+		date +"%T %F Retry #${III} host = ${host}"
 		sleep 3
 	else
 		/home/pi/webcamwatcher/gpio_driver.py 16 lo > /dev/null
