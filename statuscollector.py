@@ -32,6 +32,7 @@
 #
 # ========================================================================================
 # ========================================================================================
+# 20210416 RAD Need to copy html file to cmx_web_dir as well as upload them.
 # 20201021 RAD In the course of starting this up on a "clean" system, I made some
 #              assumptions about what would be in place when this script first ran.
 #              In part default values were added; ts = 0.0, found_prev_page = "".
@@ -114,7 +115,7 @@ from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
 import re
 
-### import shutil
+import shutil
 ### import socket   ### For error processing???
 ### import calendar
 
@@ -123,6 +124,10 @@ msgqueue = {}
 
 prev_page = ""
 work_dir = ""
+
+cmx_web_dir = "/mnt/ssd/Cumulus_MX/interface"
+cmx_web_dir = ""
+
 main_image = ""
 remote_dir = "/home/content/b/o/b/bobdilly/html/WX"
 remote_dir = "/var/chroot/home/content/92/3185192/wx"
@@ -130,6 +135,7 @@ remote_dir = "/var/chroot/home/content/92/3185192/wx"
 remote_dir = "/home/dillwjfq/public_html/wx"
 
 remote_dir = ""    # This is for ftp to camdilly@dilly.family
+remote_dir = "status"
 
 this_script = sys.argv[0]
 logger_file = re.sub('\.py', '.log', this_script)
@@ -182,20 +188,27 @@ image_age_URL = ""
 # ----------------------------------------------------------------------------------------
 # ========================================================================================
 def main():
-	global work_dir
+	global work_dir, cmx_web_dir
 	global last_image_dir_mtime
 
-	if len(sys.argv) >= 2 :
+	if len(sys.argv) >= 3 :
 		work_dir = sys.argv[1]
+		cmx_web_dir = sys.argv[2]
 	else :
 		log_and_message( "ERROR: working directory is a required first argument." )
+		log_and_message( "ERROR: CMX interface directory is a required second argument." )
 		exit()
 
 	if not os.path.isdir( work_dir ) :
-		log_and_message( "ERROR: directory \"{}\" not found.".format( work_dir ) )
+		log_and_message( "ERROR: monitoring directory \"{}\" not found.".format( work_dir ) )
+		exit()
+
+	if not os.path.isdir( cmx_web_dir ) :
+		log_and_message( "ERROR: copying directory \"{}\" not found.".format( cmx_web_dir ) )
 		exit()
 
 	log_and_message( "INFO: monitoring directory \"{}\"".format( work_dir ) )
+	log_and_message( "INFO: copying to directory \"{}\"".format( cmx_web_dir ) )
 
 	#    NOTE: Should replace FTP with SCP - after passwordless login is set up.
 	fetch_FTP_credentials( work_dir + "/.ftp.credentials" )
@@ -448,6 +461,8 @@ def monitor_dir() :
 
 	# push_to_server( events_page, remote_dir, wserver )
 	push_to_server_via_scp( events_page, remote_dir, wserver )
+	#  https://docs.python.org/3/library/shutil.html
+	shutil.copy2( events_page, cmx_web_dir )
 
 	dot_counter = 0
 
@@ -493,6 +508,8 @@ def prune_msgqueue( ) :
 
 	# push_to_server( new_prev_page, remote_dir, wserver )
 	push_to_server_via_scp( new_prev_page, remote_dir, wserver )
+	#  https://docs.python.org/3/library/shutil.html
+	shutil.copy2( new_prev_page, cmx_web_dir )
 
 	prev_page = new_pp_short
 
@@ -552,14 +569,15 @@ def find_prev_page() :
 #   https://stackoverflow.com/questions/68335/how-to-copy-a-file-to-a-remote-server-in-python-using-scp-or-ssh
 #
 # @@@
+#                                                   server ... in unused
 # ----------------------------------------------------------------------------------------
 def push_to_server_via_scp(local_file, remote_path, server) :
-	remote_path = "public_html/wx"
+	rmt_path = "public_html/wx/" + remote_path
 #      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 #	destination = "user@remotehost:remotepath"
-	destination = "dillwjfq@server162.web-hosting.com:" + remote_path
-	destination = "dillwjfq@premium29.web-hosting.com:" + remote_path
+	destination = "dillwjfq@server162.web-hosting.com:" + rmt_path
+	destination = "dillwjfq@premium29.web-hosting.com:" + rmt_path
 
 	cmd = ["scp", "-q", "-P", "21098", local_file, destination]
 	### DEBUG

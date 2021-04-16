@@ -21,7 +21,7 @@ Type=simple
 User=pi
 Group=pi
 WorkingDirectory=/mnt/ssd/status
-ExecStart=/usr/bin/python3 -u /mnt/ssd/status/statuscollector.py /mnt/ssd/status
+ExecStart=/usr/bin/python3 -u /mnt/ssd/status/statuscollector.py /mnt/ssd/status /mnt/ssd/Cumulus_MX/interface
 
 Restart=always
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -52,6 +52,7 @@ RequiredBy=multi-user.target
 #  sudo systemctl daemon-reload
 #  sudo systemctl enable statuscollector
 #  sudo systemctl start statuscollector
-#  systemctl status statuscollector
+#  sudo systemctl status statuscollector
+#  sudo journalctl -u statuscollector
 #  sudo systemctl stop statuscollector
 ##############################################################################
