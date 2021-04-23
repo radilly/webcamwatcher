@@ -694,8 +694,22 @@ tmpfs              44252       0     44252   0% /run/user/1000
 Script done on 2020-10-17 10:04:44-04:00 [COMMAND_EXIT_CODE="1"]
 
 
+-----------------------------------------------------------------------------------------
+>>> Modify /etc/motd
+http://manpages.ubuntu.com/manpages/xenial/man5/update-motd.5.html
+https://www.raspberrypi.org/forums/viewtopic.php?t=23440
+https://raspberrypi.stackexchange.com/questions/73681/raspberry-pi-custom-ssh-normal-login-message
 
-
+ 1997  rm South/snapshot-2021-04-19*jpg 
+ 1998  ck_4_old 
+ 1999  grep -r 'programs included with' .*
+ 2000  grep -r 'programs included with' .bash*
+ 2001  grep -r 'programs included with' /etc
+ 2002  less /etc/motd
+ 2003  sudo cp -p /etc/motd /etc/motd.BAK
+ 2004  ls -al /etc/update-motd.d
+ 2005  cd webcamwatcher
+ 2006  history |tail >> new_raspi_OS.txt 
 
 -----------------------------------------------------------------------------------------
 
