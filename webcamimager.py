@@ -2,6 +2,17 @@
 # @@@ ...
 # ----------------------------------------------------------------------------------------
 #    NOTE:
+#    NOTE:
+#    NOTE:        grep 'convert returned data' webcamimager.log
+#    NOTE:        ---------------------------------------------
+#    NOTE:        ---------------------------------------------
+#    NOTE:        ---------------------------------------------
+#    NOTE:        ---------------------------------------------
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
+#    NOTE:
 #    NOTE: The monitoring / watchdogging should be moved to a separate process.
 #    NOTE:     For example ... see other_systemctl
 #    NOTE:
@@ -488,6 +499,7 @@ vid_date_string = ""
 dot_counter = 0
 small_counter = 0
 dot_interval = 5
+common_log = ""
 
 # strftime_GMT = "%Y/%m/%d %H:%M:%S GMT"
 # Could not get %Z to work. "empty string if the the object is naive" ... which now() is...
@@ -504,6 +516,7 @@ cfg_parameters = [
 	"remote_dir",
 	"image_age_URL",
 	"dot_interval",
+	"common_log",
 	"relay_GPIO",
 	"relay2_GPIO",
 	"cam_timeout",
@@ -556,6 +569,7 @@ def main():
 	log_and_message( "INFO: remote_dir = \"{}\"".format(remote_dir) )
 	log_and_message( "INFO: image_age_URL = \"{}\"".format( image_age_URL ) )
 	log_and_message( "INFO: dot_interval= \"{}\"".format( dot_interval ) )
+	log_and_message( "INFO: common_log = \"{}\"".format( common_log ) )
 # @@@ Deprecated	log_and_message( "INFO: cam_host = \"{}\"".format( cam_host ) )
 	log_and_message( "INFO: relay_HOST = \"{}\"".format( relay_HOST ) )
 	log_and_message( "INFO: relay_GPIO = \"{}\"".format( relay_GPIO ) )
@@ -634,10 +648,13 @@ def process_new_image( source, target) :
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 	if len(convert) > 0 :
 		logger( "WARNING: convert returned data: \"{}\"".format( convert ) )
+		logger( "WARNING: Thumbnail image \"{}\" suspect.".format( thumbnail_file ) )
 #	else :
 #		logger( "DEBUG: convert returned data: \"{}\"".format( convert ) )
 
 	push_to_server( thumbnail_file, remote_dir )
+
+	logger_common( "INFO: Processed {}".format(source_file) )
 
 #DEBUG#	logger( "DEBUG: done" )
 
@@ -729,7 +746,10 @@ def next_image_file() :
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		# Progress indicator
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-		log_string( '.' )
+		if ( dot_counter % 5 ) > 0 :
+			log_string( '.' )
+		else :
+			log_string( ':' )
 		dot_counter += 1
 		return
 
@@ -748,7 +768,7 @@ def next_image_file() :
 ###	print "DEBUG: last processed day code = " + last_day_code
 
 	# --------------------------------------------------------------------------------
-	#  Find the oldest 'unprocessed' file(s) in the work directory- the directory 
+	#  Find the oldest 'unprocessed' file(s) in the work directory- the directory
 	#  which the remote system is writing (image) files into.  The file names came
 	#  from the original cameras which incorporated a timestamp.  For example:
 	#	snapshot-2020-12-26-14-30-01.jpg
@@ -818,13 +838,40 @@ def next_image_file() :
 		# Don't process the same file - This should be rare as source_mtime is
 		# now re-read after check_stable_size() which can allow the file to
 		# "age" a little more than when we read the st_mtime above.
+		#
+		# 2021/03/27
+		# This clause caused a runaway loop and created a 20G+ lg file.
+		# The incrementing of line was added.
+		# That allowed the script to drop into "INFO: Catch-up mode on".
+		#
+		#   dot_counter  = 0 delta = 12.049928188323975
+		#   dot_counter  = 0 ds = "2021-03-27"
 		# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 		if last_filename == this_file :
 			delta = source_mtime - last_mtime  # DEBUG:
 			log_string( "\n" )
 			logger( "DEBUG-WARNING: Reprocessing {} last?????   dot_counter  = {} delta = {}".format( last_filename, dot_counter, delta ) )
 			logger( "DEBUG-WARNING: Reprocessing {} this?????   dot_counter  = {} ds = \"{}\"".format( this_file, dot_counter, date_string ) )
+			line += 1
 			continue
+
+			#  ...........................||  (27)  11:15:11
+			#  2021/03/27 11:15:11 INFO: Process snapshot-2021-03-27-11-15-01.jpg    32768 B  1616858107.9
+			#  [@1][@1a][@5][@6] 11:15:12
+			#  NOTE:
+			#  NOTE:
+			#  NOTE:
+			#  NOTE:
+			#  NOTE:
+			#  NOTE:
+			#  NOTE:
+			#  NOTE:
+			#  2021/03/27 11:15:14 WARNING: convert returned data: "convert convert: Premature end of JPEG file (/mnt/ssd/TEST/Test/T.jpg).
+			#  "
+			#  2021/03/27 11:15:16 waiting
+			#  .......................
+			#  2021/03/27 11:16:03 DEBUG-WARNING: Reprocessing snapshot-2021-03-27-11-15-01.jpg last?????   dot_counter  = 23 delta = 12.049928188323975
+			#  2021/03/27 11:16:03 DEBUG-WARNING: Reprocessing snapshot-2021-03-27-11-15-01.jpg this?????   dot_counter  = 23 ds = "2021-03-27"
 
 
 ###### NOTE: Could check
@@ -842,7 +889,7 @@ def next_image_file() :
 		# snapshot-2018-05-23-16-57-04.jpg
 		tok = re.split('-', re.sub('\.jpg', '', this_file ) )
 		day_code = int(tok[3])
-		mm_code = int(tok[4])
+		mm_code = int(tok[5])
 		if last_day_code != day_code :
 			date_rollover = True
 			vid_gen_attempt = 0
@@ -919,7 +966,7 @@ def next_image_file() :
 
 			if not date_rollover :
 				logger( "waiting" )
-				log_string( '.' )
+				log_string( ':' )
 				dot_counter = 1
 
 
@@ -942,7 +989,7 @@ def next_image_file() :
 
 			vid_date_string = ""
 
-			log_string( '.' )
+			log_string( ':' )
 			dot_counter = 1
 
 
@@ -1482,7 +1529,7 @@ def generate_video(date_string, mp4_out) :
 	logger( "DEBUG: calling = wait_ffmpeg()" )
 	wait_ffmpeg()
 
-	log_and_message( "DEBUG: Creating mp4 using cmd:\n\n\n{}".format( ffmpeg_cmd ) )
+	log_and_message( "DEBUG: Creating mp4 using cmd:\n\n{}".format( ffmpeg_cmd ) )
 	ffmpeg = ""
 
 	# --------------------------------------------------------------------------------
@@ -1535,7 +1582,7 @@ def generate_video(date_string, mp4_out) :
 	# finally :
 		# See  https://docs.python.org/3/tutorial/errors.html
 
-	elapsed = - time.time() - start
+	elapsed = time.time() - start
 	log_and_message( "DEBUG: ffmpeg runtime = {}".format( elapsed ) )
 	# -*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*-
 	# -*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*-
@@ -1544,6 +1591,18 @@ def generate_video(date_string, mp4_out) :
 	# See https://superuser.com/questions/100288/how-can-i-check-the-integrity-of-a-video-file-avi-mpeg-mp4
 	#
 	# or ffprobe 20210222_daylight.mp4 ; echo $?
+	#     $ ffprobe 20210311_daylight.mp4 ; echo $?
+	#     ffprobe version 3.2.15-0+deb9u2 Copyright (c) 2007-2020 the FFmpeg developers
+	#         Metadata:
+	#           handler_name    : VideoHandler
+	#     0  <--  Returns 0 on success
+	#     $ ffprobe .20210311_daylight.mp4 ; echo $?
+	#     ffprobe version 3.2.15-0+deb9u2 Copyright (c) 2007-2020 the FFmpeg developers
+	#       libpostproc    54.  1.100 / 54.  1.100
+	#     [mov,mp4,m4a,3gp,3g2,mj2 @ 0x1fe7e00] moov atom not found
+	#     .20210311_daylight.mp4: Invalid data found when processing input
+	#     1  <--  Returns 1 on failure
+	#
 	# NOTE: https://stackoverflow.com/questions/59627740/how-to-validate-mp4-file-or-audio-files-in-general-with-python
 	# -*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*-
 	# -*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*-
@@ -1688,7 +1747,7 @@ def tar_dailies(date_string) :
 # ----------------------------------------------------------------------------------------
 def check_stable_size( filename ) :
 	same_count_min = 5
-	pause_for = 0.5
+	pause_for = 0.8
 
 #DEBUG#	log_string( "DEBUG: \n" )
 
@@ -2272,6 +2331,21 @@ def logger(message):
 	FH.close
 
 # ----------------------------------------------------------------------------------------
+# Write message to common log file with a leading timestamp.
+#
+#   Same as logger() except that this is used for key events (image processed) shared
+#   among multiple instances of this so that, if one want's to reboot for example, one
+#   can look at the system as a whole...
+# ----------------------------------------------------------------------------------------
+def logger_common(message):
+	timestamp = datetime.datetime.now().strftime(strftime_FMT)
+
+	if len( common_log ) > 1 :
+		FH = open(common_log, "a")
+		FH.write( "{} {}\n".format( timestamp, message) )
+		FH.close
+
+# ----------------------------------------------------------------------------------------
 # Print message with a leading timestamp.
 #
 # ----------------------------------------------------------------------------------------
@@ -2388,6 +2462,8 @@ def camera_down():
 #	global check_counter
 
 	log_string( "[@1]" )  # On entry - NOTE: Added because of apparent hang, maybe in urlopen()
+			      # NOTE: See banner 2021/03/25 at the end for an example
+			      # NOTE: See banner 2021/03/25 at the end for an example
 
 	age = "0"
 	content = "-1\n-1"
@@ -2398,6 +2474,7 @@ def camera_down():
 	try :
 #>>>		response = urlopen( realtime_URL )
 		response = urlopen( image_age_URL )
+		log_string( "[@1a]" )  # After urlopen() call - NOTE: Added because of apparent hang, maybe in urlopen()
 
 		# NOTE: The decode() methed seemed required for Python 3.  See
 		#       https://stackoverflow.com/questions/31019854/typeerror-cant-use-a-string-pattern-on-a-bytes-like-object-in-re-findall
@@ -2406,6 +2483,7 @@ def camera_down():
 		# content = response.read().decode('utf-8')
 
 	except ( URLError, Exception ) as err :
+		log_string( "[@2]" )  # First except block, URLError - NOTE: Added because of apparent hang, maybe in urlopen()
 		log_and_message( "ERROR: in camera_down: {}".format( sys.exc_info()[0] ) )
 		# ------------------------------------------------------------------------
 		#  See https://docs.python.org/2/tutorial/errors.html (~ middle)
@@ -2439,12 +2517,12 @@ def camera_down():
 		#
 		#  https://stackoverflow.com/questions/8238360/how-to-save-traceback-sys-exc-info-values-in-a-variable
 		# ------------------------------------------------------------------------
-		logger( "DEBUG: content = \"" + content + "\" in camera_down()" )
 		log_and_message( "DEBUG: content = \"" + content + "\" in camera_down()" )
 
 
 #
 	except :
+		log_string( "[@4]" )  # Default except block - NOTE: Added because of apparent hang, maybe in urlopen()
 		log_and_message( "ERROR: in camera_down: NOT URLError" )
 		log_and_message( "DEBUG: Calling traceback.print_tb(tb, limit=None, file=None)" )
 		traceback.print_tb(file=sys.stdout)
@@ -2471,7 +2549,7 @@ def camera_down():
 	# ================================================================================
 	# ================================================================================
 	# logger( "DEBUG: Server image age = {}".format(age) )
-	log_string( "[@6]\n" )  # On camera_down() return - NOTE: Added because of apparent hang, maybe in urlopen()
+	log_string( "[@6] {}\n".format( timestamp() ) )  # On camera_down() return - NOTE: Added because of apparent hang, maybe in urlopen()
 	return
 
 	# ================================================================================
@@ -2589,17 +2667,22 @@ def do_midnight() :
 
 	NS = sys.argv[1]
 	if "N" in NS :
-		mp4_file = "/home/pi/N/North/arc_2018/{}_daylight.mp4".format( re.sub(r'-', r'', date_string) )
+		mp4_file = "/mnt/ssd/N/North/arc_2018/{}_daylight.mp4".format( re.sub(r'-', r'', date_string) )
 		remote_dir = "North"
-		work_dir = "/home/pi/N/North"
-		config_file = "/home/pi/N/north.cfg"
+		work_dir = "/mnt/ssd/N/North"
+		config_file = "/mnt/ssd/N/north.cfg"
 	elif "S" in NS :
-		mp4_file = "/home/pi/S/South/arc_2018/{}_daylight.mp4".format( re.sub(r'-', r'', date_string) )
+		mp4_file = "/mnt/ssd/S/South/arc_2018/{}_daylight.mp4".format( re.sub(r'-', r'', date_string) )
 		remote_dir = "South"
-		work_dir = "/home/pi/S/South"
-		config_file = "/home/pi/S/south.cfg"
+		work_dir = "/mnt/ssd/S/South"
+		config_file = "/mnt/ssd/S/south.cfg"
+	elif "T" in NS :
+		mp4_file = "/mnt/ssd/TEST/Test/arc_2018/{}_daylight.mp4".format( re.sub(r'-', r'', date_string) )
+		remote_dir = "Test"
+		work_dir = "/mnt/ssd/TEST/Test"
+		config_file = "/mnt/ssd/TEST/test.cfg"
 	else :
-		print("Arg #1 is bad.  Use N or S")
+		print("Arg #1 is bad.  Use N or S or T")
 		exit()
 
 	read_FTP_config( config_file )
@@ -2830,3 +2913,156 @@ def do_midnight() :
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
+
+ #####    ###    #####     #          #   ###    #####        #  #####  #######
+#     #  #   #  #     #   ##         #   #   #  #     #      #  #     # #
+      # # #   #       #  # #        #   # #   #       #     #         # #
+ #####  #  #  #  #####     #       #    #  #  #  #####     #     #####   #####
+#       #   # # #          #      #     #   # #       #   #     #             #
+#        #   #  #          #     #       #   #  #     #  #      #       #     #
+#######   ###   #######  #####  #         ###    #####  #       #######  #####
+
+#   .........................||  (25)  12:18:05
+#   2021/03/25 12:18:05 INFO: Monitoring "/mnt/ssd/N/North"
+#   2021/03/25 12:18:05 INFO: Process snapshot-2021-03-25-12-18-01.jpg   138227 B  1616689082.5
+#   [@1][@5][@6]
+#   2021/03/25 12:18:10 waiting
+#   ..........................||  (26)  12:19:05
+#   2021/03/25 12:19:05 INFO: Process snapshot-2021-03-25-12-19-01.jpg   139409 B  1616689142.2
+#   [@1][@5][@6]
+#   2021/03/25 12:19:18 waiting
+#   .......................||  (23)  12:20:06
+#   2021/03/25 12:20:06 INFO: Process snapshot-2021-03-25-12-20-01.jpg   139297 B  1616689202.9
+#   [@1][@5][@6]
+#   2021/03/25 12:20:19 waiting
+#   ......................||  (22)  12:21:06
+#   2021/03/25 12:21:06 INFO: Process snapshot-2021-03-25-12-21-01.jpg   139361 B  1616689262.5
+#   [@1]2021/03/25 12:23:18 ERROR: in camera_down: <class 'urllib.error.URLError'>
+#   2021/03/25 12:23:18 ERROR: type: <class 'urllib.error.URLError'>
+#   2021/03/25 12:23:18 ERROR: args: (TimeoutError(110, 'Connection timed out'),)
+#   2021/03/25 12:23:18 ERROR: We failed to reach a server.
+#   2021/03/25 12:23:18 ERROR: Reason: [Errno 110] Connection timed out
+#   2021/03/25 12:23:18 DEBUG: content = "-1
+#   -1" in camera_down()
+#   2021/03/25 12:23:18 DEBUG: content = "-1
+#   -1" in camera_down()
+#   [@5][@6]
+#   2021/03/25 12:23:24 waiting
+#   .||  (1)  12:23:29
+#   2021/03/25 12:23:29 INFO: Process snapshot-2021-03-25-12-22-01.jpg   139059 B  1616689322.2
+#   [@1][@5][@6]
+#
+#   . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#      NOTE: the gap in time...
+#   . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#
+#   2021/03/25 12:40:11 waiting
+#   ..........................||  (26)  12:41:06
+#   2021/03/25 12:41:06 INFO: Process snapshot-2021-03-25-12-41-01.jpg   135112 B  1616690462.3
+#   [@1][@5][@6]
+#   2021/03/25 12:41:11 waiting
+#   ..........................||  (26)  12:42:06
+#   2021/03/25 12:42:06 INFO: Monitoring "/mnt/ssd/N/North"
+#   2021/03/25 12:42:06 INFO: Process snapshot-2021-03-25-12-42-02.jpg   134155 B  1616690523.0
+#   [@1]2021/03/25 12:44:49 ERROR: in camera_down: <class 'urllib.error.URLError'>
+#   2021/03/25 12:44:49 ERROR: type: <class 'urllib.error.URLError'>
+#   2021/03/25 12:44:49 ERROR: args: (TimeoutError(110, 'Connection timed out'),)
+#   2021/03/25 12:44:49 ERROR: We failed to reach a server.
+#   2021/03/25 12:44:49 ERROR: Reason: [Errno 110] Connection timed out
+#   2021/03/25 12:44:49 DEBUG: content = "-1
+#   -1" in camera_down()
+#   2021/03/25 12:44:49 DEBUG: content = "-1
+#   -1" in camera_down()
+#   [@5][@6]
+#   2021/03/25 12:45:09 waiting
+#   .
+#   2021/03/25 12:45:11 INFO: Catch-up mode on
+#   2021/03/25 12:45:11 DEBUG: file   764 of   766 !!!!!! Skip processing snapshot-2021-03-25-12-43-01.jpg (in Catch-up)
+#   2021/03/25 12:45:11 DEBUG: file   765 of   766 !!!!!! Skip processing snapshot-2021-03-25-12-44-01.jpg (in Catch-up)
+#
+#   2021/03/25 12:45:11 INFO: Catch-up mode off
+#   ||  (1)  12:45:14
+#   2021/03/25 12:45:14 INFO: Process snapshot-2021-03-25-12-45-02.jpg   133274 B  1616690703.0
+#   [@1][@5][@6]
+#   2021/03/25 12:45:20 waiting
+#
+#   . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#      NOTE: the gap in time...
+#   . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+#
+#   ..........................||  (26)  13:35:06
+#   2021/03/25 13:35:06 INFO: Process snapshot-2021-03-25-13-35-01.jpg   138561 B  1616693702.6
+#   [@1][@5][@6]
+#   2021/03/25 13:35:22 waiting
+#   ....................||  (20)  13:36:05
+#   2021/03/25 13:36:05 INFO: Process snapshot-2021-03-25-13-36-01.jpg   139513 B  1616693762.3
+#   [@1]
+#        NOTE: Hung after the first beacon was logged.
+#
+#
+# NOTE: From . . . sudo journalctl -u webcam_north
+#
+#   Mar 25 10:17:46 raspb_01_Cams python3[28939]: 2021/03/25 10:17:46 INFO: mon_max_age = "600"
+#   Mar 25 10:17:46 raspb_01_Cams python3[28939]: 2021/03/25 10:17:46 INFO: other_systemctl = "webcam_south"
+#   Mar 25 10:17:46 raspb_01_Cams python3[28939]: 2021/03/25 10:17:46 INFO: status_HOST = "pi@192.168.1.10"
+#   Mar 25 10:17:46 raspb_01_Cams python3[28939]: 2021/03/25 10:17:46
+#   Mar 25 10:17:46 raspb_01_Cams python3[28939]: 2021/03/25 10:17:46 INFO: Python version: v 3.5.3 (default, Nov 18 2020, 21:09:16) ,
+#   Mar 25 10:17:46 raspb_01_Cams python3[28939]: 2021/03/25 10:17:46
+#   Mar 25 12:23:18 raspb_01_Cams python3[28939]: 2021/03/25 12:23:18 ERROR: in camera_down: <class 'urllib.error.URLError'>
+#   Mar 25 12:23:18 raspb_01_Cams python3[28939]: 2021/03/25 12:23:18 ERROR: type: <class 'urllib.error.URLError'>
+#   Mar 25 12:23:18 raspb_01_Cams python3[28939]: 2021/03/25 12:23:18 ERROR: args: (TimeoutError(110, 'Connection timed out'),)
+#   Mar 25 12:23:18 raspb_01_Cams python3[28939]: 2021/03/25 12:23:18 ERROR: We failed to reach a server.
+#   Mar 25 12:23:18 raspb_01_Cams python3[28939]: 2021/03/25 12:23:18 ERROR: Reason: [Errno 110] Connection timed out
+#   Mar 25 12:23:18 raspb_01_Cams python3[28939]: 2021/03/25 12:23:18 DEBUG: content = "-1
+#   Mar 25 12:23:18 raspb_01_Cams python3[28939]: -1" in camera_down()
+#   Mar 25 12:44:49 raspb_01_Cams python3[28939]: 2021/03/25 12:44:49 ERROR: in camera_down: <class 'urllib.error.URLError'>
+#   Mar 25 12:44:49 raspb_01_Cams python3[28939]: 2021/03/25 12:44:49 ERROR: type: <class 'urllib.error.URLError'>
+#   Mar 25 12:44:49 raspb_01_Cams python3[28939]: 2021/03/25 12:44:49 ERROR: args: (TimeoutError(110, 'Connection timed out'),)
+#   Mar 25 12:44:49 raspb_01_Cams python3[28939]: 2021/03/25 12:44:49 ERROR: We failed to reach a server.
+#   Mar 25 12:44:49 raspb_01_Cams python3[28939]: 2021/03/25 12:44:49 ERROR: Reason: [Errno 110] Connection timed out
+#   Mar 25 12:44:49 raspb_01_Cams python3[28939]: 2021/03/25 12:44:49 DEBUG: content = "-1
+#   Mar 25 12:44:49 raspb_01_Cams python3[28939]: -1" in camera_down()
+
+
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+
+ #####    ###    #####     #          #   ###    #####        #  #####  #######
+#     #  #   #  #     #   ##         #   #   #  #     #      #  #     # #    #
+      # # #   #       #  # #        #   # #   #       #     #         #     #
+ #####  #  #  #  #####     #       #    #  #  #  #####     #     #####     #
+#       #   # # #          #      #     #   # #       #   #     #         #
+#        #   #  #          #     #       #   #  #     #  #      #         #
+#######   ###   #######  #####  #         ###    #####  #       #######   #
+
+# Runaway loop...
+#
+#   2021/03/28 09:08:27 INFO: status_HOST = "pi@192.168.1.10"
+#   2021/03/28 09:08:27 
+#   2021/03/28 09:08:27 INFO: Python version: v 3.5.3 (default, Nov 18 2020, 21:09:16) , [GCC 6.3.0 20170516]
+#   2021/03/28 09:08:27 
+#   2021/03/28 09:08:27 DEBUG: Stored ts = 1616858107.9
+#   2021/03/28 09:08:27 DEBUG: Stored filename = snapshot-2021-03-27-11-15-01.jpg
+#
+#   2021/03/28 09:08:27 DEBUG-WARNING: Reprocessing snapshot-2021-03-27-11-15-01.jpg last?????   dot_counter  = 0 delta = 12.049928188323975
+#   2021/03/28 09:08:27 DEBUG-WARNING: Reprocessing snapshot-2021-03-27-11-15-01.jpg this?????   dot_counter  = 0 ds = "2021-03-27"
+#
+#   2021/03/28 09:08:27 DEBUG-WARNING: Reprocessing snapshot-2021-03-27-11-15-01.jpg last?????   dot_counter  = 0 delta = 12.049928188323975
+#   2021/03/28 09:08:27 DEBUG-WARNING: Reprocessing snapshot-2021-03-27-11-15-01.jpg this?????   dot_counter  = 0 ds = "2021-03-27"
+#
+#   2021/03/28 09:08:27 DEBUG-WARNING: Reprocessing snapshot-2021-03-27-11-15-01.jpg last?????   dot_counter  = 0 delta = 12.049928188323975
+#   2021/03/28 09:08:27 DEBUG-WARNING: Reprocessing snapshot-2021-03-27-11-15-01.jpg this?????   dot_counter  = 0 ds = "2021-03-27"
+#
+
+
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+
+
+
