@@ -19,10 +19,12 @@ fi
 # Wait for last line to be an info message
 # set -xv
 # while [[ `tail -n 1 webcamimager.log | grep -c INFO:` -lt 1 ]] ; do
-while [[ `tail -n 1 webcamimager.log | egrep -c ' (DEBUG|INFO): '` -lt 1 ]] ; do
+# while [[ `tail -n 1 webcamimager.log | egrep -c ' (DEBUG|INFO|\[@1]\[@1a]): '` -lt 1 ]] ; do
+while [[ `tail -n 1 webcamimager.log | egrep -c '( DEBUG: | INFO: | waiting|\[@1]\[@1a])'` -lt 1 ]] ; do
 	sleep 1
 	printf "."
-	true
+	# true
+	# date +"%T `tail -n 1 webcamimager.log | egrep '( DEBUG: | INFO: | waiting|\[@1]\[@1a])'`"
 done
 
 echo "rolling log..."

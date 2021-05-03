@@ -36,6 +36,7 @@ use_html = False
 def log_check():
 
 	found = 0
+	OK = True
 
 	FH = open(infile, "r")
 	lines = FH.readlines()
@@ -96,6 +97,7 @@ def log_check():
 
 
 		if age > float(age_limit) :
+			OK = False
 			msg = "ERROR: log file {} is age = {:8.2f} seconds old (beyond {:8.2f} )".format(
 				log_file_list[iii], age, float(age_limit) )
 
@@ -108,7 +110,11 @@ def log_check():
 
 	if use_html :
 		print "</TABLE>"
+	else :
+		if not OK :
+			print "\n\nWARNING: SOME LOGS ARE OLDER THAN EXPECTED!!\n"
 
+	print "\n"
 	exit()
 	exit()
 	exit()
@@ -240,7 +246,7 @@ if __name__ == '__main__':
 #	if args.html:
 #		print "html turned on"
 	if not args.html:
-		print "\n\n\n\n\n"
+		print "\n\n"
 
 	use_html = args.html
 
